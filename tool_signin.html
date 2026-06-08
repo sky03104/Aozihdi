@@ -318,13 +318,6 @@
     }
     .btn-back:hover { background: rgba(255,255,255,0.1); color: #F5F5F5; }
 
-    /* 返回主頁 */
-    .btn-home {
-      background: linear-gradient(135deg, #C9A227, #D4A800);
-      color: #0A0C10;
-      box-shadow: 0 4px 16px rgba(212,168,0,0.3);
-    }
-    .btn-home:hover { box-shadow: 0 6px 20px rgba(212,168,0,0.5); }
 
     /* ===== 頁尾 ===== */
     .page-footer {
@@ -447,9 +440,6 @@
   <button class="nav-btn btn-back" onclick="goBack()">
     <i class="ti ti-arrow-left"></i> 返回上頁
   </button>
-  <button class="nav-btn btn-home" onclick="goHome()">
-    <i class="ti ti-home"></i> 返回主頁
-  </button>
 </nav>
 
 <!-- ===== 頁尾 ===== -->
@@ -473,7 +463,7 @@
 
   // ===== 返回上頁 =====
   function goBack() {
-    // 在 iframe 中（index.html 工具頁）→ 點擊外層返回按鈕回工具頁
+    // 在 iframe 中（index.html 工具頁）→ 點擊外層返回按鈕
     if (window.self !== window.top) {
       try {
         var btn = window.top.document.getElementById('hsh-tool-back-btn');
@@ -482,23 +472,12 @@
     }
     if (window.history.length > 1) {
       window.history.back();
-    } else {
-      goHome();
     }
   }
 
   // ===== 返回主頁（保留 empId） =====
   function goHome() {
-    if (window.self !== window.top) {
-      // 在 iframe 中 → 導向 top-level index.html 首頁
-      try {
-        var base = window.top.location.href.split('?')[0].split('#')[0];
-        var url = base + (empId ? '?empId=' + encodeURIComponent(empId) : '');
-        window.top.location.href = url;
-        return;
-      } catch(e) {}
-    }
-    var url = 'index.html';
+    var url = '../index.html';
     if (empId) url += '?empId=' + encodeURIComponent(empId);
     window.location.href = url;
   }
