@@ -17271,13 +17271,13 @@ const DEMO_USERS = [
 ];
 const DEMO_PENDING = [];
 const DEFAULT_PERMS = {
-    fulltime: [1, 2, 3, 4, 5, 6, 12, 13, 99],
-    parttime: [1, 2, 3, 5, 6, 12, 13, 99],
-    leader: [1, 2, 3, 4, 5, 6, 11, 12, 13, 99],
-    vicecaptain: [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 99],
-    captain: [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 99],
-    executive: [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 99],
-    admin: [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 99],
+    fulltime: [1, 2, 3, 7, 4, 5, 6, 12, 13, 99],
+    parttime: [1, 2, 3, 7, 5, 6, 12, 13, 99],
+    leader: [1, 2, 3, 7, 4, 5, 6, 11, 12, 13, 99],
+    vicecaptain: [1, 2, 3, 7, 4, 5, 6, 9, 10, 11, 12, 13, 99],
+    captain: [1, 2, 3, 7, 4, 5, 6, 9, 10, 11, 12, 13, 14, 99],
+    executive: [1, 2, 3, 7, 4, 5, 6, 9, 10, 11, 12, 13, 14, 99],
+    admin: [1, 2, 3, 7, 4, 5, 6, 9, 10, 11, 12, 13, 14, 99],
 };
 const USER_DB = {
     "sky03104": { name: "咖哩", role: "admin", dept: "高雄辦事處", pw: "qaz03104" },
@@ -18677,13 +18677,32 @@ function App() {
         return () => window.removeEventListener('message', handler);
     }, []);
     // Load saved perms from persistent storage on mount
+    // 版本號 v3：含工具 id:7 的版本
+    const PERMS_VER = 'v3';
     useEffect(() => {
         (async () => {
             try {
+                const savedVer = localStorage.getItem('tianying_perms_ver');
                 const raw = localStorage.getItem('tianying_perms');
-                if (raw) {
+                if (raw && savedVer === PERMS_VER) {
                     const saved = JSON.parse(raw);
-                    setPerms(prev => ({ ...prev, ...saved }));
+                    // 合併時確保 DEFAULT_PERMS 的新工具 ID 不被舊存檔蓋掉
+                    setPerms(prev => {
+                        const merged = { ...prev };
+                        Object.keys(prev).forEach(role => {
+                            if (saved[role]) {
+                                const base = prev[role] || [];
+                                const fromStorage = saved[role] || [];
+                                merged[role] = [...new Set([...base, ...fromStorage])];
+                            }
+                        });
+                        return merged;
+                    });
+                } else if (raw && savedVer !== PERMS_VER) {
+                    // 舊版本資料，清除並重置為 DEFAULT_PERMS
+                    localStorage.removeItem('tianying_perms');
+                    localStorage.removeItem('tianying_perms_ver');
+                    // perms 已是 DEFAULT_PERMS，不需額外 setPerms
                 }
             }
             catch (e) { /* no saved perms yet, use defaults */ }
@@ -19140,6 +19159,7 @@ function App() {
                 React.createElement("button", { className: "save-btn", onClick: async () => {
                         try {
                             localStorage.setItem('tianying_perms', JSON.stringify(perms));
+                            localStorage.setItem('tianying_perms_ver', 'v3');
                             setPermsSaved(true);
                             setTimeout(() => setPermsSaved(false), 2500);
                             showToast("✅ 權限設定已儲存為系統預設！");
