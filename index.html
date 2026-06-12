@@ -17270,6 +17270,8 @@ const DEMO_USERS = [
     { id: "011369", name: "陳惠景", role: "fulltime", dept: "漢神巨蛋", status: "active" },
 ];
 const DEMO_PENDING = [];
+// 帳號申請雲端服務：申請單寫入試算表「帳號申請」分頁，供管理員跨裝置審核（與打烊後登錄共用同一 GAS 專案）
+const ACCOUNT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwZ5f7h_Lv_MOCxPrqPpBPKA917-JKmEz5DDekYixLDsGf1QAKCTOuVxwo18OYKX7a4ng/exec';
 const DEFAULT_PERMS = {
     fulltime: [1, 2, 3, 7, 4, 5, 6, 12, 13, 99],
     parttime: [1, 2, 3, 7, 5, 6, 12, 13, 99],
@@ -18857,6 +18859,41 @@ function App() {
         setPwForm({ old: '', new1: '', new2: '' });
         showToast("✅ 密碼已成功更新！");
     };
+    /* ── 從雲端載入待審核申請（管理員登入後自動載入；審核頁可手動重新整理） ── */
+    const loadPendingFromCloud = async (silent) => {
+        try {
+            const res = await fetch(ACCOUNT_GAS_URL + '?action=getApplications');
+            const d = await res.json();
+            if (d.status === 'ok' && Array.isArray(d.list)) {
+                setPending(d.list);
+                if (!silent) showToast(`🔄 已更新待審清單（${d.list.length} 筆）`);
+            }
+            else if (!silent) showToast('❌ 載入待審清單失敗');
+        }
+        catch (e) { if (!silent) showToast('❌ 網路錯誤，無法載入待審清單'); }
+    };
+    // 管理員登入後自動從雲端載入待審申請
+    useEffect(() => {
+        if (currentUser && currentUser.role === 'admin') loadPendingFromCloud(true);
+    }, [currentUser]);
+    // 開啟頁面時背景載入雲端「已核准」帳號並合併（讓新員工核准後能在自己裝置登入）
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch(ACCOUNT_GAS_URL + '?action=getApprovedUsers');
+                const d = await res.json();
+                if (d.status === 'ok' && d.users && typeof d.users === 'object') {
+                    setUserDb(prev => {
+                        const merged = { ...prev };
+                        let added = 0;
+                        Object.keys(d.users).forEach(id => { if (!merged[id]) { merged[id] = d.users[id]; added++; } });
+                        return added ? merged : prev; // 本地已有的帳號不覆蓋（保留本地改過的密碼）
+                    });
+                }
+            }
+            catch (e) { /* 離線時略過，使用本地帳號資料 */ }
+        })();
+    }, []);
     const handleRegister = () => {
         if (regStep === 1) {
             if (!regForm.name || !regForm.id || !regForm.dept) {
@@ -18888,7 +18925,7 @@ function App() {
             showToast("⚠️ 密碼至少3碼");
             return;
         }
-        // Add to pending list (NOT directly logged in)
+        // 建立申請單（不直接登入）
         const newPending = {
             id: Date.now(),
             name: regForm.name,
@@ -18898,11 +18935,30 @@ function App() {
             pw: regForm.pw,
             appliedAt: new Date().toLocaleDateString('zh-TW').replace(/\//g, '-'),
         };
-        setPending(prev => [...prev, newPending]);
-        setPage("login");
-        setRegStep(1);
-        setRegForm({ name: "", id: "", dept: "", role: "fulltime", pw: "", pw2: "" });
-        showToast("📋 申請已送出，請等待管理員審核");
+        // 申請單寫入雲端試算表，管理員在任何裝置都能看到並審核（寫入成功才視為送出）
+        (async () => {
+            showToast("⏳ 申請送出中…");
+            try {
+                const body = new URLSearchParams();
+                body.append('action', 'submitApplication');
+                body.append('data', JSON.stringify(newPending));
+                const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
+                const d = await res.json();
+                if (d.status === 'ok') {
+                    setPending(prev => [...prev, newPending]);
+                    setPage("login");
+                    setRegStep(1);
+                    setRegForm({ name: "", id: "", dept: "", role: "fulltime", pw: "", pw2: "" });
+                    showToast("✅ 申請已送出，請等待管理員審核");
+                }
+                else {
+                    showToast("❌ 送出失敗：" + (d.msg || '請稍後再試'));
+                }
+            }
+            catch (e) {
+                showToast("❌ 網路錯誤，申請未送出，請稍後再試");
+            }
+        })();
     };
     const togglePerm = (roleId, toolId) => {
         setPerms(prev => {
@@ -19263,7 +19319,11 @@ function App() {
                             React.createElement("div", { style: { fontSize: 11, color: 'var(--muted)' } }, tool.category)),
                         React.createElement("span", { style: { fontSize: 12, color: 'var(--gold)', fontWeight: 600 } }, "\u7DE8\u8F2F \u203A")))))))),
             adminSubTab === "users" && (React.createElement(UsersTab, { userDb: userDb, setUserDb: setUserDb, showToast: showToast, setSelectedUser: setSelectedUser })),
-            adminSubTab === "approve" && React.createElement(React.Fragment, null, pending.length === 0 ? (React.createElement("div", { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } },
+            adminSubTab === "approve" && React.createElement(React.Fragment, null,
+                React.createElement("button", { onClick: () => loadPendingFromCloud(false), style: { width: '100%', padding: '9px', marginBottom: 12, borderRadius: 8, cursor: 'pointer',
+                        background: 'rgba(129,140,248,.12)', color: '#818CF8', border: '1px solid rgba(129,140,248,.35)',
+                        fontFamily: "'Noto Sans TC',sans-serif", fontSize: 13, fontWeight: 700 } }, "\uD83D\uDD04 \u91CD\u65B0\u6574\u7406\u5F85\u5BE9\u6E05\u55AE"),
+                pending.length === 0 ? (React.createElement("div", { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } },
                 React.createElement("div", { style: { fontSize: 36, marginBottom: 12 } }, "\u2705"),
                 React.createElement("div", { style: { fontSize: 14, fontWeight: 600 } }, "\u76EE\u524D\u6C92\u6709\u5F85\u5BE9\u6838\u7684\u7533\u8ACB"),
                 React.createElement("div", { style: { fontSize: 12, marginTop: 4 } }, "\u6240\u6709\u5E33\u865F\u7533\u8ACB\u5747\u5DF2\u8655\u7406\u5B8C\u7562"))) : React.createElement(React.Fragment, null,
@@ -19293,7 +19353,18 @@ function App() {
                             React.createElement("div", { style: { fontSize: 10, color: 'var(--muted)', marginBottom: 2 } }, row.k),
                             React.createElement("div", { style: { fontSize: 13, fontWeight: 600 } }, row.v))))),
                         React.createElement("div", { style: { display: 'flex', gap: 8 } },
-                            React.createElement("button", { onClick: () => {
+                            React.createElement("button", { onClick: async () => {
+                                    // 先更新雲端試算表狀態，成功後才更新本地（避免雲端與本地不一致）
+                                    try {
+                                        const body = new URLSearchParams();
+                                        body.append('action', 'reviewApplication');
+                                        body.append('id', String(p.id));
+                                        body.append('decision', 'approved');
+                                        const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
+                                        const d = await res.json();
+                                        if (d.status !== 'ok') { showToast('❌ 雲端更新失敗：' + (d.msg || '請重試')); return; }
+                                    }
+                                    catch (e) { showToast('❌ 網路錯誤，請重試'); return; }
                                     setUserDb(prev => ({ ...prev, [p.empId]: { name: p.name, role: p.role, dept: p.dept, pw: p.pw, status: 'active' } }));
                                     setPending(prev => prev.filter(x => x.id !== p.id));
                                     showToast(`✅ 已核准 ${p.name} 的帳號申請`);
@@ -19301,7 +19372,17 @@ function App() {
                                     background: 'rgba(16,185,129,.15)', color: 'var(--success)',
                                     border: '1px solid rgba(16,185,129,.35)', fontFamily: "'Noto Sans TC',sans-serif",
                                     fontSize: 13, fontWeight: 700, transition: 'background .2s' } }, "\u2705 \u6838\u51C6"),
-                            React.createElement("button", { onClick: () => {
+                            React.createElement("button", { onClick: async () => {
+                                    try {
+                                        const body = new URLSearchParams();
+                                        body.append('action', 'reviewApplication');
+                                        body.append('id', String(p.id));
+                                        body.append('decision', 'rejected');
+                                        const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
+                                        const d = await res.json();
+                                        if (d.status !== 'ok') { showToast('❌ 雲端更新失敗：' + (d.msg || '請重試')); return; }
+                                    }
+                                    catch (e) { showToast('❌ 網路錯誤，請重試'); return; }
                                     setPending(prev => prev.filter(x => x.id !== p.id));
                                     showToast(`❌ 已拒絕 ${p.name} 的帳號申請`);
                                 }, style: { flex: 1, padding: '9px', borderRadius: 8, cursor: 'pointer',
