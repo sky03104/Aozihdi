@@ -17951,6 +17951,55 @@ function ok(obj) {
                 localStorage.setItem('tianying_sched_v1', JSON.stringify({ ym: `${Y}-${M}`, staff: staff, sched: sched }));
             } catch (e) { }
         }, [staff, sched]);
+        /* ── 開啟時從線上班表（試算表）載入最新資料：跨裝置同步 ──
+           任何裝置上傳或排班後，其他裝置開啟班表管理工具即自動載入最新內容；
+           離線或 GAS 尚未更新 v2.1 時靜默略過，沿用本機快取 ── */
+        useEffect(() => {
+            (async () => {
+                if (!asUrl) return;
+                try {
+                    const res = await fetch(asUrl + '?action=getSchedule');
+                    const d = await res.json();
+                    if (!d.success || !Array.isArray(d.rows) || !d.rows.length) return;
+                    // 線上班表月份（Z1）需與當前月份相符才套用，避免換月初期載入舊月資料
+                    const expectYm = `${Y}/${M < 10 ? '0' + M : M}`;
+                    if (d.ym && String(d.ym).trim() !== expectYm) return;
+                    const nStaff = [...staff];
+                    const nSc = { ...sched };
+                    let cnt = 0;
+                    d.rows.forEach(row => {
+                        const name = String(row.name || '').trim();
+                        if (!name || name.length < 2 || /^\d/.test(name)) return;
+                        const shifts = {};
+                        (row.shifts || []).forEach((v, i) => {
+                            if (i < DAYS) {
+                                const t = String(v == null ? '' : v).trim();
+                                shifts[i + 1] = (!t || t === '—') ? '-' : t;
+                            }
+                        });
+                        let m = nStaff.find(s => s.name === name);
+                        const role = ROLE_XL[String(row.roleStr || '').trim()] || (m ? m.role : 'staff');
+                        if (!m) {
+                            const id = ++_nid;
+                            m = { id: id, name: name, role: role, shift: '晚班' };
+                            nStaff.push(m);
+                            nSc[m.id] = {};
+                        }
+                        else {
+                            const i2 = nStaff.findIndex(s => s.id === m.id);
+                            nStaff[i2] = { ...nStaff[i2], role: role };
+                        }
+                        nSc[m.id] = { ...nSc[m.id], ...shifts };
+                        cnt++;
+                    });
+                    if (!cnt) return;
+                    setStaff(nStaff);
+                    setSched(nSc);
+                    T(`📅 已載入線上班表最新資料（${cnt} 人）`);
+                }
+                catch (e) { /* 離線或讀取失敗 → 沿用本機快取 */ }
+            })();
+        }, []);
         /* ── 套用「資料上傳工具」postMessage 傳來的班表（試算表已由上傳流程寫入，此處僅更新顯示與快取） ── */
         useEffect(() => {
             if (!externalScheduleData) return;
