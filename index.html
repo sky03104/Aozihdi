@@ -17951,62 +17951,79 @@ function ok(obj) {
                 localStorage.setItem('tianying_sched_v1', JSON.stringify({ ym: `${Y}-${M}`, staff: staff, sched: sched }));
             } catch (e) { }
         }, [staff, sched]);
-        /* ── 開啟時從線上班表（試算表）載入最新資料：跨裝置同步 ──
-           任何裝置上傳或排班後，其他裝置開啟班表管理工具即自動載入最新內容；
-           離線或 GAS 尚未更新 v2.1 時靜默略過，沿用本機快取 ── */
+        /* ── 共用：從線上班表（試算表）載入最新資料並套用 ──
+           GAS v2.2 起會辨識紅字「休」並回傳「排休」，APP 內以獨立班別顯示；
+           離線、GAS 尚未更新、或線上班表月份與當前月不符時回傳 0（沿用本機快取） ── */
+        const loadFromCloud = async () => {
+            if (!asUrl) return 0;
+            try {
+                const res = await fetch(asUrl + '?action=getSchedule');
+                const d = await res.json();
+                if (!d.success || !Array.isArray(d.rows) || !d.rows.length) return 0;
+                // 線上班表月份（Z1）需與當前月份相符才套用，避免換月初期載入舊月資料
+                const expectYm = `${Y}/${M < 10 ? '0' + M : M}`;
+                if (d.ym && String(d.ym).trim() !== expectYm) return 0;
+                const nStaff = [...staff];
+                const nSc = { ...sched };
+                let cnt = 0;
+                d.rows.forEach(row => {
+                    const name = String(row.name || '').trim();
+                    if (!name || name.length < 2 || /^\d/.test(name)) return;
+                    const shifts = {};
+                    (row.shifts || []).forEach((v, i) => {
+                        if (i < DAYS) {
+                            const t = String(v == null ? '' : v).trim();
+                            shifts[i + 1] = (!t || t === '—') ? '-' : t;
+                        }
+                    });
+                    let m = nStaff.find(s => s.name === name);
+                    const role = ROLE_XL[String(row.roleStr || '').trim()] || (m ? m.role : 'staff');
+                    if (!m) {
+                        const id = ++_nid;
+                        m = { id: id, name: name, role: role, shift: '晚班' };
+                        nStaff.push(m);
+                        nSc[m.id] = {};
+                    }
+                    else {
+                        const i2 = nStaff.findIndex(s => s.id === m.id);
+                        nStaff[i2] = { ...nStaff[i2], role: role };
+                    }
+                    nSc[m.id] = { ...nSc[m.id], ...shifts };
+                    cnt++;
+                });
+                if (!cnt) return 0;
+                setStaff(nStaff);
+                setSched(nSc);
+                return cnt;
+            }
+            catch (e) { return 0; /* 離線或讀取失敗 → 沿用本機快取 */ }
+        };
+        /* ── 開啟時自動載入線上班表（跨裝置同步） ── */
         useEffect(() => {
             (async () => {
-                if (!asUrl) return;
-                try {
-                    const res = await fetch(asUrl + '?action=getSchedule');
-                    const d = await res.json();
-                    if (!d.success || !Array.isArray(d.rows) || !d.rows.length) return;
-                    // 線上班表月份（Z1）需與當前月份相符才套用，避免換月初期載入舊月資料
-                    const expectYm = `${Y}/${M < 10 ? '0' + M : M}`;
-                    if (d.ym && String(d.ym).trim() !== expectYm) return;
-                    const nStaff = [...staff];
-                    const nSc = { ...sched };
-                    let cnt = 0;
-                    d.rows.forEach(row => {
-                        const name = String(row.name || '').trim();
-                        if (!name || name.length < 2 || /^\d/.test(name)) return;
-                        const shifts = {};
-                        (row.shifts || []).forEach((v, i) => {
-                            if (i < DAYS) {
-                                const t = String(v == null ? '' : v).trim();
-                                shifts[i + 1] = (!t || t === '—') ? '-' : t;
-                            }
-                        });
-                        let m = nStaff.find(s => s.name === name);
-                        const role = ROLE_XL[String(row.roleStr || '').trim()] || (m ? m.role : 'staff');
-                        if (!m) {
-                            const id = ++_nid;
-                            m = { id: id, name: name, role: role, shift: '晚班' };
-                            nStaff.push(m);
-                            nSc[m.id] = {};
-                        }
-                        else {
-                            const i2 = nStaff.findIndex(s => s.id === m.id);
-                            nStaff[i2] = { ...nStaff[i2], role: role };
-                        }
-                        nSc[m.id] = { ...nSc[m.id], ...shifts };
-                        cnt++;
-                    });
-                    if (!cnt) return;
-                    setStaff(nStaff);
-                    setSched(nSc);
-                    T(`📅 已載入線上班表最新資料（${cnt} 人）`);
-                }
-                catch (e) { /* 離線或讀取失敗 → 沿用本機快取 */ }
+                const cnt = await loadFromCloud();
+                if (cnt) T(`📅 已載入線上班表最新資料（${cnt} 人）`);
             })();
         }, []);
-        /* ── 套用「資料上傳工具」postMessage 傳來的班表（試算表已由上傳流程寫入，此處僅更新顯示與快取） ── */
+        /* ── 資料上傳工具完成上傳後的同步 ──
+           優先改用雲端重新載入（試算表已寫入，且 GAS 會辨識紅字休=排休，資料最完整）；
+           GAS 尚未更新 v2.2 時退回直接套用 postMessage 傳來的資料（無紅字辨識） ── */
         useEffect(() => {
             if (!externalScheduleData) return;
             if (!Array.isArray(externalScheduleData.rows) || !externalScheduleData.rows.length) {
                 if (onExternalApplied) onExternalApplied();
                 return;
             }
+            (async () => {
+                const cloudCnt = await loadFromCloud();
+                if (cloudCnt) {
+                    T(`📅 已從資料上傳工具同步 ${cloudCnt} 人班表`);
+                    if (onExternalApplied) onExternalApplied();
+                    return;
+                }
+                applyPostedRows();
+            })();
+            function applyPostedRows() {
             const nStaff = [...staff];
             const nSc = { ...sched };
             let cnt = 0;
@@ -18039,6 +18056,7 @@ function ok(obj) {
             setSched(nSc);
             T(`📅 已從資料上傳工具同步 ${cnt} 人班表`);
             if (onExternalApplied) onExternalApplied();
+            }
         }, [externalScheduleData]);
         function upShift(id, day, type) {
             var _a;
