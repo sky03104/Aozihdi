@@ -8,6 +8,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="天鷹保全">
   <meta name="theme-color" content="#0A0C10">
+  <link rel="icon" href="./icon.png" type="image/png">
+  <link rel="apple-touch-icon" href="./icon.png">
+  <link rel="manifest" href="./manifest.json">
   <title>天鷹保全 · 內部系統</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;}
@@ -17270,8 +17273,8 @@ const DEMO_USERS = [
     { id: "011369", name: "陳惠景", role: "fulltime", dept: "漢神巨蛋", status: "active" },
 ];
 const DEMO_PENDING = [];
-// 帳號申請雲端服務：申請單寫入試算表「帳號申請」分頁，供管理員跨裝置審核（與打烊後登錄共用同一 GAS 專案）
-const ACCOUNT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwZ5f7h_Lv_MOCxPrqPpBPKA917-JKmEz5DDekYixLDsGf1QAKCTOuVxwo18OYKX7a4ng/exec';
+// 帳號申請／請假申請雲端服務：寫入「天鷹保全APP」試算表（獨立GAS專案）
+const ACCOUNT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxEVBHseDpLWiWe4d8kLcCHbVFiKAK9wyoLwqNkt59PS4vPCY9QfG0_wiDJf2coO3zMcg/exec';
 const DEFAULT_PERMS = {
     fulltime: [1, 2, 3, 7, 4, 5, 6, 12, 13, 99],
     parttime: [1, 2, 3, 7, 5, 6, 12, 13, 99],
@@ -18900,6 +18903,10 @@ function App() {
             const favKey = 'hsh_favs_' + rem.empId;
             const savedFavs = localStorage.getItem(favKey);
             if (savedFavs) { try { setFavorites(JSON.parse(savedFavs)); } catch(e){} }
+            if (CAN_MANAGE_ROLES.includes(sessionUser.role)) {
+                loadPendingFromCloud(true);
+                loadLeaveFromCloud(true);
+            }
             setPage("main");
         } catch(e) {}
     }, []);
@@ -18935,6 +18942,10 @@ function App() {
         const favKey = 'hsh_favs_' + loginForm.id.trim();
         const savedFavs = localStorage.getItem(favKey);
         if (savedFavs) { try { setFavorites(JSON.parse(savedFavs)); } catch(e){} }
+        if (CAN_MANAGE_ROLES.includes(sessionUser.role)) {
+            loadPendingFromCloud(true);
+            loadLeaveFromCloud(true);
+        }
         setPage("main");
         showToast("✅ 登入成功，歡迎回來！");
     };
@@ -18960,6 +18971,17 @@ function App() {
         setChangePwModal(false);
         setPwForm({ old: '', new1: '', new2: '' });
         showToast("✅ 密碼已成功更新！");
+    };
+    /* ── 從雲端載入請假申請清單（管理/組長以上登入後自動載入；可手動重新整理） ── */
+    const loadLeaveFromCloud = async (silent) => {
+        try {
+            const res = await fetch(ACCOUNT_GAS_URL + '?action=getLeaveRequests');
+            const d = await res.json();
+            if (d.status === 'ok' && Array.isArray(d.list)) {
+                setLeaveRequests(d.list);
+                if (!silent) showToast(`🔄 已更新請假清單（${d.list.length} 筆）`);
+            }
+        } catch (e) {}
     };
     /* ── 從雲端載入待審核申請（管理員登入後自動載入；審核頁可手動重新整理） ── */
     const loadPendingFromCloud = async (silent) => {
@@ -19066,7 +19088,13 @@ function App() {
         setPerms(prev => {
             const current = prev[roleId] || [];
             const next = current.includes(toolId) ? current.filter(x => x !== toolId) : [...current, toolId];
-            return { ...prev, [roleId]: next };
+            const merged = { ...prev, [roleId]: next };
+            /* 即時寫入本機，避免重整/重開時被舊設定覆蓋 */
+            try {
+                localStorage.setItem('tianying_perms', JSON.stringify(merged));
+                localStorage.setItem('tianying_perms_ver', 'v4');
+            } catch (e) {}
+            return merged;
         });
     };
     const toggleFav = (e, toolId) => {
@@ -19599,7 +19627,10 @@ function App() {
                     leaveRequests.filter(r => r.status === 'pending').length > 0 && (React.createElement("div", { style: { background: 'rgba(248,113,113,.2)', border: '1px solid rgba(248,113,113,.4)',
                         borderRadius: 20, padding: '3px 10px', fontSize: 12, color: '#F87171', fontWeight: 700 } },
                     leaveRequests.filter(r => r.status === 'pending').length,
-                    " \u7B46\u5F85\u5BE9"))),
+                    " \u7B46\u5F85\u5BE9")),
+                CAN_MANAGE_ROLES.includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role) && (React.createElement("button", { onClick: () => loadLeaveFromCloud(false), style: { background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.35)',
+                        borderRadius: 8, color: '#818CF8', padding: '6px 10px', cursor: 'pointer',
+                        fontSize: 12, fontFamily: "'Microsoft JhengHei',sans-serif" } }, "\uD83D\uDD04 \u91CD\u65B0\u6574\u7406"))),
             React.createElement("div", { style: { flex: 1, overflowY: 'auto', padding: 14 } },
                 (React.createElement("div", { style: { background: 'rgba(255,255,255,.055)', backdropFilter: 'blur(10px)',
                         border: '1px solid rgba(212,168,0,.2)', borderRadius: 14, padding: 18, marginBottom: 16 } },
@@ -19769,6 +19800,19 @@ function App() {
                             setLeaveRequests(prev => [req, ...prev]);
                             setLeaveForm({ type: '排休', selectedDates: [], reason: '' });
                             showToast(`✅ 已送出 ${dates.length} 天請假申請，等待主管審核`);
+                            /* 同步寫入雲端試算表「請假申請」分頁，供組長以上跨裝置審核 */
+                            (async () => {
+                                try {
+                                    const body = new FormData();
+                                    body.append('action', 'submitLeave');
+                                    body.append('data', JSON.stringify(req));
+                                    const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
+                                    const d = await res.json();
+                                    if (d.status !== 'ok') showToast('⚠️ 已送出，但雲端同步失敗，請稍後請組長手動重新整理', 'err');
+                                } catch (e) {
+                                    showToast('⚠️ 已送出，但網路異常，雲端同步失敗', 'err');
+                                }
+                            })();
                         }, className: "save-btn" },
                         "\uD83D\uDCE4 \u9001\u51FA\u7533\u8ACB\uFF08",
                         leaveForm.selectedDates.length,
@@ -19828,6 +19872,17 @@ function App() {
                                     React.createElement("button", { onClick: () => {
                                             setLeaveRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'approved' } : r));
                                             showToast(`✅ 已核准 ${req.name} 的${req.type}申請`);
+                                            (async () => {
+                                                try {
+                                                    const body = new FormData();
+                                                    body.append('action', 'updateLeaveStatus');
+                                                    body.append('id', req.id);
+                                                    body.append('decision', 'approved');
+                                                    const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
+                                                    const d = await res.json();
+                                                    if (d.status !== 'ok') showToast('⚠️ 雲端更新失敗：' + (d.message || ''), 'err');
+                                                } catch (e) { showToast('⚠️ 雲端更新失敗，請檢查網路', 'err'); }
+                                            })();
                                         }, style: { flex: 1, minWidth: 80, background: 'rgba(74,222,128,.15)',
                                             border: '1px solid rgba(74,222,128,.35)', borderRadius: 8,
                                             padding: 9, fontSize: 13, fontWeight: 700, color: 'var(--success)',
@@ -19835,6 +19890,17 @@ function App() {
                                     React.createElement("button", { onClick: () => {
                                             setLeaveRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'rejected' } : r));
                                             showToast(`❌ 已拒絕 ${req.name} 的${req.type}申請`);
+                                            (async () => {
+                                                try {
+                                                    const body = new FormData();
+                                                    body.append('action', 'updateLeaveStatus');
+                                                    body.append('id', req.id);
+                                                    body.append('decision', 'rejected');
+                                                    const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
+                                                    const d = await res.json();
+                                                    if (d.status !== 'ok') showToast('⚠️ 雲端更新失敗：' + (d.message || ''), 'err');
+                                                } catch (e) { showToast('⚠️ 雲端更新失敗，請檢查網路', 'err'); }
+                                            })();
                                         }, style: { flex: 1, minWidth: 80, background: 'rgba(248,113,113,.12)',
                                             border: '1px solid rgba(248,113,113,.3)', borderRadius: 8,
                                             padding: 9, fontSize: 13, fontWeight: 700, color: '#F87171',
