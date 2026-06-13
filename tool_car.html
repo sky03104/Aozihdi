@@ -277,8 +277,17 @@ body{
 
     <div class="divider"></div>
 
-    <!-- B1F -->
-    <div class="grp-hd">B1F 地下一樓汽車場</div>
+    <!-- B1F 地下一樓汽車停車場 -->
+    <div class="grp-hd">B1F 地下一樓汽車停車場</div>
+
+    <div class="inp-row">
+      <div class="inp-lbl">A 區角錐控管<span class="sub">A 區角錐佔位數（空白視為 0）</span></div>
+      <div class="stepper">
+        <button class="s-btn" onclick="step('a-cone',-1)">−</button>
+        <input type="number" class="s-val" id="a-cone" value="0" min="0" oninput="calc()">
+        <button class="s-btn" onclick="step('a-cone',1)">+</button>
+      </div>
+    </div>
 
     <div class="inp-row">
       <div class="inp-lbl">B1F 實際佔位<span class="sub">B1F 已停車輛數</span></div>
@@ -289,37 +298,10 @@ body{
       </div>
     </div>
 
-    <div class="inp-row">
-      <div class="inp-lbl">A 區角錐控管<span class="sub">A 區角錐佔位數（可留空）</span></div>
-      <div class="stepper">
-        <button class="s-btn" onclick="stepCone('a-cone',-1)">−</button>
-        <input type="number" class="s-val" id="a-cone" value="" min="0" placeholder="—" oninput="calc()">
-        <button class="s-btn" onclick="stepCone('a-cone',1)">+</button>
-      </div>
-    </div>
-
-    <div class="inp-row">
-      <div class="inp-lbl">B1F 計數版<span class="sub">博辰計數器 B1F 讀值</span></div>
-      <div class="stepper">
-        <button class="s-btn" onclick="step('b1f-cnt',-1)">−</button>
-        <input type="number" class="s-val" id="b1f-cnt" value="445" min="0" oninput="calc()">
-        <button class="s-btn" onclick="step('b1f-cnt',1)">+</button>
-      </div>
-    </div>
-
     <div class="divider"></div>
 
-    <!-- B2F -->
-    <div class="grp-hd">B2F 地下二樓汽車場</div>
-
-    <div class="inp-row">
-      <div class="inp-lbl">B2F 實際佔位<span class="sub">B2F 已停車輛數</span></div>
-      <div class="stepper">
-        <button class="s-btn" onclick="step('b2f-occ',-1)">−</button>
-        <input type="number" class="s-val" id="b2f-occ" value="0" min="0" oninput="calc()">
-        <button class="s-btn" onclick="step('b2f-occ',1)">+</button>
-      </div>
-    </div>
+    <!-- B2F 地下二樓汽車停車場 -->
+    <div class="grp-hd">B2F 地下二樓汽車停車場</div>
 
     <div class="inp-row">
       <div class="inp-lbl">F.J.K.L.M 角錐控管<span class="sub">B2F 角錐佔位數</span></div>
@@ -331,17 +313,17 @@ body{
     </div>
 
     <div class="inp-row">
-      <div class="inp-lbl">B2F 計數版<span class="sub">博辰計數器 B2F 讀值</span></div>
+      <div class="inp-lbl">B2F 實際佔位<span class="sub">B2F 已停車輛數</span></div>
       <div class="stepper">
-        <button class="s-btn" onclick="step('b2f-cnt',-1)">−</button>
-        <input type="number" class="s-val" id="b2f-cnt" value="982" min="0" oninput="calc()">
-        <button class="s-btn" onclick="step('b2f-cnt',1)">+</button>
+        <button class="s-btn" onclick="step('b2f-occ',-1)">−</button>
+        <input type="number" class="s-val" id="b2f-occ" value="0" min="0" oninput="calc()">
+        <button class="s-btn" onclick="step('b2f-occ',1)">+</button>
       </div>
     </div>
 
     <div class="divider"></div>
 
-    <!-- 機車 -->
+    <!-- 機車停車場 -->
     <div class="grp-hd">機車停車場</div>
 
     <div class="inp-row">
@@ -350,6 +332,29 @@ body{
         <button class="s-btn" onclick="step('mc-occ',-1)">−</button>
         <input type="number" class="s-val" id="mc-occ" value="0" min="0" oninput="calc()">
         <button class="s-btn" onclick="step('mc-occ',1)">+</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- 修改前計數版 -->
+    <div class="grp-hd">修改前計數版</div>
+
+    <div class="inp-row">
+      <div class="inp-lbl">B1F 計數版<span class="sub">博辰計數器 B1F 讀值</span></div>
+      <div class="stepper">
+        <button class="s-btn" onclick="step('b1f-cnt',-1)">−</button>
+        <input type="number" class="s-val" id="b1f-cnt" value="445" min="0" oninput="calc()">
+        <button class="s-btn" onclick="step('b1f-cnt',1)">+</button>
+      </div>
+    </div>
+
+    <div class="inp-row">
+      <div class="inp-lbl">B2F 計數版<span class="sub">博辰計數器 B2F 讀值</span></div>
+      <div class="stepper">
+        <button class="s-btn" onclick="step('b2f-cnt',-1)">−</button>
+        <input type="number" class="s-val" id="b2f-cnt" value="982" min="0" oninput="calc()">
+        <button class="s-btn" onclick="step('b2f-cnt',1)">+</button>
       </div>
     </div>
 
@@ -364,7 +369,7 @@ body{
 
     <div class="divider"></div>
 
-    <!-- 鼎高 -->
+    <!-- 鼎高在席系統 -->
     <div class="grp-hd">鼎高在席系統</div>
 
     <div class="inp-row">
@@ -486,7 +491,7 @@ const B2F_TOT = 982;   // B2F 總車位數
 const MC_TOT  = 4169;  // 機車總車位數
 
 /* ===== GAS Web App URL（部署後填入） ===== */
-const GAS_URL = 'YOUR_GAS_WEB_APP_URL_HERE';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxCpyGyeY4rSnLs5-vB2RK_KzFPceMoXNrZB0nkiaH8iHpX0xsD0daiW51u7RcVnTThGw/exec'; // 停車場誤差計算 GAS
 
 /* ===== 全域：最新計算結果 ===== */
 let LAST = null;
@@ -511,7 +516,7 @@ function step(id, delta) {
   calc();
 }
 
-/* ===== 步進器：A區角錐（可空） ===== */
+/* ===== 步進器：A區角錐（改為與一般欄位相同，空白視為 0） ===== */
 function stepCone(id, delta) {
   const el = document.getElementById(id);
   let v = el.value === '' ? 0 : (parseInt(el.value) || 0);
@@ -522,11 +527,11 @@ function stepCone(id, delta) {
 
 /* ===== 取輸入值 ===== */
 function getInp() {
-  const aConeRaw = document.getElementById('a-cone').value;
+  const aConeRaw = document.getElementById('a-cone').value; // 空值視為 0
   return {
     date    : document.getElementById('inp-date').value,
     b1fOcc  : parseInt(document.getElementById('b1f-occ').value) || 0,
-    aCone   : aConeRaw === '' ? null : (parseInt(aConeRaw) || 0),
+    aCone   : parseInt(aConeRaw) || 0, // 空值或非數字一律視為 0
     b1fCnt  : parseInt(document.getElementById('b1f-cnt').value) || 0,
     b2fOcc  : parseInt(document.getElementById('b2f-occ').value) || 0,
     fjklm   : parseInt(document.getElementById('fjklm').value) || 0,
@@ -540,7 +545,7 @@ function getInp() {
 
 /* ===== 核心計算邏輯 ===== */
 function doCalc(p) {
-  const ac = p.aCone === null ? 0 : p.aCone; // A角錐（null視為0）
+  const ac = p.aCone || 0; // A角錐（空白視為0）
 
   // 三大主要數字：實際可用車位
   const b1fAct = B1F_TOT - ac - p.b1fOcc;           // B1F 實際車位數
@@ -580,13 +585,11 @@ function genLine(p, c) {
   const ds = `${dt.getMonth()+1}/${dt.getDate()}`;
 
   // A區角錐顯示：null → 空白，數字 → 顯示數字
-  const aStr = p.aCone === null ? '' : String(p.aCone);
-
   return [
     ds,
     `汽車實際佔位數：${c.carOccLine}`,
     `B1F：實際佔位：${p.b1fOcc}`,
-    `　A區角錐控管：${aStr}`,
+    `　A區角錐控管：${p.aCone}`,
     `B2F：實際佔位：${p.b2fOcc}`,
     `　F.J.K.L.M區角錐控管：${p.fjklm}`,
     `機車實際佔位數：${p.mcOcc}`,
@@ -675,11 +678,13 @@ async function saveToSheet() {
   btn.innerHTML = '<div class="spin-sm"></div>&nbsp;儲存中...';
 
   const {p, c} = LAST;
-  const ac = p.aCone === null ? '' : p.aCone;
+  const ac = p.aCone || 0;
 
   const payload = {
-    action:'saveParkingCalc',
-    date  : p.date,
+    action   : 'saveParkingCalc',
+    ssId     : '1bqnbYp0y4IHo6BiA4D92AbkAj2Ee9qN5e3xWxREZACo', // 目標試算表 ID
+    sheetName: '停車場車位誤差計算',                              // 目標分頁名稱
+    date     : p.date,
     counterTotal: c.cntTot,
     carActual   : c.carAct,
     carOcc      : c.carOccSheet,
@@ -727,7 +732,7 @@ function resetAll() {
   document.getElementById('inp-date').value =
     `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   document.getElementById('b1f-occ').value = 0;
-  document.getElementById('a-cone').value  = '';
+  document.getElementById('a-cone').value  = 0;
   document.getElementById('b1f-cnt').value = 445;
   document.getElementById('b2f-occ').value = 0;
   document.getElementById('fjklm').value   = 0;
