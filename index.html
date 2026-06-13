@@ -17893,6 +17893,9 @@ function ok(obj) {
             ? { id: 99, name: outerUser.name, role: ROLE_MAP[outerUser.role] || 'staff' }
             : null;
         const [user, setUser] = useState(autoUser);
+        /* ── 雙班別：目前檢視的班表（night=晚班 / morning=早班），各自獨立快取與雲端同步 ── */
+        const [curShift, setCurShift] = useState('night');
+        const SHED_CACHE_KEYS = { night: 'tianying_sched_v1', morning: 'tianying_sched_m1' };
         /* ── 班表/員工持久化：載入上次快取（員工名單跨月保留；班表僅同月份沿用） ── */
         const _schedCache = (() => {
             try {
@@ -17934,7 +17937,7 @@ function ok(obj) {
                 return;
             setSyncS("syncing");
             try {
-                const p = { action: "updateSchedule", month: M, year: Y,
+                const p = { action: "updateSchedule", shift: curShift, month: M, year: Y,
                     data: sf.map(s => ({ name: s.name, shifts: Array.from({ length: DAYS }, (_, i) => { var _a; return ((_a = sc[s.id]) === null || _a === void 0 ? void 0 : _a[i + 1]) || '-'; }) })) };
                 await fetch(asUrl, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
                 setSyncS("ok");
@@ -17945,26 +17948,29 @@ function ok(obj) {
                 setTimeout(() => setSyncS("idle"), 3000);
             }
         }
-        /* ── 持久化：staff/sched 任一變更即寫入快取（修復：員工管理儲存後重開遺失） ── */
+        /* ── 持久化：staff/sched 任一變更即寫入「目前班別」的快取（晚班/早班分開存） ── */
         useEffect(() => {
             try {
-                localStorage.setItem('tianying_sched_v1', JSON.stringify({ ym: `${Y}-${M}`, staff: staff, sched: sched }));
+                localStorage.setItem(SHED_CACHE_KEYS[curShift], JSON.stringify({ ym: `${Y}-${M}`, staff: staff, sched: sched }));
             } catch (e) { }
-        }, [staff, sched]);
+        }, [staff, sched, curShift]);
         /* ── 共用：從線上班表（試算表）載入最新資料並套用 ──
            GAS v2.2 起會辨識紅字「休」並回傳「排休」，APP 內以獨立班別顯示；
            離線、GAS 尚未更新、或線上班表月份與當前月不符時回傳 0（沿用本機快取） ── */
-        const loadFromCloud = async () => {
+        const loadFromCloud = async (shiftArg, baseStaff, baseSched) => {
+            const shKey = shiftArg || curShift;
+            const bStaff = baseStaff || staff;
+            const bSched = baseSched || sched;
             if (!asUrl) return 0;
             try {
-                const res = await fetch(asUrl + '?action=getSchedule');
+                const res = await fetch(asUrl + '?action=getSchedule&shift=' + shKey);
                 const d = await res.json();
                 if (!d.success || !Array.isArray(d.rows) || !d.rows.length) return 0;
                 // 線上班表月份（Z1）需與當前月份相符才套用，避免換月初期載入舊月資料
                 const expectYm = `${Y}/${M < 10 ? '0' + M : M}`;
                 if (d.ym && String(d.ym).trim() !== expectYm) return 0;
-                const nStaff = [...staff];
-                const nSc = { ...sched };
+                const nStaff = [...bStaff];
+                const nSc = { ...bSched };
                 let cnt = 0;
                 d.rows.forEach(row => {
                     const name = String(row.name || '').trim();
@@ -17980,7 +17986,7 @@ function ok(obj) {
                     const role = ROLE_XL[String(row.roleStr || '').trim()] || (m ? m.role : 'staff');
                     if (!m) {
                         const id = ++_nid;
-                        m = { id: id, name: name, role: role, shift: '晚班' };
+                        m = { id: id, name: name, role: role, shift: shKey === 'morning' ? '早班' : '晚班' };
                         nStaff.push(m);
                         nSc[m.id] = {};
                     }
@@ -17997,6 +18003,26 @@ function ok(obj) {
                 return cnt;
             }
             catch (e) { return 0; /* 離線或讀取失敗 → 沿用本機快取 */ }
+        };
+        /* ── 切換班別：載入目標班別快取後再向雲端取最新（目前班別資料已由持久化 effect 寫入各自快取） ── */
+        const switchShift = async (s) => {
+            if (s === curShift) return;
+            let nStaff = [], nSc = {};
+            try {
+                const c = JSON.parse(localStorage.getItem(SHED_CACHE_KEYS[s]) || 'null');
+                if (c && Array.isArray(c.staff) && c.staff.length) {
+                    nStaff = c.staff;
+                    nSc = (c.ym === `${Y}-${M}` && c.sched) ? c.sched : buildSched(c.staff);
+                    _nid = Math.max(_nid, ...c.staff.map(x => Number(x.id) || 0));
+                }
+            }
+            catch (e) { }
+            setCurShift(s);
+            setStaff(nStaff);
+            setSched(nSc);
+            const cnt = await loadFromCloud(s, nStaff, nSc);
+            if (cnt) T(`📅 已載入${s === 'morning' ? '早班' : '晚班'}線上班表（${cnt} 人）`);
+            else T(s === 'morning' ? '☀️ 已切換為早班班表' : '🌙 已切換為晚班班表');
         };
         /* ── 開啟時自動載入線上班表（跨裝置同步） ── */
         useEffect(() => {
@@ -18015,7 +18041,13 @@ function ok(obj) {
                 return;
             }
             (async () => {
-                const cloudCnt = await loadFromCloud();
+                // 資料上傳工具的同步通知僅針對晚班；目前檢視早班時不套用，提示切換即可
+                if (curShift !== 'night') {
+                    T('📅 晚班班表已更新，切換至晚班班表即可檢視');
+                    if (onExternalApplied) onExternalApplied();
+                    return;
+                }
+                const cloudCnt = await loadFromCloud('night');
                 if (cloudCnt) {
                     T(`📅 已從資料上傳工具同步 ${cloudCnt} 人班表`);
                     if (onExternalApplied) onExternalApplied();
@@ -18607,6 +18639,9 @@ function ok(obj) {
             React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, padding: "9px 12px" } }, [{ v: staff.length, l: "總人數", c: C.text, b: C.cardBd }, { v: todayOn, l: "今日出勤", c: C.goldBri, b: `${C.gold}55` }, { v: staff.length - todayOn, l: "今日休假", c: C.warn, b: `${C.warn}44` }, { v: `${M}月`, l: "當前月份", c: C.indigoBri, b: `${C.indigo}44` }].map((x, i) => (React.createElement("div", { key: i, style: { background: C.card, borderRadius: 9, padding: "9px 5px", textAlign: "center", border: `1px solid ${x.b}` } },
                 React.createElement("div", { style: { fontSize: 18, fontWeight: 900, color: x.c } }, x.v),
                 React.createElement("div", { style: { fontSize: 9, color: C.textMute, marginTop: 2 } }, x.l))))),
+            React.createElement("div", { style: { display: "flex", gap: 8, padding: "10px 12px 6px" } },
+                React.createElement("button", { style: { flex: 1, padding: "9px", borderRadius: 9, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", border: curShift === 'night' ? `1.5px solid ${C.gold}` : `1px solid ${C.cardBd}`, background: curShift === 'night' ? "rgba(212,168,0,0.18)" : C.card, color: curShift === 'night' ? C.goldBri : C.textMute }, onClick: () => switchShift('night') }, "🌙 晚班班表"),
+                React.createElement("button", { style: { flex: 1, padding: "9px", borderRadius: 9, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", border: curShift === 'morning' ? `1.5px solid ${C.gold}` : `1px solid ${C.cardBd}`, background: curShift === 'morning' ? "rgba(212,168,0,0.18)" : C.card, color: curShift === 'morning' ? C.goldBri : C.textMute }, onClick: () => switchShift('morning') }, "☀️ 早班班表")),
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 12px 9px" } },
                 React.createElement("span", { style: { fontSize: 11, color: C.textMute } }, "\u73ED\u5225\uFF1A"),
                 ["all", "早班", "晚班"].map(sg => (React.createElement("button", { key: sg, style: { ...S.chip, background: fShift === sg ? "rgba(212,168,0,0.15)" : C.card, color: fShift === sg ? C.goldBri : C.textDim, borderColor: fShift === sg ? `${C.gold}88` : C.cardBd }, onClick: () => setFShift(sg) }, sg === "all" ? "全部" : sg)))),
