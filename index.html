@@ -17528,6 +17528,36 @@ const css = `
   .tool-card:hover { border-color:var(--gold); transform:translateY(-2px);
     box-shadow:0 6px 20px rgba(212,168,0,.15); }
   .tool-card.locked { opacity:.35; cursor:not-allowed; }
+  /* 有功能且有權限：實體金色按鍵感（F款） */
+  .tool-card.raised {
+    background: linear-gradient(160deg, rgba(212,168,0,.16), #161B26 60%);
+    border: 1px solid rgba(212,168,0,.5);
+    border-top-color: rgba(255,225,120,.55);
+    border-bottom-color: rgba(120,90,0,.7);
+    box-shadow: 0 7px 0 rgba(90,70,0,.55), 0 10px 18px rgba(0,0,0,.55), 0 0 16px rgba(212,168,0,.12),
+                inset 0 1px 0 rgba(255,255,255,.15);
+    transform: translateY(-3px);
+  }
+  .tool-card.raised:hover {
+    box-shadow: 0 8px 0 rgba(90,70,0,.6), 0 12px 22px rgba(0,0,0,.6), 0 0 22px rgba(212,168,0,.22),
+                inset 0 1px 0 rgba(255,255,255,.18);
+    transform: translateY(-4px);
+  }
+  .tool-card.raised:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 rgba(90,70,0,.5), inset 0 4px 10px rgba(0,0,0,.5);
+  }
+  /* 沒功能或沒權限：凹陷下沉感（F款） */
+  .tool-card.pressed {
+    background: #0D1117;
+    border: 1px solid rgba(0,0,0,.5);
+    border-top-color: rgba(0,0,0,.65);
+    border-bottom-color: rgba(255,255,255,.03);
+    box-shadow: inset 0 5px 12px rgba(0,0,0,.85), inset 0 -1px 0 rgba(255,255,255,.02);
+    transform: translateY(1px);
+    filter: saturate(.4) brightness(.7);
+  }
+  .tool-card.pressed:hover { transform: translateY(1px); box-shadow: inset 0 5px 12px rgba(0,0,0,.85), inset 0 -1px 0 rgba(255,255,255,.02); }
   .tool-emoji { font-size:26px; }
   .tool-name { font-size:12px; font-weight:600; line-height:1.3; }
   .tool-cat { font-size:10px; color:var(--muted); }
@@ -18803,10 +18833,16 @@ function App() {
     const [users, setUsers] = useState(DEMO_USERS);
     const [pending, setPending] = useState(DEMO_PENDING);
     const [favorites, setFavorites] = useState(() => {
-        /* 個人收藏：從 localStorage 讀取（依 empId 區分） */
+        /* 個人收藏：依登入帳號(empId)讀取，跟著帳號設定而非裝置 */
         try {
-            const saved = localStorage.getItem('hsh_personal_favs');
-            if (saved) return JSON.parse(saved);
+            const sess = JSON.parse(localStorage.getItem('hsh_session_user') || 'null');
+            if (sess && sess.empId) {
+                const saved = localStorage.getItem('hsh_favs_' + sess.empId);
+                if (saved) return JSON.parse(saved);
+            }
+            // 相容舊版資料
+            const legacy = localStorage.getItem('hsh_personal_favs');
+            if (legacy) return JSON.parse(legacy);
         } catch(e) {}
         return [1, 2]; // 預設常用工具
     });
@@ -18864,8 +18900,9 @@ function App() {
             try {
                 const raw = localStorage.getItem('tianying_perms');
                 const savedVer = localStorage.getItem('tianying_perms_ver');
-                // v3 與 v4 儲存格式相同（完整快照），v3 資料直接沿用並升級版本標記
-                if (raw && (savedVer === PERMS_VER || savedVer === 'v3')) {
+                // v3 與 v4 儲存格式相同（完整快照），任何已存在的快照皆直接沿用並升級版本標記，
+                // 不再因版本字串不符而清空使用者已設定的權限（避免改完又被重置）
+                if (raw) {
                     const saved = JSON.parse(raw);
                     setPerms(prev => {
                         const merged = { ...prev };
@@ -18876,9 +18913,6 @@ function App() {
                         return merged;
                     });
                     if (savedVer !== PERMS_VER) localStorage.setItem('tianying_perms_ver', PERMS_VER);
-                } else if (raw) {
-                    localStorage.removeItem('tianying_perms');
-                    localStorage.removeItem('tianying_perms_ver');
                 }
             }
             catch (e) { /* 尚無儲存的權限設定，使用預設值 */ }
@@ -19310,7 +19344,7 @@ function App() {
             favorites.filter(id => userTools.includes(id)).length === 0 ? (React.createElement("div", { style: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10,
                     padding: '20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 } },
                 React.createElement("div", { style: { fontSize: 28, marginBottom: 8 } }, "\u2B50"),
-                "\u524D\u5F80\u300C\u5DE5\u5177\u300D\u9801\uFF0C\u9EDE\u64CA\u5DE5\u5177\u53F3\u4E0A\u89D2\u7684 \u2B50 \u52A0\u5165\u5E38\u7528\u5FEB\u6377")) : (React.createElement("div", { className: "tool-grid" }, tools.filter(t => favorites.includes(t.id) && userTools.includes(t.id)).map(tool => (React.createElement("div", { key: tool.id, className: "tool-card", style: { position: 'relative' }, onClick: () => { if (tool.toolId === 'leave') {
+                "\u524D\u5F80\u300C\u5DE5\u5177\u300D\u9801\uFF0C\u9EDE\u64CA\u5DE5\u5177\u53F3\u4E0A\u89D2\u7684 \u2B50 \u52A0\u5165\u5E38\u7528\u5FEB\u6377")) : (React.createElement("div", { className: "tool-grid" }, tools.filter(t => favorites.includes(t.id) && userTools.includes(t.id)).map(tool => (React.createElement("div", { key: tool.id, className: `tool-card ${tool.toolId ? "raised" : "pressed"}`, style: { position: 'relative' }, onClick: () => { if (tool.toolId === 'leave') {
                     setShowLeave(true);
                     if (CAN_MANAGE_ROLES.includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role)) loadLeaveFromCloud(true);
                 }
@@ -19345,7 +19379,8 @@ function App() {
                     React.createElement("div", { className: "tool-grid" }, catTools.map(tool => {
                         const unlocked = userTools.includes(tool.id);
                         const isFav = favorites.includes(tool.id);
-                        return (React.createElement("div", { key: tool.id, className: `tool-card ${!unlocked ? "locked" : ""}`, style: { position: 'relative' }, onClick: () => { if (!unlocked)
+                        const raised = unlocked && !!tool.toolId;
+                        return (React.createElement("div", { key: tool.id, className: `tool-card ${!unlocked ? "locked" : ""} ${raised ? "raised" : "pressed"}`, style: { position: 'relative' }, onClick: () => { if (!unlocked)
                                 return; if (tool.toolId === 'leave') {
                                 setShowLeave(true);
                                 if (CAN_MANAGE_ROLES.includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role)) loadLeaveFromCloud(true);
