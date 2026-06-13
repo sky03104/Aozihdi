@@ -18980,8 +18980,12 @@ function App() {
             if (d.status === 'ok' && Array.isArray(d.list)) {
                 setLeaveRequests(d.list);
                 if (!silent) showToast(`🔄 已更新請假清單（${d.list.length} 筆）`);
+            } else {
+                showToast('⚠️ 請假清單載入失敗：' + (d.msg || d.message || '未知錯誤'), 'err');
             }
-        } catch (e) {}
+        } catch (e) {
+            showToast('⚠️ 請假清單雲端連線失敗：' + e.message, 'err');
+        }
     };
     /* ── 從雲端載入待審核申請（管理員登入後自動載入；審核頁可手動重新整理） ── */
     const loadPendingFromCloud = async (silent) => {
@@ -19293,7 +19297,7 @@ function App() {
                     React.createElement("div", { style: { fontSize: 18, marginBottom: 2 } }, "\u2B50"),
                     React.createElement("div", { className: "stat-num" }, tools.filter(t => favorites.includes(t.id) && userTools.includes(t.id)).length),
                     React.createElement("div", { className: "stat-lbl" }, "\u5E38\u7528\u5DE5\u5177"))),
-                (currentUser === null || currentUser === void 0 ? void 0 : currentUser.role) === 'admin' ? (React.createElement("div", { className: "stat-card", style: { cursor: 'pointer' }, onClick: () => setShowLeave(true) },
+                CAN_MANAGE_ROLES.includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role) ? (React.createElement("div", { className: "stat-card", style: { cursor: 'pointer' }, onClick: () => { setShowLeave(true); loadLeaveFromCloud(true); } },
                     React.createElement("div", { style: { fontSize: 18, marginBottom: 2 } }, "\uD83D\uDCDD"),
                     React.createElement("div", { className: "stat-num", style: {
                             color: leaveRequests.filter(r => r.status === 'pending').length > 0 ? '#FBBF24' : 'var(--success)'
@@ -19308,6 +19312,7 @@ function App() {
                 React.createElement("div", { style: { fontSize: 28, marginBottom: 8 } }, "\u2B50"),
                 "\u524D\u5F80\u300C\u5DE5\u5177\u300D\u9801\uFF0C\u9EDE\u64CA\u5DE5\u5177\u53F3\u4E0A\u89D2\u7684 \u2B50 \u52A0\u5165\u5E38\u7528\u5FEB\u6377")) : (React.createElement("div", { className: "tool-grid" }, tools.filter(t => favorites.includes(t.id) && userTools.includes(t.id)).map(tool => (React.createElement("div", { key: tool.id, className: "tool-card", style: { position: 'relative' }, onClick: () => { if (tool.toolId === 'leave') {
                     setShowLeave(true);
+                    if (CAN_MANAGE_ROLES.includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role)) loadLeaveFromCloud(true);
                 }
                 else if (tool.toolId) {
                     setActiveToolId(tool.toolId);
@@ -19343,6 +19348,7 @@ function App() {
                         return (React.createElement("div", { key: tool.id, className: `tool-card ${!unlocked ? "locked" : ""}`, style: { position: 'relative' }, onClick: () => { if (!unlocked)
                                 return; if (tool.toolId === 'leave') {
                                 setShowLeave(true);
+                                if (CAN_MANAGE_ROLES.includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role)) loadLeaveFromCloud(true);
                             }
                             else if (tool.toolId) {
                                 setActiveToolId(tool.toolId);
