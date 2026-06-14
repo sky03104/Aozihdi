@@ -19038,7 +19038,10 @@ function App() {
     useEffect(() => {
         if (currentUser && currentUser.role === 'admin') loadPendingFromCloud(true);
     }, [currentUser]);
-    // 開啟頁面時背景載入雲端「已核准」帳號並合併（讓新員工核准後能在自己裝置登入）
+    // 開啟頁面時背景載入雲端「帳號管理」資料並合併：
+    // 1. 雲端有、本地沒有 → 新增（新核准帳號同步，讓新員工能在自己裝置登入）
+    // 2. 本地已有但「從未被本機App修改過」（即仍等於原始 USER_DB[id]）→ 用雲端版本覆蓋（管理員雲端改密碼/角色/部門即時生效）
+    // 3. 本地已有且「已被本機App修改過」（與原始 USER_DB[id] 不同）→ 保留本機版本（不被雲端覆蓋）
     useEffect(() => {
         (async () => {
             try {
@@ -19047,9 +19050,36 @@ function App() {
                 if (d.status === 'ok' && d.users && typeof d.users === 'object') {
                     setUserDb(prev => {
                         const merged = { ...prev };
-                        let added = 0;
-                        Object.keys(d.users).forEach(id => { if (!merged[id]) { merged[id] = d.users[id]; added++; } });
-                        return added ? merged : prev; // 本地已有的帳號不覆蓋（保留本地改過的密碼）
+                        let changed = false;
+                        Object.keys(d.users).forEach(id => {
+                            const cloudRec = d.users[id];
+                            if (!merged[id]) {
+                                // 雲端新增帳號 → 補進本地
+                                merged[id] = cloudRec;
+                                changed = true;
+                            } else {
+                                const seedRec = USER_DB[id];
+                                // 判斷本機是否曾被App修改：與原始種子資料逐欄比對
+                                const isUnmodified = seedRec
+                                    && seedRec.name === merged[id].name
+                                    && seedRec.pw === merged[id].pw
+                                    && seedRec.role === merged[id].role
+                                    && seedRec.dept === merged[id].dept;
+                                if (isUnmodified) {
+                                    // 本機未被修改過（仍為原始種子值）→ 用雲端版本覆蓋
+                                    const same = merged[id].name === cloudRec.name
+                                        && merged[id].pw === cloudRec.pw
+                                        && merged[id].role === cloudRec.role
+                                        && merged[id].dept === cloudRec.dept;
+                                    if (!same) {
+                                        merged[id] = { ...merged[id], ...cloudRec };
+                                        changed = true;
+                                    }
+                                }
+                                // else: 本機已改過，保留本機版本（不動作）
+                            }
+                        });
+                        return changed ? merged : prev;
                     });
                 }
             }
