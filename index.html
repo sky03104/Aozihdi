@@ -18875,6 +18875,11 @@ function App() {
         return USER_DB;
     });
     const [changePwModal, setChangePwModal] = useState(false);
+    const [lineBindModal, setLineBindModal] = useState(false);
+    const [lineCode, setLineCode] = useState(null); // 產生的6位數綁定驗證碼
+    const [lineCodeLoading, setLineCodeLoading] = useState(false);
+    const [lineBindStatus, setLineBindStatus] = useState(null); // { bound, lineUserId, boundAt } | null=未查詢
+    const [lineBindLoading, setLineBindLoading] = useState(false);
     const [pwForm, setPwForm] = useState({ old: '', new1: '', new2: '' }); // null | 'upload' | 'closing' | 'schedule'
     // Listen for schedule data from 資料上傳工具 iframe
     useEffect(() => {
@@ -19019,6 +19024,74 @@ function App() {
             }
         } catch (e) {
             showToast('⚠️ 請假清單雲端連線失敗：' + e.message, 'err');
+        }
+    };
+    /* ── LINE 綁定：查詢目前工號的綁定狀態 ── */
+    const loadLineBindStatus = async () => {
+        if (!(currentUser === null || currentUser === void 0 ? void 0 : currentUser.empId)) return;
+        setLineBindLoading(true);
+        try {
+            const res = await fetch(ACCOUNT_GAS_URL + '?action=getLineBinding&empId=' + encodeURIComponent(currentUser.empId));
+            const d = await res.json();
+            if (d.status === 'ok') {
+                setLineBindStatus({ bound: !!d.bound, lineUserId: d.lineUserId || '', boundAt: d.boundAt || '' });
+            } else {
+                setLineBindStatus({ bound: false });
+                showToast('⚠️ 綁定狀態查詢失敗：' + (d.msg || '請重試'));
+            }
+        } catch (e) {
+            setLineBindStatus({ bound: false });
+            showToast('⚠️ 網路錯誤，無法查詢綁定狀態');
+        } finally {
+            setLineBindLoading(false);
+        }
+    };
+    /* ── LINE 綁定：產生6位數驗證碼，供員工至 LINE Bot 輸入完成綁定 ── */
+    const handleGenerateLineCode = async () => {
+        if (!(currentUser === null || currentUser === void 0 ? void 0 : currentUser.empId)) return;
+        setLineCodeLoading(true);
+        try {
+            const data = JSON.stringify({ empId: currentUser.empId, name: currentUser.name });
+            const res = await fetch(ACCOUNT_GAS_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'action=generateLineCode&data=' + encodeURIComponent(data)
+            });
+            const d = await res.json();
+            if (d.status === 'ok' && d.code) {
+                setLineCode(d.code);
+                showToast('✅ 驗證碼已產生，請於 5 分鐘內至 LINE Bot 輸入');
+            } else {
+                showToast('❌ 驗證碼產生失敗：' + (d.msg || '請重試'));
+            }
+        } catch (e) {
+            showToast('⚠️ 網路錯誤，無法產生驗證碼');
+        } finally {
+            setLineCodeLoading(false);
+        }
+    };
+    /* ── LINE 綁定：解除目前工號的 LINE 綁定 ── */
+    const handleUnbindLine = async () => {
+        if (!(currentUser === null || currentUser === void 0 ? void 0 : currentUser.empId)) return;
+        setLineBindLoading(true);
+        try {
+            const data = JSON.stringify({ empId: currentUser.empId });
+            const res = await fetch(ACCOUNT_GAS_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'action=unbindLine&data=' + encodeURIComponent(data)
+            });
+            const d = await res.json();
+            if (d.status === 'ok') {
+                showToast('✅ 已解除 LINE 綁定');
+                setLineBindStatus({ bound: false });
+            } else {
+                showToast('❌ 解除綁定失敗：' + (d.msg || '請重試'));
+            }
+        } catch (e) {
+            showToast('⚠️ 網路錯誤，無法解除綁定');
+        } finally {
+            setLineBindLoading(false);
         }
     };
     /* ── 從雲端載入待審核申請（管理員登入後自動載入；審核頁可手動重新整理） ── */
@@ -19634,6 +19707,11 @@ function App() {
                     color: '#fff', cursor: 'pointer', marginBottom: 10,
                     fontFamily: "'Microsoft JhengHei',sans-serif",
                     boxShadow: '0 3px 14px rgba(99,102,241,.3)' } }, "\uD83D\uDD11 \u4FEE\u6539\u5BC6\u78BC"),
+            React.createElement("button", { onClick: () => { setLineBindModal(true); setLineCode(null); loadLineBindStatus(); }, style: { width: '100%', background: 'linear-gradient(135deg,#06C755,#3DDC84)',
+                    border: 'none', borderRadius: 8, padding: 13, fontSize: 14, fontWeight: 700,
+                    color: '#fff', cursor: 'pointer', marginBottom: 10,
+                    fontFamily: "'Microsoft JhengHei',sans-serif",
+                    boxShadow: '0 3px 14px rgba(6,199,85,.3)' } }, "\uD83D\uDCF1 \u7DA1\u5B9A LINE \u901A\u77E5"),
             React.createElement("button", { className: "logout-btn", onClick: () => { setPage("login"); setCurrentUser(null); localStorage.removeItem('hsh_session_user'); showToast("已登出"); } }, "\u767B\u51FA\u5E33\u865F")));
     };
     const NAV = [
@@ -20178,6 +20256,38 @@ function App() {
                         React.createElement("span", { className: "input-icon" }, f.icon),
                         React.createElement("input", { className: "inp", type: "password", placeholder: f.ph, value: pwForm[f.key], onChange: e => setPwForm(prev => ({ ...prev, [f.key]: e.target.value })) }))))),
                 React.createElement("button", { className: "save-btn", onClick: handleChangePw }, "\uD83D\uDCBE \u78BA\u8A8D\u66F4\u65B0\u5BC6\u78BC")))),
+        lineBindModal && (React.createElement("div", { className: "modal-overlay", onClick: () => setLineBindModal(false) },
+            React.createElement("div", { className: "modal", onClick: e => e.stopPropagation() },
+                React.createElement("button", { className: "modal-close", onClick: () => setLineBindModal(false) }, "\u2715"),
+                React.createElement("div", { className: "modal-title" }, "\uD83D\uDCF1 \u7DA1\u5B9A LINE \u901A\u77E5"),
+                React.createElement("div", { style: { background: 'rgba(255,255,255,.05)', borderRadius: 8, padding: '10px 12px',
+                        marginBottom: 16, fontSize: 12, color: 'var(--muted)' } },
+                    "\u5DE5\u865F\uFF1A", currentUser === null || currentUser === void 0 ? void 0 :
+                    currentUser.empId,
+                    "\u3000\u5E33\u865F\uFF1A", currentUser === null || currentUser === void 0 ? void 0 :
+                    currentUser.name),
+                lineBindLoading && (React.createElement("div", { style: { textAlign: 'center', color: 'var(--muted)', fontSize: 13, padding: '12px 0' } }, "\u8B80\u53D6\u72C0\u6CC1\u4E2D\u2026")),
+                !lineBindLoading && lineBindStatus && lineBindStatus.bound && (React.createElement("div", null,
+                    React.createElement("div", { style: { background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)',
+                            borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 13, color: '#4ADE80' } },
+                        "\u2705 \u5DF2\u7DA1\u5B9A LINE \u901A\u77E5",
+                        React.createElement("div", { style: { fontSize: 11, color: 'var(--muted)', marginTop: 4 } },
+                            "\u7DA1\u5B9A\u6642\u9593\uFF1A", lineBindStatus.boundAt || '-')),
+                    React.createElement("button", { className: "save-btn", style: { background: 'linear-gradient(135deg,#E53E3E,#F87171)' },
+                        onClick: handleUnbindLine, disabled: lineBindLoading }, "\uD83D\uDD17 \u89E3\u9664\u7DA1\u5B9A"))),
+                !lineBindLoading && lineBindStatus && !lineBindStatus.bound && (React.createElement("div", null,
+                    React.createElement("div", { style: { background: 'rgba(255,255,255,.05)', borderRadius: 8, padding: '10px 12px',
+                            marginBottom: 16, fontSize: 12, color: 'var(--muted)', lineHeight: 1.7 } },
+                        "\u274C \u5C1A\u672A\u7DA1\u5B9A\u3002\u9EDE\u64CA\u4E0B\u65B9\u300C\u7522\u751F\u9A57\u8B49\u78BC\u300D\uFF0C\u53D6\u5F97 6 \u4F4D\u6578\u9A57\u8B49\u78BC\u5F8C\uFF0C\u5230\u300C\u5929\u9DF9\u4FDD\u5168 LINE Bot\u300D\u8F38\u5165\u9A57\u8B49\u78BC\u5373\u53EF\u5B8C\u6210\u7DA1\u5B9A\uFF08\u9A57\u8B49\u78BC 5 \u5206\u9418\u5167\u6709\u6548\uFF09\u3002"),
+                    !lineCode && (React.createElement("button", { className: "save-btn", onClick: handleGenerateLineCode, disabled: lineCodeLoading },
+                        lineCodeLoading ? "\u7522\u751F\u4E2D\u2026" : "\uD83D\uDD22 \u7522\u751F\u9A57\u8B49\u78BC")),
+                    lineCode && (React.createElement("div", { style: { textAlign: 'center', marginTop: 16 } },
+                        React.createElement("div", { style: { fontSize: 13, color: 'var(--muted)', marginBottom: 8 } }, "\u60A8\u7684\u9A57\u8B49\u78BC"),
+                        React.createElement("div", { style: { fontSize: 36, fontWeight: 800, letterSpacing: 8, color: '#FFD700',
+                                fontFamily: "'Courier New',monospace", marginBottom: 12 } }, lineCode),
+                        React.createElement("div", { style: { fontSize: 12, color: 'var(--muted)', marginBottom: 12 } }, "\u8ACB\u5728 5 \u5206\u9418\u5167\u5C07\u6B64\u78BC\u8F38\u5165 LINE Bot \u5C0D\u8A71\u6846"),
+                        React.createElement("button", { className: "save-btn", style: { background: 'linear-gradient(135deg,#6366F1,#818CF8)' },
+                            onClick: handleGenerateLineCode, disabled: lineCodeLoading }, "\uD83D\uDD04 \u91CD\u65B0\u7522\u751F")))))))),
         editingTool && (React.createElement("div", { className: "modal-overlay", onClick: () => setEditingTool(null) },
             React.createElement("div", { className: "modal", onClick: e => e.stopPropagation() },
                 React.createElement("button", { className: "modal-close", onClick: () => setEditingTool(null) }, "\u2715"),
