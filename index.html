@@ -19122,6 +19122,22 @@ function App() {
             }
         })();
     };
+    /* ── 請假日期顯示格式化：統一轉為「YYYY/M/D」中文數字格式，
+       並修正舊資料因 Google Sheets 自動轉成 Date 物件造成的時區誤差 ── */
+    const fmtLeaveDate = (val) => {
+        if (!val) return '';
+        // 標準 "YYYY-MM-DD" 字串：直接拆解轉換，不經過 Date 物件，避免時區位移
+        if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val) && !val.includes('T')) {
+            const [y, m, d] = val.slice(0, 10).split('-');
+            return `${y}/${parseInt(m, 10)}/${parseInt(d, 10)}`;
+        }
+        // 其他格式（含 T/Z 的 ISO 字串、Date 物件等）：以台北時區重新格式化
+        try {
+            const dt = new Date(val);
+            if (isNaN(dt.getTime())) return String(val);
+            return dt.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' });
+        } catch (e) { return String(val); }
+    };
     const togglePerm = (roleId, toolId) => {
         setPerms(prev => {
             const current = prev[roleId] || [];
@@ -19893,13 +19909,13 @@ function App() {
                             React.createElement("div", { style: { fontSize: 12, color: 'var(--muted)', marginBottom: 6 } },
                                 "\uD83D\uDCC5 ",
                                 req.dates && req.dates.length > 1
-                                    ? `${req.startDate} ～ ${req.endDate}（${req.days} 天）`
-                                    : `${req.startDate}（${req.days || 1} 天）`,
+                                    ? `${fmtLeaveDate(req.startDate)} ～ ${fmtLeaveDate(req.endDate)}（${req.days} 天）`
+                                    : `${fmtLeaveDate(req.startDate)}（${req.days || 1} 天）`,
                                 req.dept),
                             req.dates && req.dates.length > 1 && (React.createElement("div", { style: { fontSize: 11, color: 'var(--muted2)', marginBottom: 6,
                                     background: 'rgba(255,255,255,.03)', padding: '4px 8px', borderRadius: 6 } },
                                 "\u8A73\u7D30\u65E5\u671F\uFF1A",
-                                req.dates.join('、'))),
+                                req.dates.map(fmtLeaveDate).join('、'))),
                             req.reason && (React.createElement("div", { style: { fontSize: 12, color: 'var(--muted)',
                                     background: 'rgba(255,255,255,.04)', borderRadius: 6,
                                     padding: '6px 10px', marginBottom: 8 } },
@@ -19907,7 +19923,7 @@ function App() {
                                 req.reason)),
                             React.createElement("div", { style: { fontSize: 11, color: 'var(--muted2)', marginBottom: isManager && req.status === 'pending' ? 10 : 0 } },
                                 "\u7533\u8ACB\u65E5\uFF1A",
-                                req.appliedAt),
+                                fmtLeaveDate(req.appliedAt)),
                             isManager && (React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' } },
                                 req.status === 'pending' && (React.createElement(React.Fragment, null,
                                     React.createElement("button", { onClick: () => {
