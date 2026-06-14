@@ -18939,8 +18939,8 @@ function App() {
             if (savedFavs) { try { setFavorites(JSON.parse(savedFavs)); } catch(e){} }
             if (CAN_MANAGE_ROLES.includes(sessionUser.role)) {
                 loadPendingFromCloud(true);
-                loadLeaveFromCloud(true);
             }
+            loadLeaveFromCloud(true);
             setPage("main");
         } catch(e) {}
     }, []);
@@ -18978,8 +18978,8 @@ function App() {
         if (savedFavs) { try { setFavorites(JSON.parse(savedFavs)); } catch(e){} }
         if (CAN_MANAGE_ROLES.includes(sessionUser.role)) {
             loadPendingFromCloud(true);
-            loadLeaveFromCloud(true);
         }
+        loadLeaveFromCloud(true);
         setPage("main");
         showToast("✅ 登入成功，歡迎回來！");
     };
