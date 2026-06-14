@@ -233,11 +233,11 @@ var empId=new URLSearchParams(window.location.search).get('empId')||'';
 // ═══════ LIFF 整合（綁定 LINE 通知用，可選功能） ═══════
 // LIFF_ID：於 LINE Developers Console → LIFF → 新增 App 後取得
 // 格式如 '1234567890-abcdefgh'，若尚未設定請保持空字串（不影響原有功能）
-var LIFF_ID = '';
+var LIFF_ID = '2010392723-Pl8dPArQ';
 
 // 優先序：URL ?empId= 參數 > LIFF 自動帶入（依 LINE綁定 反查工號） > 無
-// LIFF 初始化失敗或非 LINE 環境時靜默跳過，不影響一般瀏覽器開啟
-if (LIFF_ID && !empId) {
+// LIFF 初始化失敗、SDK 未載入或非 LINE 環境時靜默跳過，不影響一般瀏覽器開啟
+if (LIFF_ID && !empId && typeof liff !== 'undefined') {
   liff.init({ liffId: LIFF_ID }).then(function () {
     if (!liff.isLoggedIn()) {
       // 未登入時不強制導向登入，避免一般瀏覽器誤觸發；僅在 LIFF 內嵌瀏覽器才會自動登入
