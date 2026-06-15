@@ -17243,7 +17243,7 @@ const TOOLS = [
     { id: 5, name: "訪客登記系統", icon: "🪪", category: "門禁管理" },
     { id: 7, name: "停車場車位數計算", icon: "🅿️", category: "核心工具", toolId: "car" },
     { id: 6, name: "過夜車輛登記", icon: "🚗", category: "門禁管理", toolId: "signin" },
-    { id: 9, name: "舊資料上傳", icon: "☁️", category: "資料管理" },
+    { id: 9, name: "施工單查詢", icon: "📋", category: "資料管理", externalUrl: "https://sky03104.github.io/tianying-security/tool_work.html" },
     { id: 10, name: "影像調閱申請", icon: "📷", category: "資料管理" },
     { id: 11, name: "設備檢查表", icon: "🔧", category: "設備管理" },
     { id: 12, name: "緊急聯絡清單", icon: "📞", category: "緊急應變", toolId: "emergency" },
@@ -17276,9 +17276,9 @@ const DEMO_PENDING = [];
 // 帳號申請／請假申請雲端服務：寫入「天鷹保全APP」試算表（獨立GAS專案）
 const ACCOUNT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxEVBHseDpLWiWe4d8kLcCHbVFiKAK9wyoLwqNkt59PS4vPCY9QfG0_wiDJf2coO3zMcg/exec';
 const DEFAULT_PERMS = {
-    fulltime: [1, 2, 3, 7, 4, 5, 6, 12, 13, 99],
-    parttime: [1, 2, 3, 7, 5, 6, 12, 13, 99],
-    leader: [1, 2, 3, 7, 4, 5, 6, 11, 12, 13, 99],
+    fulltime: [1, 2, 3, 7, 4, 5, 6, 9, 12, 13, 99],
+    parttime: [1, 2, 3, 7, 5, 6, 9, 12, 13, 99],
+    leader: [1, 2, 3, 7, 4, 5, 6, 9, 11, 12, 13, 99],
     vicecaptain: [1, 2, 3, 7, 4, 5, 6, 9, 10, 11, 12, 13, 99],
     captain: [1, 2, 3, 7, 4, 5, 6, 9, 10, 11, 12, 13, 14, 99],
     executive: [1, 2, 3, 7, 4, 5, 6, 9, 10, 11, 12, 13, 14, 99],
@@ -18898,26 +18898,30 @@ function App() {
     useEffect(() => {
         try { localStorage.setItem('tianying_userdb', JSON.stringify(userDb)); } catch (e) { }
     }, [userDb]);
-    // 載入已儲存的權限設定（v4：以儲存值完整覆蓋預設值，「移除權限」不再被預設值補回）
-    const PERMS_VER = 'v4';
+    // 載入已儲存的權限設定（v5：版本變更時採聯集合併，補回新工具權限，不遺失既有自訂設定）
+    const PERMS_VER = 'v5';
     useEffect(() => {
         (async () => {
             try {
                 const raw = localStorage.getItem('tianying_perms');
                 const savedVer = localStorage.getItem('tianying_perms_ver');
-                // v3 與 v4 儲存格式相同（完整快照），任何已存在的快照皆直接沿用並升級版本標記，
-                // 不再因版本字串不符而清空使用者已設定的權限（避免改完又被重置）
+                const versionChanged = savedVer !== PERMS_VER;
+                // v3 與 v4 儲存格式相同（完整快照）；版本變更時與新預設值聯集，
+                // 確保新增工具（如施工單查詢）權限自動補上，且不遺失使用者已設定的權限
                 if (raw) {
                     const saved = JSON.parse(raw);
                     setPerms(prev => {
                         const merged = { ...prev };
                         Object.keys(prev).forEach(role => {
-                            // 儲存值直接覆蓋（含被移除的權限）；儲存中沒有的新角色保留預設
-                            if (Array.isArray(saved[role])) merged[role] = saved[role];
+                            if (Array.isArray(saved[role])) {
+                                merged[role] = versionChanged
+                                    ? Array.from(new Set([...saved[role], ...prev[role]]))
+                                    : saved[role];
+                            }
                         });
                         return merged;
                     });
-                    if (savedVer !== PERMS_VER) localStorage.setItem('tianying_perms_ver', PERMS_VER);
+                    if (versionChanged) localStorage.setItem('tianying_perms_ver', PERMS_VER);
                 }
             }
             catch (e) { /* 尚無儲存的權限設定，使用預設值 */ }
@@ -19463,12 +19467,15 @@ function App() {
             favorites.filter(id => userTools.includes(id)).length === 0 ? (React.createElement("div", { style: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10,
                     padding: '20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 } },
                 React.createElement("div", { style: { fontSize: 28, marginBottom: 8 } }, "\u2B50"),
-                "\u524D\u5F80\u300C\u5DE5\u5177\u300D\u9801\uFF0C\u9EDE\u64CA\u5DE5\u5177\u53F3\u4E0A\u89D2\u7684 \u2B50 \u52A0\u5165\u5E38\u7528\u5FEB\u6377")) : (React.createElement("div", { className: "tool-grid" }, tools.filter(t => favorites.includes(t.id) && userTools.includes(t.id)).map(tool => (React.createElement("div", { key: tool.id, className: `tool-card ${tool.toolId ? "raised" : "pressed"}`, style: { position: 'relative' }, onClick: () => { if (tool.toolId === 'leave') {
+                "\u524D\u5F80\u300C\u5DE5\u5177\u300D\u9801\uFF0C\u9EDE\u64CA\u5DE5\u5177\u53F3\u4E0A\u89D2\u7684 \u2B50 \u52A0\u5165\u5E38\u7528\u5FEB\u6377")) : (React.createElement("div", { className: "tool-grid" }, tools.filter(t => favorites.includes(t.id) && userTools.includes(t.id)).map(tool => (React.createElement("div", { key: tool.id, className: `tool-card ${(tool.toolId || tool.externalUrl) ? "raised" : "pressed"}`, style: { position: 'relative' }, onClick: () => { if (tool.toolId === 'leave') {
                     setShowLeave(true);
                     if (CAN_MANAGE_ROLES.includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role)) loadLeaveFromCloud(true);
                 }
                 else if (tool.toolId) {
                     setActiveToolId(tool.toolId);
+                }
+                else if (tool.externalUrl) {
+                    window.open(tool.externalUrl, '_blank');
                 }
                 else {
                     showToast(`📂 開啟：${tool.name}`);
@@ -19498,7 +19505,7 @@ function App() {
                     React.createElement("div", { className: "tool-grid" }, catTools.map(tool => {
                         const unlocked = userTools.includes(tool.id);
                         const isFav = favorites.includes(tool.id);
-                        const raised = unlocked && !!tool.toolId;
+                        const raised = unlocked && (!!tool.toolId || !!tool.externalUrl);
                         return (React.createElement("div", { key: tool.id, className: `tool-card ${!unlocked ? "locked" : ""} ${raised ? "raised" : "pressed"}`, style: { position: 'relative' }, onClick: () => { if (!unlocked)
                                 return; if (tool.toolId === 'leave') {
                                 setShowLeave(true);
@@ -19506,6 +19513,9 @@ function App() {
                             }
                             else if (tool.toolId) {
                                 setActiveToolId(tool.toolId);
+                            }
+                            else if (tool.externalUrl) {
+                                window.open(tool.externalUrl, '_blank');
                             }
                             else {
                                 showToast(`📂 開啟：${tool.name}`);
