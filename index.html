@@ -17987,13 +17987,19 @@ function ok(obj) {
                 localStorage.setItem(SHED_CACHE_KEYS[curShift], JSON.stringify({ ym: `${Y}-${M}`, staff: staff, sched: sched }));
             } catch (e) { }
         }, [staff, sched, curShift]);
+        /* ── 即時狀態 ref：雲端非同步回填時以「最新」staff/sched 為基底合併，
+              避免抓取期間使用者剛修改的班別/班表被舊快照蓋回（修正改晚班又跳回早班） ── */
+        const staffRef = useRef(staff);
+        const schedRef = useRef(sched);
+        useEffect(() => { staffRef.current = staff; }, [staff]);
+        useEffect(() => { schedRef.current = sched; }, [sched]);
         /* ── 共用：從線上班表（試算表）載入最新資料並套用 ──
            GAS v2.2 起會辨識紅字「休」並回傳「排休」，APP 內以獨立班別顯示；
            離線、GAS 尚未更新、或線上班表月份與當前月不符時回傳 0（沿用本機快取） ── */
         const loadFromCloud = async (shiftArg, baseStaff, baseSched) => {
             const shKey = shiftArg || curShift;
-            const bStaff = baseStaff || staff;
-            const bSched = baseSched || sched;
+            const bStaff = baseStaff || staffRef.current;
+            const bSched = baseSched || schedRef.current;
             if (!asUrl) return 0;
             try {
                 const res = await fetch(asUrl + '?action=getSchedule&shift=' + shKey);
@@ -18852,9 +18858,16 @@ function App() {
     const [externalScheduleData, setExternalScheduleData] = useState(null);
     const [showBulletin, setShowBulletin] = useState(false);
     const [bulletinSearch, setBulletinSearch] = useState('');
-    const [announcements, setAnnouncements] = useState([
-        { id: 1, title: "歡迎使用天鷹保全管理系統", content: "系統已正式上線，如有問題請聯絡管理員。", author: "管理員", date: "2025-06-05", pinned: true },
-    ]);
+    const [announcements, setAnnouncements] = useState(() => {
+        /* 公告持久化載入：重開不再消失（無儲存值時帶入預設歡迎公告） */
+        try {
+            const saved = JSON.parse(localStorage.getItem('tianying_announcements') || 'null');
+            if (Array.isArray(saved)) return saved;
+        } catch (e) { }
+        return [
+            { id: 1, title: "歡迎使用天鷹保全管理系統", content: "系統已正式上線，如有問題請聯絡管理員。", author: "管理員", date: "2025-06-05", pinned: true },
+        ];
+    });
     const [editingAnn, setEditingAnn] = useState(null);
     const [showLeave, setShowLeave] = useState(false);
     const [leaveRequests, setLeaveRequests] = useState([]);
@@ -18898,34 +18911,89 @@ function App() {
     useEffect(() => {
         try { localStorage.setItem('tianying_userdb', JSON.stringify(userDb)); } catch (e) { }
     }, [userDb]);
-    // 載入已儲存的權限設定（v5：版本變更時採聯集合併，補回新工具權限，不遺失既有自訂設定）
-    const PERMS_VER = 'v5';
+    // 公告持久化：新增／編輯／刪除／置頂任一變更即寫入本機，重開保留
     useEffect(() => {
+        try { localStorage.setItem('tianying_announcements', JSON.stringify(announcements)); } catch (e) { }
+    }, [announcements]);
+    // 公告雲端讀取：自「公告欄」分頁拉最新（含圖片 Drive 連結），成功則更新並快取本機
+    const loadAnnouncementsCloud = async () => {
+        if (!ACCOUNT_GAS_URL) return;
+        try {
+            const res = await fetch(ACCOUNT_GAS_URL + '?action=getAnnouncements');
+            const d = await res.json();
+            if (d && d.status === 'ok' && Array.isArray(d.rows) && d.rows.length) {
+                setAnnouncements(d.rows);
+                try { localStorage.setItem('tianying_announcements', JSON.stringify(d.rows)); } catch (e) { }
+            }
+        } catch (e) { /* 離線 → 沿用本機快取 */ }
+    };
+    // 公告雲端同步：推送整份清單到「公告欄」分頁（最後寫入為準）。
+    //  圖片連同送出：新圖為 base64 → GAS 上傳至 Drive 換成連結；舊圖為 Drive 連結直接沿用。
+    //  回應可讀 → 直接以含連結的清單覆寫本機（跨裝置可見、避免下次編輯重複上傳）。
+    const pushAnnouncementsCloud = async (list) => {
+        if (!ACCOUNT_GAS_URL) return;
+        try {
+            const data = JSON.stringify({ announcements: list || [] });
+            const res = await fetch(ACCOUNT_GAS_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'action=saveAnnouncements&data=' + encodeURIComponent(data)
+            });
+            const d = await res.json();
+            if (d && d.status === 'ok' && Array.isArray(d.rows)) {
+                setAnnouncements(d.rows);
+                try { localStorage.setItem('tianying_announcements', JSON.stringify(d.rows)); } catch (e) { }
+            }
+        } catch (e) { /* 離線：本機已更新，下次連線再同步 */ }
+    };
+    // 公告：開啟時自雲端「公告欄」分頁載入最新（含圖片 Drive 連結，跨裝置同步）；雲端為空則以本機種子化
+    useEffect(() => {
+        if (!ACCOUNT_GAS_URL) return;
         (async () => {
             try {
-                const raw = localStorage.getItem('tianying_perms');
-                const savedVer = localStorage.getItem('tianying_perms_ver');
-                const versionChanged = savedVer !== PERMS_VER;
-                // v3 與 v4 儲存格式相同（完整快照）；版本變更時與新預設值聯集，
-                // 確保新增工具（如施工單查詢）權限自動補上，且不遺失使用者已設定的權限
-                if (raw) {
-                    const saved = JSON.parse(raw);
-                    setPerms(prev => {
-                        const merged = { ...prev };
-                        Object.keys(prev).forEach(role => {
-                            if (Array.isArray(saved[role])) {
-                                merged[role] = versionChanged
-                                    ? Array.from(new Set([...saved[role], ...prev[role]]))
-                                    : saved[role];
-                            }
-                        });
-                        return merged;
-                    });
-                    if (versionChanged) localStorage.setItem('tianying_perms_ver', PERMS_VER);
+                const res = await fetch(ACCOUNT_GAS_URL + '?action=getAnnouncements');
+                const d = await res.json();
+                if (!d || d.status !== 'ok' || !Array.isArray(d.rows)) return;
+                if (!d.rows.length) {
+                    if (announcements.length) pushAnnouncementsCloud(announcements); // 首次部署種子化
+                    return;
                 }
-            }
-            catch (e) { /* 尚無儲存的權限設定，使用預設值 */ }
+                setAnnouncements(d.rows);
+                try { localStorage.setItem('tianying_announcements', JSON.stringify(d.rows)); } catch (e) { }
+            } catch (e) { /* 離線 → 沿用本機快取 */ }
         })();
+    }, []);
+    // 載入已儲存的權限設定（v6：儲存值為權威，含「移除」的工具不再被預設值蓋回；
+    //  僅針對「儲存後系統才新增的工具」自動補上預設權限，靠 perms_known 已知工具清單判斷）
+    const PERMS_VER = 'v6';
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem('tianying_perms');
+            if (!raw) return; // 尚無儲存設定 → 直接用 DEFAULT_PERMS
+            const saved = JSON.parse(raw);
+            // 已知工具清單：儲存當下系統存在的工具 id；舊版未紀錄 → 視為「全部已知」避免把移除項當新增補回
+            let known = null;
+            try { known = JSON.parse(localStorage.getItem('tianying_perms_known') || 'null'); } catch (e) { }
+            const knownSet = new Set(Array.isArray(known) ? known : []);
+            const hasKnown = knownSet.size > 0;
+            setPerms(prev => {
+                const merged = { ...prev };
+                Object.keys(prev).forEach(role => {
+                    if (!Array.isArray(saved[role])) return;
+                    const base = [...saved[role]]; // 儲存值完整沿用（權威）
+                    if (hasKnown) {
+                        // 只補「儲存後才新增的工具」之預設權限，絕不影響既有移除
+                        (prev[role] || []).forEach(toolId => {
+                            if (!knownSet.has(toolId) && !base.includes(toolId)) base.push(toolId);
+                        });
+                    }
+                    merged[role] = base;
+                });
+                return merged;
+            });
+            localStorage.setItem('tianying_perms_ver', PERMS_VER);
+        }
+        catch (e) { /* 解析失敗 → 沿用預設值 */ }
     }, []);
     // 記住我：頁面載入時自動登入
     useEffect(() => {
@@ -19250,10 +19318,11 @@ function App() {
             const current = prev[roleId] || [];
             const next = current.includes(toolId) ? current.filter(x => x !== toolId) : [...current, toolId];
             const merged = { ...prev, [roleId]: next };
-            /* 即時寫入本機，避免重整/重開時被舊設定覆蓋 */
+            /* 即時寫入本機，避免重整/重開時被舊設定覆蓋（版本與已知工具清單一併更新） */
             try {
                 localStorage.setItem('tianying_perms', JSON.stringify(merged));
-                localStorage.setItem('tianying_perms_ver', 'v4');
+                localStorage.setItem('tianying_perms_known', JSON.stringify(TOOLS.map(t => t.id)));
+                localStorage.setItem('tianying_perms_ver', PERMS_VER);
             } catch (e) {}
             return merged;
         });
@@ -19584,7 +19653,8 @@ function App() {
                 React.createElement("button", { className: "save-btn", onClick: async () => {
                         try {
                             localStorage.setItem('tianying_perms', JSON.stringify(perms));
-                            localStorage.setItem('tianying_perms_ver', 'v4');
+                            localStorage.setItem('tianying_perms_known', JSON.stringify(TOOLS.map(t => t.id)));
+                            localStorage.setItem('tianying_perms_ver', PERMS_VER);
                             setPermsSaved(true);
                             setTimeout(() => setPermsSaved(false), 2500);
                             showToast("✅ 權限設定已儲存為系統預設！");
@@ -19598,6 +19668,8 @@ function App() {
                         setPerms(DEFAULT_PERMS);
                         try {
                             localStorage.removeItem('tianying_perms');
+                            localStorage.removeItem('tianying_perms_known');
+                            localStorage.removeItem('tianying_perms_ver');
                         }
                         catch (e) { }
                         showToast("🔄 已還原為原廠預設權限");
@@ -20175,17 +20247,21 @@ function App() {
                                 }
                                 const now = new Date().toLocaleDateString('zh-TW').replace(/\//g, '-');
                                 if (editingAnn.id) {
-                                    setAnnouncements(prev => prev.map(a => a.id === editingAnn.id
-                                        ? { ...a, ...editingAnn, date: now } : a));
-                                    showToast('✅ 公告已更新');
+                                    const next = announcements.map(a => a.id === editingAnn.id
+                                        ? { ...a, ...editingAnn, date: now } : a);
+                                    setAnnouncements(next);
+                                    pushAnnouncementsCloud(next);
+                                    showToast('✅ 公告已更新（同步雲端）');
                                 }
                                 else {
-                                    setAnnouncements(prev => [
+                                    const next = [
                                         { id: Date.now(), ...editingAnn,
                                             author: (currentUser === null || currentUser === void 0 ? void 0 : currentUser.name) || '管理員', date: now },
-                                        ...prev
-                                    ]);
-                                    showToast('✅ 公告已新增');
+                                        ...announcements
+                                    ];
+                                    setAnnouncements(next);
+                                    pushAnnouncementsCloud(next);
+                                    showToast('✅ 公告已新增（同步雲端）');
                                 }
                                 setEditingAnn(null);
                             }, style: { flex: 1, background: 'linear-gradient(135deg,#D4A800,#FFD700)', border: 'none',
@@ -20229,8 +20305,10 @@ function App() {
                                     cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif" } }, "\u270F\uFE0F"),
                             React.createElement("button", { onClick: () => {
                                     if (window.confirm(`確定要刪除「${ann.title}」嗎？`)) {
-                                        setAnnouncements(prev => prev.filter(a => a.id !== ann.id));
-                                        showToast('🗑️ 公告已刪除');
+                                        const next = announcements.filter(a => a.id !== ann.id);
+                                        setAnnouncements(next);
+                                        pushAnnouncementsCloud(next);
+                                        showToast('🗑️ 公告已刪除（同步雲端）');
                                     }
                                 }, style: { background: 'rgba(248,113,113,.12)', border: '1px solid rgba(248,113,113,.25)',
                                     borderRadius: 6, padding: '3px 8px', fontSize: 11, color: 'var(--error)',
