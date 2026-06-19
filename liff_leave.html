@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>天鷹保全 · 請假申請</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="https://static.line-cdn.net/liff/edge/2/sdk.js"></script>
 <style>
 /* ── 天鷹保全設計變數 ── */
 :root{
@@ -100,6 +100,11 @@ body{
 .cal-cell.past{opacity:.28; cursor:not-allowed;}
 .cal-cell.sel{background:linear-gradient(135deg,var(--gold3),var(--gold4)); color:var(--bg); font-weight:900; border-color:var(--gold2);}
 .cal-cell.today{border-color:var(--indigo);}
+.cal-cell.full{background:rgba(248,113,113,.1); color:#F87171; cursor:not-allowed;}
+.cal-cell{position:relative;}
+.cal-cell .cnt{position:absolute; bottom:2px; left:0; right:0; text-align:center; font-size:8px; line-height:1; font-weight:700;}
+.cal-legend{display:flex; gap:10px; margin-top:8px; font-size:10px; color:var(--muted); flex-wrap:wrap; justify-content:center;}
+.cal-legend .dot{display:inline-block; width:10px; height:10px; border-radius:3px; vertical-align:middle; margin-right:3px;}
 .sel-count{margin-top:12px; font-size:13px; color:var(--muted); text-align:center;}
 .sel-count b{color:var(--gold2); font-size:15px;}
 /* ── 按鈕 ── */
@@ -227,6 +232,11 @@ body{
       </div>
       <div class="cal-grid" id="cal-dow"></div>
       <div class="cal-grid" id="cal-body" style="margin-top:5px;"></div>
+      <div class="cal-legend">
+        <span><span class="dot" style="background:linear-gradient(135deg,var(--gold3),var(--gold4));"></span>已選</span>
+        <span><span class="dot" style="background:rgba(248,113,113,.2);"></span>已滿</span>
+        <span>每格數字 = 申請人數/上限</span>
+      </div>
       <div class="sel-count">已選 <b id="sel-count">0</b> 天</div>
     </div>
 
@@ -268,6 +278,8 @@ var calMin = new Date();          // 最早可顯示月（本月）
 calRef.setDate(1); calMin.setDate(1);
 var calMaxMonthOffset = 1;        // 可往後切換到下個月（預排休）
 var selectedDates = {};           // { 'YYYY-MM-DD': true }
+var LEAVE_CAP = 3;                 // 每天請假人數上限（與管理員頁初值一致）
+var dayCount = {};                 // { 'YYYY-MM-DD': 已申請人數 }
 var submitting = false;
 
 /* ── 工具 ── */
@@ -306,6 +318,23 @@ function renderDow(){
   $('cal-dow').innerHTML = html;
 }
 
+// 從 GAS 抓所有請假申請，統計每日人數（排除 rejected）
+function loadLeaveCounts(){
+  var url = GAS_URL + '?action=getLeaveRequests';
+  return fetch(url).then(function(r){ return r.json(); }).then(function(d){
+    dayCount = {};
+    if(d && (d.status==='ok') && Array.isArray(d.list)){
+      d.list.forEach(function(req){
+        if(req.status === 'rejected') return;
+        var dates = req.dates || [];
+        dates.forEach(function(dt){
+          dayCount[dt] = (dayCount[dt] || 0) + 1;
+        });
+      });
+    }
+  }).catch(function(){ dayCount = {}; });
+}
+
 function renderCal(){
   var y = calRef.getFullYear(), m = calRef.getMonth();
   $('cal-title').textContent = y + '年 ' + (m+1) + '月';
@@ -328,10 +357,17 @@ function renderCal(){
     var key = ymd(cur);
     var cls = 'cal-cell';
     var isPast = cur < today;
+    var isSel = !!selectedDates[key];
+    var used = dayCount[key] || 0;
+    var isFull = used >= LEAVE_CAP;
     if(isPast) cls += ' past';
-    if(selectedDates[key]) cls += ' sel';
+    if(isSel) cls += ' sel';
     if(cur.getTime()===today.getTime()) cls += ' today';
-    html += '<div class="'+cls+'" data-key="'+key+'" '+(isPast?'':'onclick="toggleDay(this)"')+'>'+d+'</div>';
+    if(isFull && !isSel && !isPast) cls += ' full';
+    // 額滿且未選 → 不可點；過去日 → 不可點
+    var canPick = !isPast && (!isFull || isSel);
+    var cntHtml = used>0 ? '<span class="cnt">'+used+'/'+LEAVE_CAP+'</span>' : '';
+    html += '<div class="'+cls+'" data-key="'+key+'" '+(canPick?'onclick="toggleDay(this)"':'')+'>'+d+cntHtml+'</div>';
   }
   $('cal-body').innerHTML = html;
   updateCount();
@@ -339,6 +375,13 @@ function renderCal(){
 
 function toggleDay(el){
   var key = el.getAttribute('data-key');
+  var used = dayCount[key] || 0;
+  var isSel = !!selectedDates[key];
+  // 額滿且尚未選取 → 不可選
+  if(used >= LEAVE_CAP && !isSel){
+    alert('⚠️ ' + key + ' 當天請假人數已滿（' + used + '/' + LEAVE_CAP + '）');
+    return;
+  }
   if(selectedDates[key]){ delete selectedDates[key]; el.classList.remove('sel'); }
   else { selectedDates[key] = true; el.classList.add('sel'); }
   updateCount();
@@ -416,10 +459,12 @@ function bootForm(){
   $('me-id').textContent = '工號 ' + ME.empId + (ME.dept ? '　·　'+ME.dept : '');
   $('me-avatar').textContent = (ME.name||'?').charAt(0);
   renderDow();
+  showState('form');
+  // 先顯示表單，再非同步抓人數，抓完重新渲染日曆
   renderCal();
+  loadLeaveCounts().then(function(){ renderCal(); });
   $('cal-prev').onclick = calPrev;
   $('cal-next').onclick = calNext;
-  showState('form');
 }
 
 function hideSplash(){
