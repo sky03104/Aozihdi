@@ -19118,6 +19118,21 @@ function App() {
             if (d.status === 'ok') {
                 if (typeof d.leaveCapMorning === 'number') setLeaveCapMorning(d.leaveCapMorning);
                 if (typeof d.leaveCapNight === 'number') setLeaveCapNight(d.leaveCapNight);
+                if (d.toolPerms) {
+                    try {
+                        const cp = typeof d.toolPerms === 'string' ? JSON.parse(d.toolPerms) : d.toolPerms;
+                        if (cp && typeof cp === 'object') {
+                            setPerms(prev => {
+                                const m = { ...prev };
+                                Object.keys(prev).forEach(role => { if (Array.isArray(cp[role])) m[role] = cp[role]; });
+                                return m;
+                            });
+                            localStorage.setItem('tianying_perms', JSON.stringify(cp));
+                            localStorage.setItem('tianying_perms_known', JSON.stringify(TOOLS.map(t => t.id)));
+                            localStorage.setItem('tianying_perms_ver', PERMS_VER);
+                        }
+                    } catch (e) { }
+                }
             }
         } catch (e) { /* 失敗用預設 早5晚3 */ }
     };
@@ -19702,7 +19717,16 @@ function App() {
                             localStorage.setItem('tianying_perms_ver', PERMS_VER);
                             setPermsSaved(true);
                             setTimeout(() => setPermsSaved(false), 2500);
-                            showToast("✅ 權限設定已儲存為系統預設！");
+                            try {
+                                const body = new FormData();
+                                body.append('action', 'setSettings');
+                                body.append('data', JSON.stringify({ toolPerms: JSON.stringify(perms) }));
+                                const r = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
+                                const d = await r.json();
+                                showToast(d.status === 'ok' ? "✅ 權限已同步到雲端，所有裝置將自動更新！" : "✅ 本機已儲存（雲端同步失敗）");
+                            } catch (e) {
+                                showToast("✅ 本機已儲存（無網路，雲端未同步）");
+                            }
                         }
                         catch (e) {
                             showToast("⚠️ 儲存失敗，請再試一次");
