@@ -103,6 +103,9 @@ body{
 .cal-cell.full{background:rgba(248,113,113,.1); color:#F87171; cursor:not-allowed;}
 .cal-cell{position:relative;}
 .cal-cell .cnt{position:absolute; bottom:2px; left:0; right:0; text-align:center; font-size:8px; line-height:1; font-weight:700;}
+.shift-badge{display:inline-block; margin-left:6px; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:700; vertical-align:middle;}
+.shift-badge.m{background:rgba(129,140,248,.18); color:#818CF8; border:1px solid rgba(129,140,248,.4);}
+.shift-badge.n{background:rgba(212,168,0,.18); color:var(--gold2); border:1px solid rgba(212,168,0,.4);}
 .cal-legend{display:flex; gap:10px; margin-top:8px; font-size:10px; color:var(--muted); flex-wrap:wrap; justify-content:center;}
 .cal-legend .dot{display:inline-block; width:10px; height:10px; border-radius:3px; vertical-align:middle; margin-right:3px;}
 .sel-count{margin-top:12px; font-size:13px; color:var(--muted); text-align:center;}
@@ -235,7 +238,7 @@ body{
       <div class="cal-legend">
         <span><span class="dot" style="background:linear-gradient(135deg,var(--gold3),var(--gold4));"></span>已選</span>
         <span><span class="dot" style="background:rgba(248,113,113,.2);"></span>已滿</span>
-        <span>每格數字 = 申請人數/上限</span>
+        <span>數字＝你班別當天人數/上限</span>
       </div>
       <div class="sel-count">已選 <b id="sel-count">0</b> 天</div>
     </div>
@@ -270,7 +273,7 @@ var LIFF_ID = '2010392723-P8uR4CaO';
 var TYPE_COLOR = { '排休':'#818CF8','病假':'#F87171','事假':'#FB923C','婚假':'#F0C040','喪假':'#6B7280','公假':'#3B82F6' };
 
 // 目前使用者
-var ME = { empId:'', name:'', dept:'' };
+var ME = { empId:'', name:'', dept:'', shift:'晚班' };
 
 // 月曆狀態
 var calRef = new Date();          // 目前顯示的月份
@@ -278,8 +281,10 @@ var calMin = new Date();          // 最早可顯示月（本月）
 calRef.setDate(1); calMin.setDate(1);
 var calMaxMonthOffset = 1;        // 可往後切換到下個月（預排休）
 var selectedDates = {};           // { 'YYYY-MM-DD': true }
-var LEAVE_CAP = 3;                 // 每天請假人數上限（與管理員頁初值一致）
-var dayCount = {};                 // { 'YYYY-MM-DD': 已申請人數 }
+// 早晚班分軌：上限從 GAS 系統設定讀取，預設早5晚3
+var CAP = { '早班':5, '晚班':3 };
+// 分早晚統計每日人數：dayCount['早班']['2026-07-04'] = 人數
+var dayCount = { '早班':{}, '晚班':{} };
 var submitting = false;
 
 /* ── 工具 ── */
@@ -318,21 +323,33 @@ function renderDow(){
   $('cal-dow').innerHTML = html;
 }
 
-// 從 GAS 抓所有請假申請，統計每日人數（排除 rejected）
+// 讀取早晚班上限（系統設定）
+function loadSettings(){
+  var url = GAS_URL + '?action=getSettings';
+  return fetch(url).then(function(r){ return r.json(); }).then(function(d){
+    if(d && d.status==='ok'){
+      if(typeof d.leaveCapMorning === 'number') CAP['早班'] = d.leaveCapMorning;
+      if(typeof d.leaveCapNight   === 'number') CAP['晚班'] = d.leaveCapNight;
+    }
+  }).catch(function(){ /* 失敗用預設 早5晚3 */ });
+}
+
+// 從 GAS 抓所有請假申請，分早晚班統計每日人數（排除 rejected）
 function loadLeaveCounts(){
   var url = GAS_URL + '?action=getLeaveRequests';
   return fetch(url).then(function(r){ return r.json(); }).then(function(d){
-    dayCount = {};
-    if(d && (d.status==='ok') && Array.isArray(d.list)){
+    dayCount = { '早班':{}, '晚班':{} };
+    if(d && d.status==='ok' && Array.isArray(d.list)){
       d.list.forEach(function(req){
         if(req.status === 'rejected') return;
+        var sh = (req.shift === '早班') ? '早班' : '晚班';  // 容錯：非早班一律當晚班
         var dates = req.dates || [];
         dates.forEach(function(dt){
-          dayCount[dt] = (dayCount[dt] || 0) + 1;
+          dayCount[sh][dt] = (dayCount[sh][dt] || 0) + 1;
         });
       });
     }
-  }).catch(function(){ dayCount = {}; });
+  }).catch(function(){ dayCount = { '早班':{}, '晚班':{} }; });
 }
 
 function renderCal(){
@@ -352,21 +369,22 @@ function renderCal(){
 
   var html = '';
   for(var i=0;i<firstDow;i++) html += '<div class="cal-cell empty"></div>';
+  var myShift = (ME.shift === '早班') ? '早班' : '晚班';
+  var myCap = CAP[myShift];
   for(var d=1;d<=daysInMonth;d++){
     var cur = new Date(y, m, d);
     var key = ymd(cur);
     var cls = 'cal-cell';
     var isPast = cur < today;
     var isSel = !!selectedDates[key];
-    var used = dayCount[key] || 0;
-    var isFull = used >= LEAVE_CAP;
+    var used = (dayCount[myShift] && dayCount[myShift][key]) || 0;
+    var isFull = used >= myCap;
     if(isPast) cls += ' past';
     if(isSel) cls += ' sel';
     if(cur.getTime()===today.getTime()) cls += ' today';
     if(isFull && !isSel && !isPast) cls += ' full';
-    // 額滿且未選 → 不可點；過去日 → 不可點
     var canPick = !isPast && (!isFull || isSel);
-    var cntHtml = used>0 ? '<span class="cnt">'+used+'/'+LEAVE_CAP+'</span>' : '';
+    var cntHtml = used>0 ? '<span class="cnt">'+used+'/'+myCap+'</span>' : '';
     html += '<div class="'+cls+'" data-key="'+key+'" '+(canPick?'onclick="toggleDay(this)"':'')+'>'+d+cntHtml+'</div>';
   }
   $('cal-body').innerHTML = html;
@@ -375,11 +393,12 @@ function renderCal(){
 
 function toggleDay(el){
   var key = el.getAttribute('data-key');
-  var used = dayCount[key] || 0;
   var isSel = !!selectedDates[key];
-  // 額滿且尚未選取 → 不可選
-  if(used >= LEAVE_CAP && !isSel){
-    alert('⚠️ ' + key + ' 當天請假人數已滿（' + used + '/' + LEAVE_CAP + '）');
+  var myShift = (ME.shift === '早班') ? '早班' : '晚班';
+  var myCap = CAP[myShift];
+  var used = (dayCount[myShift] && dayCount[myShift][key]) || 0;
+  if(used >= myCap && !isSel){
+    alert('⚠️ ' + key + ' 當天「' + myShift + '」請假人數已滿（' + used + '/' + myCap + '）');
     return;
   }
   if(selectedDates[key]){ delete selectedDates[key]; el.classList.remove('sel'); }
@@ -421,6 +440,7 @@ function submitLeave(){
     endDate: dates[dates.length-1],
     days: dates.length,
     reason: $('f-reason').value.trim(),
+    shift: (ME.shift === '早班') ? '早班' : '晚班',
     appliedAt: ymd(new Date())
   };
 
@@ -456,15 +476,18 @@ function resolveEmp(userId){
 /* ── 啟動 ── */
 function bootForm(){
   $('me-name').textContent = ME.name;
-  $('me-id').textContent = '工號 ' + ME.empId + (ME.dept ? '　·　'+ME.dept : '');
+  var myShift = (ME.shift === '早班') ? '早班' : '晚班';
+  var badgeCls = (myShift === '早班') ? 'm' : 'n';
+  $('me-id').innerHTML = '工號 ' + ME.empId + (ME.dept ? '　·　'+ME.dept : '') +
+    '<span class="shift-badge '+badgeCls+'">'+myShift+'</span>';
   $('me-avatar').textContent = (ME.name||'?').charAt(0);
   renderDow();
-  showState('form');
-  // 先顯示表單，再非同步抓人數，抓完重新渲染日曆
-  renderCal();
-  loadLeaveCounts().then(function(){ renderCal(); });
   $('cal-prev').onclick = calPrev;
   $('cal-next').onclick = calNext;
+  showState('form');
+  // 先渲染一次（用預設值），再非同步抓設定+人數後重渲染
+  renderCal();
+  Promise.all([loadSettings(), loadLeaveCounts()]).then(function(){ renderCal(); });
 }
 
 function hideSplash(){
@@ -501,6 +524,7 @@ async function main(){
       ME.empId = res.empId;
       ME.name = res.name || '';
       ME.dept = res.dept || '';
+      ME.shift = (res.shift === '早班') ? '早班' : '晚班';
       bootForm();
     } else {
       showState('unbound');

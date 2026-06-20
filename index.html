@@ -18878,7 +18878,8 @@ function App() {
         const d = new Date();
         return { year: d.getFullYear(), month: d.getMonth() };
     });
-    const [leaveCapacity, setLeaveCapacity] = useState(3); // 每天最多請假人數
+    const [leaveCapMorning, setLeaveCapMorning] = useState(5); // 早班每天最多請假人數
+    const [leaveCapNight, setLeaveCapNight] = useState(3);     // 晚班每天最多請假人數
     const [userDb, setUserDb] = useState(() => {
         // 帳號資料持久化載入：與預設 USER_DB 合併（儲存值覆蓋同工號、保留雙方新增的帳號）
         try {
@@ -19018,6 +19019,7 @@ function App() {
                 loadPendingFromCloud(true);
             }
             loadLeaveFromCloud(true);
+            loadLeaveSettings();
             setPage("main");
         } catch(e) {}
     }, []);
@@ -19057,6 +19059,7 @@ function App() {
             loadPendingFromCloud(true);
         }
         loadLeaveFromCloud(true);
+        loadLeaveSettings();
         setPage("main");
         showToast("✅ 登入成功，歡迎回來！");
     };
@@ -19096,6 +19099,34 @@ function App() {
             }
         } catch (e) {
             showToast('⚠️ 請假清單雲端連線失敗：' + e.message, 'err');
+        }
+    };
+    /* ── 從雲端載入早晚班請假上限（系統設定分頁） ── */
+    const loadLeaveSettings = async () => {
+        try {
+            const res = await fetch(ACCOUNT_GAS_URL + '?action=getSettings');
+            const d = await res.json();
+            if (d.status === 'ok') {
+                if (typeof d.leaveCapMorning === 'number') setLeaveCapMorning(d.leaveCapMorning);
+                if (typeof d.leaveCapNight === 'number') setLeaveCapNight(d.leaveCapNight);
+            }
+        } catch (e) { /* 失敗用預設 早5晚3 */ }
+    };
+    /* ── 管理員儲存早晚班上限到雲端 ── */
+    const saveLeaveSettings = async (m, n) => {
+        try {
+            const body = new FormData();
+            body.append('action', 'setSettings');
+            body.append('data', JSON.stringify({ leaveCapMorning: m, leaveCapNight: n }));
+            const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
+            const d = await res.json();
+            if (d.status === 'ok') {
+                showToast(`✅ 已儲存上限（早${d.leaveCapMorning}／晚${d.leaveCapNight}）`);
+            } else {
+                showToast('⚠️ 上限儲存失敗：' + (d.msg || '未知錯誤'), 'err');
+            }
+        } catch (e) {
+            showToast('⚠️ 上限儲存連線失敗：' + e.message, 'err');
         }
     };
     /* ── LINE 綁定：查詢目前工號的綁定狀態 ── */
@@ -19922,13 +19953,14 @@ function App() {
                             const daysInMonth = new Date(year, month + 1, 0).getDate();
                             const today = new Date();
                             const todayStr = today.toLocaleDateString('sv-SE'); // YYYY-MM-DD
-                            // 計算每天已有多少人申請（已核准 + 待審核）
-                            const dayCount = {};
+                            // 計算每天已有多少人申請（已核准 + 待審核），分早晚班
+                            const dayCount = { '早班': {}, '晚班': {} };
                             leaveRequests.forEach(req => {
                                 if (req.status === 'rejected')
                                     return;
+                                const sh = (req.shift === '早班') ? '早班' : '晚班';
                                 (req.dates || []).forEach(d => {
-                                    dayCount[d] = (dayCount[d] || 0) + 1;
+                                    dayCount[sh][d] = (dayCount[sh][d] || 0) + 1;
                                 });
                             });
                             const cells = [];
@@ -19947,12 +19979,15 @@ function App() {
                                     const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                                     const isPast = dStr < todayStr;
                                     const isSel = leaveForm.selectedDates.includes(dStr);
-                                    const used = dayCount[dStr] || 0;
-                                    const isFull = used >= leaveCapacity;
+                                    const usedM = dayCount['早班'][dStr] || 0;
+                                    const usedN = dayCount['晚班'][dStr] || 0;
+                                    const fullM = usedM >= leaveCapMorning;
+                                    const fullN = usedN >= leaveCapNight;
+                                    const isFull = fullM && fullN; // 早晚都滿才視為該日額滿
                                     const canPick = !isPast && (!isFull || isSel);
                                     return (React.createElement("button", { key: i, disabled: !canPick, onClick: () => {
                                             if (isFull && !isSel) {
-                                                showToast(`⚠️ ${dStr} 當天請假人數已滿`);
+                                                showToast(`⚠️ ${dStr} 早晚班皆已額滿`);
                                                 return;
                                             }
                                             setLeaveForm(p => ({
@@ -19990,11 +20025,13 @@ function App() {
                                             minHeight: 36
                                         } },
                                         React.createElement("span", null, d),
-                                        used > 0 && (React.createElement("span", { style: { fontSize: 8, marginTop: 1,
-                                                color: isSel ? '#0A0C10' : (isFull ? '#F87171' : 'var(--muted)') } },
-                                            used,
-                                            "/",
-                                            leaveCapacity))));
+                                        (usedM > 0 || usedN > 0) && (React.createElement("span", { style: { fontSize: 7.5, marginTop: 1, lineHeight: 1.25,
+                                                color: isSel ? '#0A0C10' : 'var(--muted)' } },
+                                            React.createElement("span", { style: { color: isSel ? '#0A0C10' : (fullM ? '#F87171' : '#818CF8') } },
+                                                "早" + usedM + "/" + leaveCapMorning),
+                                            React.createElement("br", null),
+                                            React.createElement("span", { style: { color: isSel ? '#0A0C10' : (fullN ? '#F87171' : 'var(--gold2)') } },
+                                                "晚" + usedN + "/" + leaveCapNight)))));
                                 })),
                                 React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 8, fontSize: 10, color: 'var(--muted)', flexWrap: 'wrap' } },
                                     React.createElement("span", null,
@@ -20007,17 +20044,26 @@ function App() {
                                                 background: 'rgba(248,113,113,.2)',
                                                 borderRadius: 3, verticalAlign: 'middle' } }),
                                         " \u5DF2\u6EFF"),
-                                    React.createElement("span", null, "\u6BCF\u683C\u6578\u5B57 = \u7533\u8ACB\u4EBA\u6578/\u4E0A\u9650"))));
+                                    React.createElement("span", null, "\u65E9/\u665A = \u65E9\u73ED\u00B7\u665A\u73ED\u7533\u8ACB\u4EBA\u6578/\u4E0A\u9650"))));
                         })()),
                     CAN_MANAGE_ROLES.includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role) && (React.createElement("div", { className: "input-group", style: { background: 'rgba(99,102,241,.08)',
                             border: '1px solid rgba(99,102,241,.25)', borderRadius: 8, padding: '10px 12px', marginBottom: 10 } },
                         React.createElement("label", { style: { fontSize: 11, color: 'var(--indigo2)', fontWeight: 700,
-                                letterSpacing: 1, display: 'block', marginBottom: 6 } }, "\uD83D\uDD27 \u7BA1\u7406\u54E1\u5C08\u5C6C\uFF1A\u6BCF\u65E5\u8ACB\u5047\u4EBA\u6578\u4E0A\u9650"),
-                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
-                            React.createElement("input", { type: "number", min: "1", max: "50", value: leaveCapacity, onChange: e => setLeaveCapacity(Math.max(1, parseInt(e.target.value) || 1)), style: { flex: 1, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)',
+                                letterSpacing: 1, display: 'block', marginBottom: 6 } }, "\uD83D\uDD27 \u7BA1\u7406\u54E1\u5C08\u5C6C\uFF1A\u6BCF\u65E5\u8ACB\u5047\u4EBA\u6578\u4E0A\u9650\uFF08\u65E9/\u665A\u73ED\uFF09"),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+                            React.createElement("span", { style: { fontSize: 12, color: '#818CF8', fontWeight: 700, minWidth: 30 } }, "\u65E9\u73ED"),
+                            React.createElement("input", { type: "number", min: "0", max: "50", value: leaveCapMorning, onChange: e => setLeaveCapMorning(Math.max(0, parseInt(e.target.value) || 0)), style: { width: 60, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(129,140,248,.3)',
                                     borderRadius: 6, padding: '6px 10px', fontSize: 13, color: 'var(--text)',
                                     fontFamily: "'Microsoft JhengHei',sans-serif", outline: 'none' } }),
-                            React.createElement("span", { style: { fontSize: 12, color: 'var(--muted)' } }, "\u4EBA / \u5929")))),
+                            React.createElement("span", { style: { fontSize: 12, color: 'var(--gold2)', fontWeight: 700, minWidth: 30, marginLeft: 4 } }, "\u665A\u73ED"),
+                            React.createElement("input", { type: "number", min: "0", max: "50", value: leaveCapNight, onChange: e => setLeaveCapNight(Math.max(0, parseInt(e.target.value) || 0)), style: { width: 60, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(212,168,0,.3)',
+                                    borderRadius: 6, padding: '6px 10px', fontSize: 13, color: 'var(--text)',
+                                    fontFamily: "'Microsoft JhengHei',sans-serif", outline: 'none' } }),
+                            React.createElement("span", { style: { fontSize: 12, color: 'var(--muted)' } }, "\u4EBA / \u5929")),
+                        React.createElement("button", { onClick: () => saveLeaveSettings(leaveCapMorning, leaveCapNight), style: { marginTop: 8, width: '100%',
+                                background: 'linear-gradient(135deg,#6366F1,#818CF8)', border: 'none', borderRadius: 6,
+                                padding: '7px 0', fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer',
+                                fontFamily: "'Microsoft JhengHei',sans-serif" } }, "\uD83D\uDCBE \u5132\u5B58\u4E0A\u9650\u81F3\u96F2\u7AEF"))),
                     React.createElement("div", { className: "input-group" },
                         React.createElement("label", { className: "input-label" }, "\u8ACB\u5047\u539F\u56E0\uFF08\u9078\u586B\uFF09"),
                         React.createElement("textarea", { value: leaveForm.reason, onChange: e => setLeaveForm(p => ({ ...p, reason: e.target.value })), placeholder: "\u8ACB\u8F38\u5165\u8ACB\u5047\u539F\u56E0\u2026", rows: 2, style: { width: '100%', background: 'rgba(255,255,255,.06)',
