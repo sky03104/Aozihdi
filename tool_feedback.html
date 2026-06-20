@@ -652,28 +652,42 @@
                 setShowConfirmModal(true);
             };
 
+            // 將檔案轉為 base64 的輔助函式
+            const fileToBase64 = (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            };
+
             const confirmSubmit = async () => {
                 setShowConfirmModal(false);
                 setIsSubmitting(true);
                 setErrorMessage('');
 
                 try {
-                    // 構建 FormData
+                    // 將圖片轉為 base64 陣列
+                    let imagesBase64 = [];
+                    if (formData.files.length > 0) {
+                        imagesBase64 = await Promise.all(
+                            formData.files.map(file => fileToBase64(file))
+                        );
+                    }
+
+                    // 構建 FormData（欄位名稱對齊 GAS）
                     const formDataToSend = new FormData();
+                    formDataToSend.append('action', 'feedback');
                     formDataToSend.append('type', feedbackType);
-                    formDataToSend.append('targetName', formData.targetName);
+                    formDataToSend.append('target', formData.targetName);
                     formDataToSend.append('category', formData.category);
                     formDataToSend.append('description', formData.description);
                     formDataToSend.append('date', formData.date);
-                    formDataToSend.append('submittedAt', new Date().toISOString());
-                    formDataToSend.append('submitterId', empId); // 系統後台記錄用
+                    formDataToSend.append('empId', empId);
+                    formDataToSend.append('images', imagesBase64.length > 0 ? JSON.stringify(imagesBase64) : '');
 
-                    // 添加檔案
-                    formData.files.forEach((file, index) => {
-                        formDataToSend.append(`file_${index}`, file);
-                    });
-
-                    // 發送到 GAS（placeholder URL）
+                    // 發送到 GAS
                     const gasUrl = 'https://script.google.com/macros/s/AKfycbwHXlwTMmJyA79Cuzdh2IPRnBLUWm2YPEqXn5XJj4GVEUlCnNIv8hgRTJ7Xr198hZxG/exec';
 
                     const response = await fetch(gasUrl, {
