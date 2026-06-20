@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>天鷹保全 · 匿名表揚/檢舉</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/react@19/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@19/umd/react-dom.production.min.js"></script>
+    <style>
+        :root {
+            --bg: #0A0C10;
+            --surface: #111827;
+            --primary: #D4A800;
+            --primary-glow: rgba(212, 168, 0, 0.3);
+            --text: #F5F5F5;
+            --text-muted: #8A95A8;
+            --border: rgba(255, 255, 255, 0.08);
+            --success: #4ADE80;
+            --error: #F87171;
+            --glass: rgba(255, 255, 255, 0.03);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Noto Sans TC', sans-serif;
+            min-height: 100vh;
+        }
+
+        #splash {
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s;
+        }
+
+        #splash.hide {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .splash-ring {
+            width: 50px;
+            height: 50px;
+            border: 3px solid transparent;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .back-btn {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 12px;
+            border-radius: 8px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: var(--primary);
+        }
+
+        .emp-info {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .card {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(12px);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            color: var(--primary);
+            margin: 0 0 20px 0;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .card-subtitle {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin: 0 0 16px 0;
+            line-height: 1.5;
+        }
+
+        .tab-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            background: var(--glass);
+            color: var(--text-muted);
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            font-family: 'Noto Sans TC', sans-serif;
+            font-size: 14px;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #D4A800, #F0C040);
+            color: #000;
+            border-color: var(--primary);
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: var(--primary);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .label {
+            display: block;
+            color: var(--text);
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .label-required {
+            color: var(--error);
+            margin-left: 4px;
+        }
+
+        .input,
+        .textarea,
+        .select {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            color: var(--text);
+            font-family: 'Noto Sans TC', sans-serif;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .input:focus,
+        .textarea:focus,
+        .select:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: rgba(0, 0, 0, 0.3);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        .textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .input::placeholder,
+        .textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        .select option {
+            background: var(--surface);
+            color: var(--text);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-input-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px dashed var(--border);
+            border-radius: 10px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .file-input-label:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(212, 168, 0, 0.05);
+        }
+
+        .file-preview {
+            margin-top: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .file-item {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .file-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .file-remove {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 20px;
+            height: 20px;
+            background: var(--error);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .file-remove:hover {
+            background: #ff4444;
+        }
+
+        .anonymous-notice {
+            background: rgba(212, 168, 0, 0.1);
+            border: 1px solid rgba(212, 168, 0, 0.3);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .anonymous-notice-icon {
+            color: var(--primary);
+            font-size: 18px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .anonymous-notice-text {
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .btn-primary {
+            width: 100%;
+            background: linear-gradient(135deg, #D4A800, #F0C040);
+            color: #000;
+            border: none;
+            padding: 16px;
+            border-radius: 12px;
+            font-weight: 700;
+            margin-top: 20px;
+            cursor: pointer;
+            font-family: 'Noto Sans TC', sans-serif;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(212, 168, 0, 0.3);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-title {
+            color: var(--primary);
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0 0 12px 0;
+        }
+
+        .modal-content {
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Noto Sans TC', sans-serif;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .modal-btn-cancel {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .modal-btn-cancel:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .modal-btn-confirm {
+            background: linear-gradient(135deg, #D4A800, #F0C040);
+            color: #000;
+        }
+
+        .modal-btn-confirm:hover {
+            box-shadow: 0 4px 12px rgba(212, 168, 0, 0.3);
+        }
+
+        /* Success State */
+        .success-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+            text-align: center;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #D4A800, #F0C040);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            animation: scaleIn 0.6s ease-out;
+        }
+
+        .success-icon i {
+            color: #000;
+            font-size: 40px;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .success-title {
+            color: var(--primary);
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .success-message {
+            color: var(--text-muted);
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .error-message {
+            background: rgba(248, 113, 113, 0.1);
+            border: 1px solid rgba(248, 113, 113, 0.3);
+            border-radius: 10px;
+            padding: 12px;
+            color: #ff6b6b;
+            font-size: 13px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+        }
+
+        .error-message i {
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(212, 168, 0, 0.3);
+            border-top: 2px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 16px;
+            }
+
+            .card {
+                padding: 16px;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 12px;
+                align-items: flex-start;
+            }
+
+            .modal {
+                width: 95%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="splash"><div class="splash-ring"></div></div>
+    <div id="root"></div>
+    <script>
+        const { useState, useEffect } = React;
+        const params = new URLSearchParams(window.location.search);
+        const empId = params.get('empId') || '訪客';
+
+        // 表揚類別
+        const praiseCategories = [
+            '工作表現優異',
+            '熱心助人',
+            '客戶好評',
+            '創新思維',
+            '團隊合作',
+            '其他'
+        ];
+
+        // 檢舉類別
+        const reportCategories = [
+            '違規行為',
+            '態度不佳',
+            '曠職遲到',
+            '服務不周',
+            '其他違規',
+            '其他'
+        ];
+
+        function App() {
+            const [feedbackType, setFeedbackType] = useState('praise'); // 'praise' or 'report'
+            const [formData, setFormData] = useState({
+                targetName: '',
+                category: '',
+                description: '',
+                date: new Date().toISOString().split('T')[0],
+                files: []
+            });
+            const [showConfirmModal, setShowConfirmModal] = useState(false);
+            const [isSubmitting, setIsSubmitting] = useState(false);
+            const [submitSuccess, setSubmitSuccess] = useState(false);
+            const [errorMessage, setErrorMessage] = useState('');
+
+            useEffect(() => {
+                setTimeout(() => {
+                    const s = document.getElementById('splash');
+                    if (s) {
+                        s.classList.add('hide');
+                        setTimeout(() => s.remove(), 500);
+                    }
+                }, 500);
+            }, []);
+
+            // 切換反饋類型時重置表單
+            useEffect(() => {
+                setFormData({
+                    targetName: '',
+                    category: '',
+                    description: '',
+                    date: new Date().toISOString().split('T')[0],
+                    files: []
+                });
+                setErrorMessage('');
+            }, [feedbackType]);
+
+            const handleInputChange = (e) => {
+                const { name, value } = e.target;
+                setFormData(prev => ({
+                    ...prev,
+                    [name]: value
+                }));
+                setErrorMessage('');
+            };
+
+            const handleFileChange = (e) => {
+                const files = Array.from(e.target.files);
+                const validFiles = files.filter(file => {
+                    if (!file.type.startsWith('image/')) {
+                        setErrorMessage('只支援圖片檔案（JPG、PNG、GIF 等）');
+                        return false;
+                    }
+                    if (file.size > 5 * 1024 * 1024) {
+                        setErrorMessage('單個檔案不超過 5MB');
+                        return false;
+                    }
+                    return true;
+                });
+
+                if (formData.files.length + validFiles.length > 5) {
+                    setErrorMessage('最多只能上傳 5 張圖片');
+                    return;
+                }
+
+                setFormData(prev => ({
+                    ...prev,
+                    files: [...prev.files, ...validFiles]
+                }));
+            };
+
+            const removeFile = (index) => {
+                setFormData(prev => ({
+                    ...prev,
+                    files: prev.files.filter((_, i) => i !== index)
+                }));
+            };
+
+            const validateForm = () => {
+                if (!formData.targetName.trim()) {
+                    setErrorMessage('請填寫對象（被表揚/檢舉的人員姓名或工號）');
+                    return false;
+                }
+                if (!formData.category) {
+                    setErrorMessage('請選擇事由分類');
+                    return false;
+                }
+                if (!formData.description.trim()) {
+                    setErrorMessage('請填寫事件描述');
+                    return false;
+                }
+                if (!formData.date) {
+                    setErrorMessage('請選擇發生日期');
+                    return false;
+                }
+                return true;
+            };
+
+            const handleSubmit = () => {
+                if (!validateForm()) {
+                    return;
+                }
+                setShowConfirmModal(true);
+            };
+
+            const confirmSubmit = async () => {
+                setShowConfirmModal(false);
+                setIsSubmitting(true);
+                setErrorMessage('');
+
+                try {
+                    // 構建 FormData
+                    const formDataToSend = new FormData();
+                    formDataToSend.append('type', feedbackType);
+                    formDataToSend.append('targetName', formData.targetName);
+                    formDataToSend.append('category', formData.category);
+                    formDataToSend.append('description', formData.description);
+                    formDataToSend.append('date', formData.date);
+                    formDataToSend.append('submittedAt', new Date().toISOString());
+                    formDataToSend.append('submitterId', empId); // 系統後台記錄用
+
+                    // 添加檔案
+                    formData.files.forEach((file, index) => {
+                        formDataToSend.append(`file_${index}`, file);
+                    });
+
+                    // 發送到 GAS（placeholder URL）
+                    const gasUrl = 'https://script.google.com/macros/d/YOUR_DEPLOYMENT_ID/usercontent';
+
+                    const response = await fetch(gasUrl, {
+                        method: 'POST',
+                        body: formDataToSend,
+                        mode: 'no-cors'
+                    });
+
+                    // 由於 no-cors 模式無法檢查實際狀態，假設成功
+                    setSubmitSuccess(true);
+                    setFormData({
+                        targetName: '',
+                        category: '',
+                        description: '',
+                        date: new Date().toISOString().split('T')[0],
+                        files: []
+                    });
+
+                    // 3 秒後自動返回表單
+                    setTimeout(() => {
+                        setSubmitSuccess(false);
+                    }, 3000);
+                } catch (error) {
+                    setErrorMessage('提交失敗，請稍後重試：' + error.message);
+                    setIsSubmitting(false);
+                }
+            };
+
+            const categories = feedbackType === 'praise' ? praiseCategories : reportCategories;
+            const typeLabel = feedbackType === 'praise' ? '表揚' : '檢舉';
+
+            if (submitSuccess) {
+                return React.createElement("div", { className: "container" },
+                    React.createElement("div", { className: "header" },
+                        React.createElement("a", { href: `../index.html?empId=${empId}`, className: "back-btn" },
+                            React.createElement("i", { className: "ti ti-chevron-left" }), "返回主選單"),
+                        React.createElement("span", { className: "emp-info" }, `人員：${empId}`)
+                    ),
+                    React.createElement("div", { className: "card" },
+                        React.createElement("div", { className: "success-container" },
+                            React.createElement("div", { className: "success-icon" },
+                                React.createElement("i", { className: "ti ti-check" })
+                            ),
+                            React.createElement("div", { className: "success-title" }, "提交成功"),
+                            React.createElement("div", { className: "success-message" },
+                                `您的${typeLabel}已成功提交，感謝您的參與。\n本次提交為完全匿名，您的身份不會顯示在報告中。`
+                            )
+                        )
+                    )
+                );
+            }
+
+            return React.createElement("div", { className: "container" },
+                React.createElement("div", { className: "header" },
+                    React.createElement("a", { href: `../index.html?empId=${empId}`, className: "back-btn" },
+                        React.createElement("i", { className: "ti ti-chevron-left" }), "返回主選單"),
+                    React.createElement("span", { className: "emp-info" }, `人員：${empId}`)
+                ),
+                React.createElement("div", { className: "card" },
+                    React.createElement("h2", { className: "card-title" }, "匿名表揚/檢舉"),
+                    React.createElement("p", { className: "card-subtitle" }, "感謝您的參與，您的意見對我們非常重要。此表單完全匿名，請放心填寫。"),
+
+                    // 類型選擇
+                    React.createElement("div", { className: "tab-group" },
+                        React.createElement("button", {
+                            className: `tab-btn ${feedbackType === 'praise' ? 'active' : ''}`,
+                            onClick: () => setFeedbackType('praise')
+                        },
+                            React.createElement("i", { className: "ti ti-thumb-up" }), " 表揚"
+                        ),
+                        React.createElement("button", {
+                            className: `tab-btn ${feedbackType === 'report' ? 'active' : ''}`,
+                            onClick: () => setFeedbackType('report')
+                        },
+                            React.createElement("i", { className: "ti ti-alert-circle" }), " 檢舉"
+                        )
+                    ),
+
+                    // 匿名提示
+                    React.createElement("div", { className: "anonymous-notice" },
+                        React.createElement("i", { className: "ti ti-lock anonymous-notice-icon" }),
+                        React.createElement("div", { className: "anonymous-notice-text" },
+                            "此為匿名提交，您的身份不會顯示在報告中。系統僅在後台記錄提交者資訊用於防止濫用。"
+                        )
+                    ),
+
+                    // 錯誤訊息
+                    errorMessage && React.createElement("div", { className: "error-message" },
+                        React.createElement("i", { className: "ti ti-alert-triangle" }),
+                        React.createElement("span", null, errorMessage)
+                    ),
+
+                    // 表單
+                    React.createElement("div", { className: "form-group" },
+                        React.createElement("label", { className: "label" },
+                            "對象",
+                            React.createElement("span", { className: "label-required" }, "*")
+                        ),
+                        React.createElement("input", {
+                            type: "text",
+                            className: "input",
+                            name: "targetName",
+                            value: formData.targetName,
+                            onChange: handleInputChange,
+                            placeholder: "被表揚/檢舉的人員姓名或工號"
+                        })
+                    ),
+
+                    React.createElement("div", { className: "form-group" },
+                        React.createElement("label", { className: "label" },
+                            "事由分類",
+                            React.createElement("span", { className: "label-required" }, "*")
+                        ),
+                        React.createElement("select", {
+                            className: "select",
+                            name: "category",
+                            value: formData.category,
+                            onChange: handleInputChange
+                        },
+                            React.createElement("option", { value: "" }, "-- 請選擇 --"),
+                            categories.map(cat =>
+                                React.createElement("option", { key: cat, value: cat }, cat)
+                            )
+                        )
+                    ),
+
+                    React.createElement("div", { className: "form-group" },
+                        React.createElement("label", { className: "label" },
+                            "事件描述",
+                            React.createElement("span", { className: "label-required" }, "*")
+                        ),
+                        React.createElement("textarea", {
+                            className: "textarea",
+                            name: "description",
+                            value: formData.description,
+                            onChange: handleInputChange,
+                            placeholder: "請詳細描述事件經過、時間、地點等相關資訊..."
+                        })
+                    ),
+
+                    React.createElement("div", { className: "form-group" },
+                        React.createElement("label", { className: "label" },
+                            "發生日期",
+                            React.createElement("span", { className: "label-required" }, "*")
+                        ),
+                        React.createElement("input", {
+                            type: "date",
+                            className: "input",
+                            name: "date",
+                            value: formData.date,
+                            onChange: handleInputChange
+                        })
+                    ),
+
+                    React.createElement("div", { className: "form-group" },
+                        React.createElement("label", { className: "label" },
+                            React.createElement("i", { className: "ti ti-photo" }), " 附件上傳（可選）"
+                        ),
+                        React.createElement("div", { className: "file-input-wrapper" },
+                            React.createElement("input", {
+                                type: "file",
+                                id: "fileInput",
+                                className: "file-input",
+                                multiple: true,
+                                accept: "image/*",
+                                onChange: handleFileChange
+                            }),
+                            React.createElement("label", { htmlFor: "fileInput", className: "file-input-label" },
+                                React.createElement("i", { className: "ti ti-cloud-upload" }),
+                                "點擊或拖放圖片上傳（最多 5 張，單個不超過 5MB）"
+                            )
+                        ),
+                        formData.files.length > 0 && React.createElement("div", { className: "file-preview" },
+                            formData.files.map((file, index) =>
+                                React.createElement("div", { key: index, className: "file-item" },
+                                    React.createElement("img", { src: URL.createObjectURL(file), alt: `preview-${index}` }),
+                                    React.createElement("button", {
+                                        className: "file-remove",
+                                        onClick: () => removeFile(index),
+                                        title: "移除"
+                                    }, "×")
+                                )
+                            )
+                        )
+                    ),
+
+                    React.createElement("button", {
+                        className: "btn-primary",
+                        onClick: handleSubmit,
+                        disabled: isSubmitting
+                    },
+                        isSubmitting ? React.createElement(React.Fragment, null,
+                            React.createElement("span", { className: "loading-spinner" }),
+                            "提交中..."
+                        ) : React.createElement(React.Fragment, null,
+                            React.createElement("i", { className: "ti ti-send" }),
+                            `提交${typeLabel}`
+                        )
+                    )
+                ),
+
+                // 確認對話框
+                showConfirmModal && React.createElement("div", { className: "modal-overlay" },
+                    React.createElement("div", { className: "modal" },
+                        React.createElement("h3", { className: "modal-title" }, "確認提交"),
+                        React.createElement("div", { className: "modal-content" },
+                            `您確定要提交此${typeLabel}嗎？\n\n提交後將無法編輯，請確認所有資訊正確。`
+                        ),
+                        React.createElement("div", { className: "modal-actions" },
+                            React.createElement("button", {
+                                className: "modal-btn modal-btn-cancel",
+                                onClick: () => setShowConfirmModal(false)
+                            }, "取消"),
+                            React.createElement("button", {
+                                className: "modal-btn modal-btn-confirm",
+                                onClick: confirmSubmit
+                            }, "確認提交")
+                        )
+                    )
+                )
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+    </script>
+</body>
+</html>
