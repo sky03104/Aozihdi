@@ -557,7 +557,10 @@
     <script>
         const { useState, useEffect } = React;
         const params = new URLSearchParams(window.location.search);
-        const empId = params.get('empId') || '未登入';
+        // 工號：優先 ?empId=（主選單帶入），缺則同 origin 讀登入態 session，最後才『未登入』
+        let empId = params.get('empId') || '';
+        if (!empId) { try { empId = (JSON.parse(localStorage.getItem('hsh_session_user') || '{}').empId) || ''; } catch (e) {} }
+        if (!empId) empId = '未登入';
         // 同 origin 可讀主程式登入態，盡量帶出姓名供後台辨識（前台不顯示）
         function getSessionName(){
             try { const u = JSON.parse(localStorage.getItem('hsh_session_user') || '{}');

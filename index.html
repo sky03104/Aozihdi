@@ -17239,7 +17239,7 @@ const TOOLS = [
     { id: 1, name: "班表查詢", icon: "📅", category: "人事管理", toolId: "schedule" },
     { id: 2, name: "打烊後進出快速登錄", icon: "🔒", category: "核心工具", toolId: "closing" },
     { id: 3, name: "資料上傳工具", icon: "☁️", category: "核心工具", toolId: "upload" },
-    { id: 4, name: "事故報告填寫", icon: "📋", category: "現場管理" },
+    { id: 4, name: "事故報告填寫", icon: "📋", category: "現場管理", externalUrl: "https://sky03104.github.io/tianying-security/tool_report.html" },
     { id: 99, name: "請假申請", icon: "📝", category: "人事管理", toolId: "leave" },
     { id: 5, name: "訪客登記系統", icon: "🪪", category: "門禁管理" },
     { id: 7, name: "停車場車位數計算", icon: "🅿️", category: "核心工具", toolId: "car" },
@@ -17248,7 +17248,7 @@ const TOOLS = [
     { id: 10, name: "影像調閱申請", icon: "📷", category: "資料管理" },
     { id: 11, name: "設備檢查表", icon: "🔧", category: "設備管理" },
     { id: 12, name: "緊急聯絡清單", icon: "📞", category: "緊急應變", toolId: "emergency" },
-    { id: 13, name: "異常事件通報", icon: "🚨", category: "緊急應變" },
+    { id: 13, name: "匿名表揚／舉報", icon: "🚨", category: "緊急應變", externalUrl: "https://sky03104.github.io/tianying-security/tool_feedback.html" },
     { id: 14, name: "明日哨表", icon: "📋", category: "核心工具", toolId: "post" },
     { id: 15, name: "績效報表查看", icon: "📊", category: "管理報表" },
 ];
@@ -17278,7 +17278,7 @@ const DEMO_PENDING = [];
 // 帳號申請／請假申請雲端服務：寫入「天鷹保全APP」試算表（獨立GAS專案）
 const ACCOUNT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxEVBHseDpLWiWe4d8kLcCHbVFiKAK9wyoLwqNkt59PS4vPCY9QfG0_wiDJf2coO3zMcg/exec';
 const DEFAULT_PERMS = {
-    fulltime: [1, 2, 3, 7, 4, 5, 6, 9, 12, 13, 99],
+    fulltime: [1, 2, 3, 7, 5, 6, 9, 12, 13, 99],
     parttime: [1, 2, 3, 7, 5, 6, 9, 12, 13, 99],
     leader: [1, 2, 3, 7, 4, 5, 6, 9, 11, 12, 13, 99],
     vicecaptain: [1, 2, 3, 7, 4, 5, 6, 9, 10, 11, 12, 13, 99],
@@ -19617,7 +19617,7 @@ function App() {
                     setActiveToolId(tool.toolId);
                 }
                 else if (tool.externalUrl) {
-                    window.open(tool.externalUrl, '_blank');
+                    window.open(tool.externalUrl + (tool.externalUrl.indexOf('?') > -1 ? '&' : '?') + 'empId=' + encodeURIComponent((currentUser && currentUser.empId) || ''), '_blank');
                 }
                 else {
                     showToast(`📂 開啟：${tool.name}`);
@@ -19657,7 +19657,7 @@ function App() {
                                 setActiveToolId(tool.toolId);
                             }
                             else if (tool.externalUrl) {
-                                window.open(tool.externalUrl, '_blank');
+                                window.open(tool.externalUrl + (tool.externalUrl.indexOf('?') > -1 ? '&' : '?') + 'empId=' + encodeURIComponent((currentUser && currentUser.empId) || ''), '_blank');
                             }
                             else {
                                 showToast(`📂 開啟：${tool.name}`);
