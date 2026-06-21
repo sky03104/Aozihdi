@@ -1,0 +1,35 @@
+# 日誌和臨時檔
+*.log
+logs/
+/tmp/
+__pycache__/
+*.pyc
+.DS_Store
+
+# 敏感資訊（若需要）
+.env
+.env.local
+secrets.yaml
+credentials.json
+
+# 編輯器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+.AppleDouble
+.LSOverride
+
+# Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+
+# 本地配置（若有個人化設定，不上傳）
+monitor-config.local.yaml

@@ -1,0 +1,221 @@
+# 天鷹保全 · 工具轉換自動化監控配置 v3.0
+# ================================================
+
+## 基本設定
+system:
+  name: "天鷹保全工具轉換自動化監控"
+  version: "3.0"
+  mode: "fully_automated"  # 等級 3：完全自動化
+  description: "所有轉換失敗自動捕獲、無需人工干預"
+
+## 監控路徑
+paths:
+  monitor_dir: "/mnt/user-data/outputs"
+  failure_log: "/tmp/failure-log.json"
+  skill_path: "/mnt/skills/user/tianying-tool-converter/SKILL.md"
+  skill_updater_log: "/tmp/skill-updater-run.log"
+  notify_file: "/tmp/skill-update-notification.txt"
+  archive_dir: "/tmp/skill-updates-archive"
+
+## 監控規則
+monitoring:
+  # 什麼情況下記錄為失敗
+  failure_patterns:
+    - pattern: "node --check failed"
+      priority: "critical"
+      section: "SOP 驗證"
+    
+    - pattern: "grep verification failed"
+      priority: "critical"
+      section: "規範檢查清單"
+    
+    - pattern: "React version mismatch"
+      priority: "critical"
+      section: "品牌規範"
+    
+    - pattern: "GAS action conflict"
+      priority: "critical"
+      section: "GAS 設計方案"
+    
+    - pattern: "empId not passed"
+      priority: "important"
+      section: "工號狀態傳遞修正"
+    
+    - pattern: "image upload failed"
+      priority: "important"
+      section: "照片上傳統一方案"
+    
+    - pattern: "permission undefined"
+      priority: "important"
+      section: "權限規劃"
+    
+    - pattern: "return path incorrect"
+      priority: "important"
+      section: "品牌規範"
+
+## 自動觸發規則
+auto_trigger:
+  # 何時自動觸發 skill-updater
+  critical_threshold: 2
+    # critical 錯誤達 ≥2 個，立即觸發學習
+    # 示例：React 19 問題 + GAS doPost 衝突 → 自動更新
+  
+  important_threshold: 4
+    # important 錯誤達 ≥4 個，觸發學習
+    # 示例：empId 傳遞 + 照片上傳 + 權限 + 返回路徑 → 自動更新
+  
+  time_based: "0 */6 * * *"
+    # cron 表達式：每 6 小時掃一次
+    # 即使無 critical，也掃看是否有待學習項目
+  
+  batch_size: 5
+    # 累積 ≥5 個待學習項目時自動觸發
+
+## 版本化規則
+versioning:
+  format: "v{major}.{minor} ({date}，自動迭代第 {iteration} 輪)"
+    # 示例：v1.2 (2026-06-25，自動迭代第 5 輪)
+  
+  changelog_location: "## 更新歷史"
+    # changelog 插入位置
+  
+  max_iterations_per_day: 3
+    # 每天最多自動迭代 3 次，避免過頻繁
+
+## 回歸測試
+regression_test:
+  enabled: true
+  checks:
+    - "frontmatter_exists"
+    - "section_structure_valid"
+    - "file_size_ok"
+    - "no_duplicate_rules"
+    - "all_dates_valid"
+    - "all_priorities_valid"
+  
+  fail_on_error: true
+    # 回歸測試失敗時，不更新 SKILL.md
+
+## 衝突檢測
+conflict_detection:
+  enabled: true
+  checks:
+    - "no_duplicate_content"
+    - "position_exists"
+    - "no_priority_mismatch"
+    - "source_tool_valid"
+  
+  manual_review_on_conflict: true
+    # 有衝突時需要人工檢視，不自動更新
+
+## 通知設定
+notification:
+  enabled: true
+  
+  channels:
+    # 支援多個通知渠道
+    - type: "file"
+      path: "/tmp/skill-update-notification.txt"
+      enabled: true
+    
+    - type: "log"
+      path: "/tmp/skill-updater-run.log"
+      enabled: true
+    
+    - type: "slack"
+      webhook_url: ""  # 可選：填入 Slack webhook URL
+      enabled: false
+    
+    - type: "email"
+      recipient: ""  # 可選：填入郵件地址
+      enabled: false
+  
+  summary_on_update: true
+    # 更新完成後發送摘要
+  
+  frequency: "on_update"
+    # on_update：更新完成時
+    # daily：每天一次
+    # weekly：每週一次
+
+## 日誌保留
+logging:
+  retention_days: 30
+    # 保留 30 天的失敗日誌
+  
+  archive_old_logs: true
+    # 超過保留期的自動歸檔到 archive_dir
+  
+  verbose: false
+    # 詳細日誌（開發用）
+
+## 人工檢視點
+manual_review:
+  # 即使自動化，下列情況仍需人工確認
+  
+  on_conflict: true
+    # diff 檢查發現衝突
+  
+  on_regression_failure: true
+    # 回歸測試失敗
+  
+  critical_rule_priority: true
+    # critical 優先級規則，更新前通知用戶
+
+  review_wait_hours: 24
+    # 等待 24 小時人工確認（若有就緒的更新）
+
+## 安全開關
+safety:
+  # 緊急情況下的保護機制
+  
+  max_rules_per_update: 10
+    # 單次更新最多 10 個規則
+  
+  auto_backup_skill: true
+    # 更新前自動備份 SKILL.md
+  
+  rollback_on_failure: true
+    # 失敗時自動回滾到前一版本
+
+## 統計追蹤
+analytics:
+  enabled: true
+  
+  track:
+    - "total_failures_per_tool"
+    - "error_type_distribution"
+    - "auto_update_frequency"
+    - "rule_coverage_improvement"
+    - "success_rate_trend"
+  
+  report_frequency: "weekly"
+    # 每週生成統計報告
+
+## 效能調優
+performance:
+  # 監控系統本身的效能
+  
+  log_scan_timeout_seconds: 5
+    # 掃描日誌的超時時間
+  
+  diff_check_timeout_seconds: 10
+    # diff 檢查的超時時間
+  
+  regression_test_timeout_seconds: 15
+    # 回歸測試的超時時間
+  
+  parallel_rules: false
+    # 是否並行處理多個規則（目前不支援）
+
+## 高級設定（專家用）
+advanced:
+  # 一般用戶無需修改
+  
+  enable_experimental_features: false
+  
+  ml_based_priority_estimation: false
+    # 未來：用 ML 自動推估優先級
+  
+  auto_suggestion_for_section: true
+    # 自動推薦規則應加在哪一節
