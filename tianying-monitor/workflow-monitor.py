@@ -1,40 +1,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-天鷹保全 · 工具轉換自動化監控系統 v3.0
+天鷹保全 · 工具轉換自動化監控系統 v3.1
 ===============================================
-等級 3：完全自動化
+等級 3：完全自動化（三技能整合版）
 
-功能：
-  1. 監控每次工具轉換執行
-  2. 自動捕獲失敗 + 邊界案例
-  3. 記錄到中央日誌 (failure-log.json)
-  4. 定期掃描日誌（可 cron 排程）
-  5. 自動觸發 skill-updater
-  6. 無人工干預，零遺漏
+v3.1 新增：
+  - 路徑全面改為 Windows 相容（pathlib，相對腳本位置）
+  - auto-learn 完成後自動觸發 failure-classifier / priority-sorter / regression-tester
+  - review-log 完成後自動觸發 proactive-suggestion
+  - 新增 --mode scan（task-detector 系統狀態掃描）
+  - 新增 --mode suggest（proactive-suggestion 完整建議）
 
 使用方式：
-  # 執行一次轉換（自動監控）
-  python3 workflow-monitor.py --mode convert --tool tool_report.html
-  
-  # 掃描日誌、自動學習更新（定時執行，如 cron）
-  python3 workflow-monitor.py --mode auto-learn
-  
-  # 查看失敗日誌
-  python3 workflow-monitor.py --mode review-log
-  
-  # 部署到 cron（推薦）
-  crontab -e
-  # 加入一行：
-  # 0 */6 * * * cd /path/to/project && python3 workflow-monitor.py --mode auto-learn
-  # (每 6 小時自動掃一次、觸發學習)
+  python workflow-monitor.py --mode auto-learn     掃描並自動學習（含 post-learn hooks）
+  python workflow-monitor.py --mode review-log     查看日誌（含主動建議）
+  python workflow-monitor.py --mode scan           系統狀態掃描 + 角色建議
+  python workflow-monitor.py --mode suggest        主動建議引擎（完整模式）
+  python workflow-monitor.py --mode convert --tool <name> --error-msg <msg>
+
+Windows Task Scheduler（每 6 小時）：
+  schtasks /create /tn "tianying-auto-learn" /tr "python <path>\\workflow-monitor.py --mode auto-learn" /sc hourly /mo 6 /f
 
 配置：
-  編輯 monitor-config.yaml 調整：
-  - 監控目錄路徑
-  - 失敗阈值（何時觸發學習）
-  - 通知方式（檔案 / Slack / 郵件）
-  - 自動學習的優先級設定
+  編輯 monitor-config.yaml 調整失敗閾值、錯誤模式等設定
 """
 
 import json
@@ -42,19 +31,23 @@ import os
 import sys
 import argparse
 import re
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any
 import traceback
 
+# ===== 基底路徑（相對於此腳本，Windows / Mac / Linux 皆相容）=====
+BASE_DIR = Path(__file__).parent
+
 # ===== 設定 =====
 CONFIG = {
-    'MONITOR_DIR': '/mnt/user-data/outputs',
-    'FAILURE_LOG': '/tmp/failure-log.json',
-    'SKILL_PATH': '/mnt/skills/user/tianying-tool-converter/SKILL.md',
-    'SKILL_UPDATER_LOG': '/tmp/skill-updater-run.log',
-    'NOTIFY_FILE': '/tmp/skill-update-notification.txt',
-    'AUTO_LEARN_THRESHOLD': 2,  # 失敗 ≥2 次才自動觸發學習
+    'MONITOR_DIR':          str(BASE_DIR / 'outputs'),
+    'FAILURE_LOG':          str(BASE_DIR / 'failure-log.json'),
+    'SKILL_PATH':           str(BASE_DIR / 'skills' / 'tianying-tool-converter.md'),
+    'SKILL_UPDATER_LOG':    str(BASE_DIR / 'skill-updater-run.log'),
+    'NOTIFY_FILE':          str(BASE_DIR / 'skill-update-notification.txt'),
+    'AUTO_LEARN_THRESHOLD': 2,
 }
 
 class ToolMonitor:
@@ -163,7 +156,26 @@ class ToolMonitor:
             for d in discoveries[-5:]:
                 print(f"   {d['timestamp'][:10]} {d['tool']}: {d['case_name']}")
         
-        print("\n💡 提示：執行 `python3 workflow-monitor.py --mode auto-learn` 自動觸發學習")
+        print("\n💡 提示：執行 `python workflow-monitor.py --mode auto-learn` 自動觸發學習")
+
+        # 自動觸發主動建議引擎
+        self._run_suggestion_hook()
+
+    def _run_suggestion_hook(self):
+        """review-log 後自動執行 proactive-suggestion.py"""
+        script = BASE_DIR / 'proactive-suggestion.py'
+        if not script.exists():
+            return
+        print()
+        try:
+            subprocess.run(
+                [sys.executable, str(script)],
+                timeout=30, encoding='utf-8', errors='replace'
+            )
+        except subprocess.TimeoutExpired:
+            print("[WRN] proactive-suggestion.py 超時（30s）")
+        except Exception as e:
+            print(f"[WRN] proactive-suggestion.py：{e}")
     
     def get_pending_learns(self) -> List[Dict]:
         """取得待學習的失敗"""
@@ -272,12 +284,50 @@ class SkillAutoUpdater:
             self._notify_update(version, rules_to_add)
             
             print(f"\n✅ 自動更新完成！{version} 已部署")
+
+            # 7. Post-learn hooks（三技能串接）
+            self._run_post_learn_hooks()
+
             return True
             
         except Exception as e:
             print(f"❌ 自動更新失敗：{e}")
             traceback.print_exc()
             return False
+
+    def _run_post_learn_hooks(self):
+        """auto-learn 成功後依序觸發：分類器 → 優先排序 → 回歸測試"""
+        hooks = [
+            ('failure-classifier.py', ['--enrich'],            '失敗分類增強'),
+            ('priority-sorter.py',    ['--output'],             '優先級排序'),
+            ('regression-tester.py',  ['--compare', '--output'], '回歸測試'),
+        ]
+        print("\n-- Post-learn hooks --")
+        for script_file, extra_args, label in hooks:
+            script = BASE_DIR / script_file
+            if not script.exists():
+                print(f"  [跳過] {label}（{script_file} 不存在）")
+                continue
+            cmd = [sys.executable, str(script)] + extra_args
+            try:
+                result = subprocess.run(
+                    cmd, capture_output=True, text=True,
+                    timeout=60, encoding='utf-8', errors='replace'
+                )
+                ok = result.returncode == 0
+                print(f"  {'[OK]' if ok else '[WRN]'} {label}")
+                # 只印關鍵摘要行
+                for line in (result.stdout or '').splitlines():
+                    s = line.strip()
+                    if s and any(kw in s for kw in [
+                        '[OK]', '[ERR]', 'ALL PASS', 'FAIL', '健康度',
+                        'critical', 'important', 'pending', '部署', '通過',
+                    ]):
+                        print(f"       {s}")
+            except subprocess.TimeoutExpired:
+                print(f"  [WRN] {label} 超時（60s）")
+            except Exception as e:
+                print(f"  [WRN] {label}：{e}")
     
     def _extract_rules(self, items: List[Dict]) -> List[Dict]:
         """從失敗項萃取新規則"""
@@ -310,7 +360,15 @@ class SkillAutoUpdater:
     def _check_conflicts(self, rules: List[Dict]) -> List[str]:
         """檢查是否有衝突"""
         conflicts = []
-        
+
+        if not Path(self.skill_path).exists():
+            conflicts.append(
+                f"SKILL.md 不存在：{self.skill_path}"
+                f"（請將技能檔案複製到 skills/ 目錄，"
+                f"執行 regression-tester.py 確認）"
+            )
+            return conflicts
+
         with open(self.skill_path, 'r', encoding='utf-8') as f:
             skill_text = f.read()
         
@@ -415,8 +473,9 @@ class SkillAutoUpdater:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='天鷹工具轉換監控系統')
-    parser.add_argument('--mode', choices=['convert', 'auto-learn', 'review-log'], 
+    parser = argparse.ArgumentParser(description='天鷹工具轉換監控系統 v3.1')
+    parser.add_argument('--mode',
+                       choices=['convert', 'auto-learn', 'review-log', 'scan', 'suggest'],
                        default='review-log', help='執行模式')
     parser.add_argument('--tool', help='工具名稱（convert 模式必需）')
     parser.add_argument('--error-type', help='錯誤類型')
@@ -428,7 +487,6 @@ def main():
     monitor = ToolMonitor()
     
     if args.mode == 'convert':
-        # 模擬轉換（實際使用時從 tianying-tool-converter 調用）
         if args.error_msg:
             monitor.record_failure(
                 args.tool or 'unknown',
@@ -449,6 +507,20 @@ def main():
     
     elif args.mode == 'review-log':
         monitor.review_log()
+
+    elif args.mode == 'scan':
+        script = BASE_DIR / 'task-detector.py'
+        if script.exists():
+            subprocess.run([sys.executable, str(script), '--scan'])
+        else:
+            print("[ERR] task-detector.py 不存在，請確認已部署 Track C")
+
+    elif args.mode == 'suggest':
+        script = BASE_DIR / 'proactive-suggestion.py'
+        if script.exists():
+            subprocess.run([sys.executable, str(script), '--full'])
+        else:
+            print("[ERR] proactive-suggestion.py 不存在，請確認已部署 Track C")
 
 
 if __name__ == '__main__':
