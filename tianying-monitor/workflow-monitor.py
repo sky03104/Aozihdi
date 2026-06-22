@@ -238,7 +238,17 @@ class SkillAutoUpdater:
                             other_items: List[Dict]) -> bool:
         """執行自動更新"""
         print("\n🔧 開始自動更新...")
-        
+
+        # 執行前自動備份（防止資料遺失）
+        _backup_script = BASE_DIR / 'data-backup.py'
+        if _backup_script.exists():
+            try:
+                subprocess.run([sys.executable, str(_backup_script), '--quiet'],
+                               capture_output=True, timeout=15)
+                print("  [備份] 資料已備份到 backups/")
+            except Exception:
+                pass
+
         try:
             # 1. 萃取新規則
             rules_to_add = self._extract_rules(critical_items + other_items)
@@ -475,7 +485,7 @@ class SkillAutoUpdater:
 def main():
     parser = argparse.ArgumentParser(description='天鷹工具轉換監控系統 v3.1')
     parser.add_argument('--mode',
-                       choices=['convert', 'auto-learn', 'review-log', 'scan', 'suggest', 'dry-run'],
+                       choices=['convert', 'auto-learn', 'review-log', 'scan', 'suggest', 'dry-run', 'report'],
                        default='review-log', help='執行模式')
     parser.add_argument('--tool', help='工具名稱（convert 模式必需）')
     parser.add_argument('--error-type', help='錯誤類型')
@@ -523,6 +533,80 @@ def main():
             subprocess.run([sys.executable, str(script), '--full'])
         else:
             print("[ERR] proactive-suggestion.py 不存在")
+
+    elif args.mode == 'report':
+        # 生成 Markdown 週報
+        import subprocess as _sp
+        dash = BASE_DIR / 'status-dashboard.py'
+        if not dash.exists():
+            print("[ERR] status-dashboard.py 不存在，請先部署 Week 4 檔案")
+        else:
+            from pathlib import Path as _P
+            data_raw = _sp.run(
+                [sys.executable, str(dash), '--json'],
+                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30
+            )
+            try:
+                import json as _j
+                d   = _j.loads(data_raw.stdout)
+                ts  = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                f   = d.get('failure', {})
+                sk  = d.get('skills', {})
+                ll  = d.get('last_learn', {})
+                al  = d.get('alerts', [])
+                icons = {'high': '!!', 'medium': '! ', 'low': 'i '}
+                lines = [
+                    f"# 天鷹保全監控系統 · 週報",
+                    f"",
+                    f"**生成時間**：{ts}",
+                    f"",
+                    f"## 系統健康度",
+                    f"",
+                    f"- 健康分數：**{d.get('health',0)}/100**  [{d.get('health_grade','?')}]",
+                    f"",
+                    f"## 失敗紀錄",
+                    f"",
+                    f"| 狀態 | 數量 |",
+                    f"|------|------|",
+                    f"| pending | {f.get('pending',0)} |",
+                    f"| critical | {f.get('critical',0)} |",
+                    f"| important | {f.get('important',0)} |",
+                    f"| learned | {f.get('learned',0)} |",
+                    f"| total | {f.get('total',0)} |",
+                    f"",
+                    f"## 技能狀態",
+                    f"",
+                    f"| 技能 | 版本 | 規則/步驟 | 狀態 |",
+                    f"|------|------|---------|------|",
+                ]
+                for name, info in sk.get('results', {}).items():
+                    ok = 'PASS' if info.get('passed', True) else 'NG'
+                    lines.append(f"| {name} | {info.get('version','?')} | {info.get('h3_count',0)} | {ok} |")
+                lines += [
+                    f"",
+                    f"## 上次自動學習",
+                    f"",
+                    f"- 版本：{ll.get('version','無記錄')}",
+                    f"- 時間：{ll.get('time','-')}",
+                    f"- 新增規則：{ll.get('rules',0)} 個",
+                    f"",
+                    f"## 需要注意",
+                    f"",
+                ]
+                if al:
+                    for pri, msg in sorted(al, key=lambda x: {'high':0,'medium':1,'low':2}.get(x[0],3)):
+                        lines.append(f"- [{icons.get(pri,'? ')}] {msg}")
+                else:
+                    lines.append("- 目前無緊急事項")
+                report = "\n".join(lines)
+                rdir   = BASE_DIR / 'reports'
+                rdir.mkdir(parents=True, exist_ok=True)
+                fname  = rdir / f"weekly-{datetime.now().strftime('%Y%m%d')}.md"
+                fname.write_text(report, encoding='utf-8')
+                print(f"[OK] 週報已儲存：{fname}")
+                print(f"     健康度 {d.get('health',0)}/100  pending {f.get('pending',0)}  alerts {len(al)}")
+            except Exception as e:
+                print(f"[ERR] 週報生成失敗：{e}")
 
     elif args.mode == 'dry-run':
         updater  = SkillAutoUpdater()
