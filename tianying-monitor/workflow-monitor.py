@@ -475,17 +475,16 @@ class SkillAutoUpdater:
 def main():
     parser = argparse.ArgumentParser(description='天鷹工具轉換監控系統 v3.1')
     parser.add_argument('--mode',
-                       choices=['convert', 'auto-learn', 'review-log', 'scan', 'suggest'],
+                       choices=['convert', 'auto-learn', 'review-log', 'scan', 'suggest', 'dry-run'],
                        default='review-log', help='執行模式')
     parser.add_argument('--tool', help='工具名稱（convert 模式必需）')
     parser.add_argument('--error-type', help='錯誤類型')
     parser.add_argument('--error-msg', help='錯誤訊息')
     parser.add_argument('--priority', default='important', help='優先級')
-    
+
     args = parser.parse_args()
-    
     monitor = ToolMonitor()
-    
+
     if args.mode == 'convert':
         if args.error_msg:
             monitor.record_failure(
@@ -494,17 +493,20 @@ def main():
                 args.error_msg,
                 args.priority
             )
-            print(f"✅ 失敗已記錄，待下次自動學習")
+            print("已記錄失敗，待下次自動學習")
         else:
-            print(f"✅ 轉換成功：{args.tool}")
-    
+            print(f"轉換成功：{args.tool}")
+
     elif args.mode == 'auto-learn':
         updater = SkillAutoUpdater()
+        pending = updater.monitor.get_pending_learns()
+        if len(pending) > 20:
+            print(f"[WRN] pending {len(pending)} 筆過多，建議先執行 log-cleaner.py --archive")
         if updater.auto_learn():
-            print("\n🎉 自動學習完成！")
+            print("\n自動學習完成！")
         else:
-            print("\n⏳ 待下次積累")
-    
+            print("\n待下次積累")
+
     elif args.mode == 'review-log':
         monitor.review_log()
 
@@ -513,14 +515,38 @@ def main():
         if script.exists():
             subprocess.run([sys.executable, str(script), '--scan'])
         else:
-            print("[ERR] task-detector.py 不存在，請確認已部署 Track C")
+            print("[ERR] task-detector.py 不存在")
 
     elif args.mode == 'suggest':
         script = BASE_DIR / 'proactive-suggestion.py'
         if script.exists():
             subprocess.run([sys.executable, str(script), '--full'])
         else:
-            print("[ERR] proactive-suggestion.py 不存在，請確認已部署 Track C")
+            print("[ERR] proactive-suggestion.py 不存在")
+
+    elif args.mode == 'dry-run':
+        updater  = SkillAutoUpdater()
+        pending  = updater.monitor.get_pending_learns()
+        critical  = [p for p in pending if p.get('priority') == 'critical']
+        important = [p for p in pending if p.get('priority') == 'important']
+        threshold = CONFIG['AUTO_LEARN_THRESHOLD']
+        print("\n[預覽模式] auto-learn 假設執行結果（不實際修改）")
+        print("=" * 50)
+        print(f"  pending {len(pending)} 筆  critical={len(critical)}  important={len(important)}")
+        will_trigger = len(critical) >= threshold or len(important) >= threshold * 2
+        if will_trigger:
+            target  = critical if len(critical) >= threshold else important
+            version = updater._get_next_version() if Path(CONFIG['SKILL_PATH']).exists() else 'v?.?'
+            rules   = updater._extract_rules(target)
+            print(f"  [觸發] 達閾值 -> 自動更新")
+            print(f"  [版本] {version}")
+            print(f"  [規則] 預計萃取 {len(rules)} 個：")
+            for r in rules[:5]:
+                print(f"         - {r['name'][:50]}")
+            print("  [hooks] failure-classifier / priority-sorter / regression-tester")
+        else:
+            remain = max(0, threshold - len(critical))
+            print(f"  [不觸發] 閾值未達（critical 還差 {remain} 筆）")
 
 
 if __name__ == '__main__':
