@@ -219,3 +219,5 @@ advanced:
   
   auto_suggestion_for_section: true
     # 自動推薦規則應加在哪一節
+
+obsidian_vault_path: "C:\Users\USER\OneDrive\文件\GitHub\tianying-security"
