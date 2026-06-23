@@ -4,17 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "3a493993378aacd3",
+        "id": "3640ca64c7a2f265",
         "type": "tabs",
         "children": [
           {
-            "id": "7f5e41083ee712ee",
+            "id": "b899aaa2bf6f9c37",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "關聯圖檢視"
+              "type": "markdown",
+              "state": {
+                "file": "01-專案狀態/project-state.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "project-state"
             }
           }
         ]
@@ -70,8 +74,7 @@
               "title": "書籤"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "horizontal",
@@ -91,6 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
+                "file": "01-專案狀態/project-state.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -100,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "反向連結"
+              "title": "project-state 的反向連結"
             }
           },
           {
@@ -109,11 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
+                "file": "01-專案狀態/project-state.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "對外連結"
+              "title": "project-state 的對外連結"
             }
           },
           {
@@ -151,12 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
+                "file": "01-專案狀態/project-state.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "大綱"
+              "title": "project-state 的大綱"
             }
           },
           {
@@ -199,8 +205,15 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "db7a0820052efdb8",
+  "active": "4bd3f0665edb2dd3",
   "lastOpenFiles": [
+    "tpl-car (1).md",
+    "tpl-car.md",
+    "project-state.md",
+    "obsidian-auto-sync (1).py",
+    "register-sync.bat",
+    "obsidian-auto-sync.py",
+    "files (1).zip",
     "tianying-monitor/DEPLOYMENT_GUIDE_LEVEL3.md",
     "99-Daily/2026-06-23.md",
     "02-工具開發/_工具開發模板.md",
