@@ -179,12 +179,11 @@
             }
           }
         ],
-        "currentTab": 6
+        "currentTab": 5
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -199,7 +198,7 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "b88cac0293760649",
+  "active": "6b3fb7aa7957b8e9",
   "lastOpenFiles": [
     "10-學習筆記/_學習筆記模板.md",
     "tianying-monitor/reports/final-validation-20260623-142148.json",
