@@ -63,11 +63,15 @@ GAS 設計規範。
 
 def _run(script: str, args: List[str], timeout: int = 30) -> Tuple[int, str, str]:
     """執行子程序，回傳 (returncode, stdout, stderr)"""
+    import os as _os
+    _env = _os.environ.copy()
+    _env['PYTHONIOENCODING'] = 'utf-8'   # 強制 UTF-8，解決 Windows CP950 中文編碼問題
     cmd = [sys.executable, str(BASE_DIR / script)] + args
     try:
         r = subprocess.run(
             cmd, capture_output=True, text=True,
-            timeout=timeout, encoding='utf-8', errors='replace'
+            timeout=timeout, encoding='utf-8', errors='replace',
+            env=_env
         )
         return r.returncode, r.stdout, r.stderr
     except subprocess.TimeoutExpired:

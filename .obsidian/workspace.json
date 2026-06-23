@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "3640ca64c7a2f265",
+        "id": "bfb92363c4867fdb",
         "type": "tabs",
         "children": [
           {
-            "id": "b899aaa2bf6f9c37",
+            "id": "b88cac0293760649",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -90,7 +90,6 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "01-專案狀態/project-state.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -100,7 +99,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "project-state 的反向連結"
+              "title": "反向連結"
             }
           },
           {
@@ -109,12 +108,11 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "01-專案狀態/project-state.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "project-state 的對外連結"
+              "title": "對外連結"
             }
           },
           {
@@ -152,13 +150,12 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "01-專案狀態/project-state.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "project-state 的大綱"
+              "title": "大綱"
             }
           },
           {
@@ -182,7 +179,7 @@
             }
           }
         ],
-        "currentTab": 4
+        "currentTab": 6
       }
     ],
     "direction": "horizontal",
@@ -202,13 +199,21 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "b899aaa2bf6f9c37",
+  "active": "b88cac0293760649",
   "lastOpenFiles": [
-    "tianying-monitor/QUICK_REF.md",
+    "tianying-monitor/reports/final-validation-20260623-142148.json",
+    "tianying-monitor/reports",
+    "tianying-monitor/failure-log.json",
     "tianying-monitor/files (1).zip",
-    "00-天鷹-MOC/系統總覽.md",
-    "tianying-monitor/project-snapshots/2026-06-22_v1.md",
     "README.md",
+    "icon.png",
+    "10-學習筆記/_學習筆記模板.md",
+    "00-天鷹-MOC/系統總覽.md",
+    "99-Daily/2026-06-23.md",
+    "tianying-monitor/reports/final-validation-20260623-141325.json",
+    "tianying-monitor/final-validation.py",
+    "tianying-monitor/QUICK_REF.md",
+    "tianying-monitor/project-snapshots/2026-06-22_v1.md",
     "01-專案狀態/project-state.md",
     "天鷹保全/監控系統狀態.md",
     "天鷹保全",
@@ -216,16 +221,11 @@
     "tianying-monitor/monthly-summary.py",
     "tianying-monitor/setup-scheduler (1).ps1",
     "tianying-monitor/setup-scheduler.ps1",
-    "tianying-monitor/alert-dispatcher.py",
-    "tianying-monitor/trend-analyzer.py",
     "tpl-car.md",
     "02-工具開發/tpl-car.md",
-    "obsidian-sync.log",
-    "obsidian-auto-sync (1).py",
     "tpl-car (1).md",
     "project-state.md",
     "tianying-monitor/DEPLOYMENT_GUIDE_LEVEL3.md",
-    "99-Daily/2026-06-23.md",
     "02-工具開發/_工具開發模板.md",
     "00-天鷹-MOC/插件安裝清單.md"
   ]

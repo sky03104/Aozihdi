@@ -1,0 +1,50 @@
+{
+  "timestamp": "2026-06-23T14:21:48.770209",
+  "results": [
+    {
+      "check": "V1 必要腳本",
+      "passed": true,
+      "detail": "共 17 個全部存在，Track A 3 個可選未找到（正常）"
+    },
+    {
+      "check": "V2 Task Scheduler",
+      "passed": true,
+      "detail": "共 6 條全部存在"
+    },
+    {
+      "check": "V3 設定檔驗證",
+      "passed": true,
+      "detail": "monitor-config.yaml ALL PASS"
+    },
+    {
+      "check": "V4 skills/ 目錄",
+      "passed": true,
+      "detail": "2 份：skill-updater, tianying-tool-converter"
+    },
+    {
+      "check": "V5 回歸歷史",
+      "passed": true,
+      "detail": "共 2 次記錄  最後：2026-06-23"
+    },
+    {
+      "check": "V6 e2e-test 快速（T1-T5）",
+      "passed": true,
+      "detail": "5/5 PASS"
+    },
+    {
+      "check": "V7 e2e-test 完整（T1-T8）",
+      "passed": true,
+      "detail": "8/8 PASS"
+    },
+    {
+      "check": "V8 status-dashboard",
+      "passed": true,
+      "detail": "系統健康：100/100  [A]"
+    }
+  ],
+  "summary": {
+    "total": 8,
+    "passed": 8,
+    "failed": 0
+  }
+}
