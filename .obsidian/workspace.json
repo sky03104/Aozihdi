@@ -49,7 +49,7 @@
             "state": {
               "type": "search",
               "state": {
-                "query": "tag:#setup",
+                "query": "",
                 "matchingCase": false,
                 "explainSearch": false,
                 "collapseAll": false,
@@ -168,13 +168,23 @@
               "icon": "calendar-with-checkmark",
               "title": "Calendar"
             }
+          },
+          {
+            "id": "580ff41f511acbe4",
+            "type": "leaf",
+            "state": {
+              "type": "git-view",
+              "state": {},
+              "icon": "git-pull-request",
+              "title": "Source Control"
+            }
           }
-        ]
+        ],
+        "currentTab": 3
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -189,7 +199,7 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "7f5e41083ee712ee",
+  "active": "db7a0820052efdb8",
   "lastOpenFiles": [
     "tianying-monitor/DEPLOYMENT_GUIDE_LEVEL3.md",
     "99-Daily/2026-06-23.md",
