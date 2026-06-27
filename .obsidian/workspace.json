@@ -11,10 +11,14 @@
             "id": "b88cac0293760649",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "關聯圖檢視"
+              "type": "markdown",
+              "state": {
+                "file": "01-專案狀態/project-state.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "project-state"
             }
           }
         ]
@@ -198,27 +202,32 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "6b3fb7aa7957b8e9",
+  "active": "b88cac0293760649",
   "lastOpenFiles": [
+    "Bases/Tasks.base",
+    "Bases/Projects.base",
+    "Bases/People.base",
+    "Bases/Daily.base",
+    "Bases",
+    "新增資料夾",
+    "Logs/2026-06-26.md",
+    "Logs",
+    "log.md",
+    "index.md",
+    "_CLAUDE.md",
+    "files (1).zip",
+    "00-天鷹-MOC/系統總覽.md",
+    "icon.png",
     "10-學習筆記/_學習筆記模板.md",
     "tianying-monitor/reports/final-validation-20260623-142148.json",
     "tianying-monitor/reports",
     "tianying-monitor/failure-log.json",
-    "tianying-monitor/files (1).zip",
     "README.md",
-    "icon.png",
-    "00-天鷹-MOC/系統總覽.md",
     "99-Daily/2026-06-23.md",
-    "tianying-monitor/reports/final-validation-20260623-141325.json",
-    "tianying-monitor/final-validation.py",
     "tianying-monitor/QUICK_REF.md",
     "tianying-monitor/project-snapshots/2026-06-22_v1.md",
     "01-專案狀態/project-state.md",
     "天鷹保全/監控系統狀態.md",
-    "天鷹保全",
-    "tianying-monitor/obsidian-export.py",
-    "tianying-monitor/monthly-summary.py",
-    "tianying-monitor/setup-scheduler (1).ps1",
     "tpl-car.md",
     "02-工具開發/tpl-car.md",
     "tpl-car (1).md",
