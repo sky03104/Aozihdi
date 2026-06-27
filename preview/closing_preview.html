@@ -580,12 +580,12 @@ function fmtTime(t){
 // Created time format: matches "yyyy/M/d HH:mm:ss" — done server side in GAS
 
 function init(){
-  /* 讀取 APP 登入者角色，若非組長以上則隱藏設定Tab */
+  /* 讀取 APP 登入者角色，僅「管理員(admin)」可見設定Tab，其他職務一律隱藏 */
   (function checkRole(){
     try{
       const u = JSON.parse(localStorage.getItem('hsh_session_user')||'{}');
-      const canSetting = ['leader','vicecaptain','captain','executive','admin'].includes(u.role)
-                        || window.self===window.top; // 直接開啟時預設允許
+      const canSetting = ['admin'].includes(u.role)
+                        || window.self===window.top; // 直接開啟（非APP內嵌）時預設允許，供管理員部署設定用
       window._canMng = canSetting; // 全域管理旗標：組長以上可設定「檢查者↔工號」綁定
       if(!canSetting){
         const st = document.getElementById('tab-settings');
