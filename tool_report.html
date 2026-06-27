@@ -98,8 +98,7 @@
         function getSessionRole(){
             try { return (JSON.parse(localStorage.getItem('hsh_session_user') || '{}').role) || ''; } catch(e){ return ''; }
         }
-        const STATUS_COLORS = { '未讀': '#F87171', '已讀': '#D4A800', '處理中': '#FB923C', '已處理': '#4ADE80' };
-        const ALL_STATUS = ['未讀', '已讀', '處理中', '已處理'];
+        const STATUS_COLORS = { '未讀': '#F87171', '待處理': '#FB923C', '已讀': '#D4A800', '處理中': '#FB923C', '已處理': '#4ADE80' };
         const ADMIN_GAS_URL = "https://script.google.com/macros/s/AKfycbwHXlwTMmJyA79Cuzdh2IPRnBLUWm2YPEqXn5XJj4GVEUlCnNIv8hgRTJ7Xr198hZxG/exec";
 
         // 狀態徽章
@@ -251,9 +250,12 @@
         function AdminApp(){
             const [list, setList] = useState([]);
             const [loading, setLoading] = useState(true);
-            const [filter, setFilter] = useState('pending'); // all | pending | done
+            const [filter, setFilter] = useState('unread'); // unread | pending | done | all
             const [selected, setSelected] = useState(null);
+            const [navRows, setNavRows] = useState([]); // 凍結的瀏覽順序（進入詳情時的篩選清單列號）
+            const [navPos, setNavPos] = useState(-1);
             const [updating, setUpdating] = useState(false);
+            const REPORT_STATUS = ['未讀', '待處理', '已處理'];
             const role = getSessionRole();
             const demo = params.get('demo') === '1'; // 預覽用假資料模式（免 GAS、免登入）
             const allowed = demo || ['executive', 'admin'].includes(role);
@@ -264,8 +266,9 @@
             }, []);
 
             const DEMO_REPORTS = [
+                { row: 6, '編號': 5, '提交時間': '2026-06-27 11:40:00', '工號': '011362', '姓名': '周大為', '日期': '2026-06-27', '時間': '11:30', '地點': '東側車道', '類別': '一般事故', '描述': '車道柵欄遭輕微擦撞變形，不影響運作，已拍照記錄。', '處理經過': '', '相關人員': '', '照片連結': '', '狀態': '未讀' },
                 { row: 5, '編號': 4, '提交時間': '2026-06-27 09:12:33', '工號': '011340', '姓名': '王丞銘', '日期': '2026-06-27', '時間': '08:55', '地點': 'A棟大廳', '類別': '設備故障', '描述': '大廳自動門感應失效，無法正常開啟，已通知廠商。', '處理經過': '暫以人工開門，廠商預計下午到場。', '相關人員': '保全李大華', '照片連結': 'https://drive.google.com/file/d/DEMO1/view\nhttps://drive.google.com/file/d/DEMO2/view', '狀態': '未讀' },
-                { row: 4, '編號': 3, '提交時間': '2026-06-26 22:40:11', '工號': '011355', '姓名': '陳小明', '日期': '2026-06-26', '時間': '22:30', '地點': 'B1停車場', '類別': '竊盜事件', '描述': '民眾反映機車置物箱遭撬開，已調閱監視器。', '處理經過': '', '相關人員': '', '照片連結': '', '狀態': '處理中' },
+                { row: 4, '編號': 3, '提交時間': '2026-06-26 22:40:11', '工號': '011355', '姓名': '陳小明', '日期': '2026-06-26', '時間': '22:30', '地點': 'B1停車場', '類別': '竊盜事件', '描述': '民眾反映機車置物箱遭撬開，已調閱監視器。', '處理經過': '', '相關人員': '', '照片連結': '', '狀態': '待處理' },
                 { row: 3, '編號': 2, '提交時間': '2026-06-25 14:05:00', '工號': '011340', '姓名': '王丞銘', '日期': '2026-06-25', '時間': '13:50', '地點': '3F辦公區', '類別': '意外受傷', '描述': '同仁於茶水間滑倒擦傷，已做基本包紮。', '處理經過': '送醫檢查無大礙。', '相關人員': '人資 林姊', '照片連結': 'https://drive.google.com/file/d/DEMO3/view', '狀態': '已處理' }
             ];
 
@@ -305,6 +308,28 @@
                 setUpdating(false);
             };
 
+            // 開啟詳情：凍結目前篩選順序供上一篇/下一篇，並自動將未讀標記為「待處理」
+            const openDetail = (item, orderedRows) => {
+                setNavRows(orderedRows);
+                setNavPos(orderedRows.indexOf(item.row));
+                setSelected(item);
+                autoMark(item);
+            };
+            const goRel = (delta) => {
+                const np = navPos + delta;
+                if (np < 0 || np >= navRows.length) return;
+                const item = list.find(r => r.row === navRows[np]);
+                if (!item) return;
+                setNavPos(np);
+                setSelected(item);
+                autoMark(item);
+            };
+            // 未讀 → 打開後自動轉「待處理」（瀏覽順序已凍結，下一篇仍走原篩選清單）
+            const autoMark = (item) => { if (item && (item['狀態'] || '未讀') === '未讀') changeStatus(item, '待處理'); };
+            const navBtnStyle = (dis) => ({ flexShrink: 0, padding: '8px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 700,
+                cursor: dis ? 'default' : 'pointer', border: '1px solid var(--border)', background: dis ? 'transparent' : 'rgba(212,168,0,.12)',
+                color: dis ? 'var(--text-muted)' : 'var(--primary)', opacity: dis ? .4 : 1 });
+
             const header = React.createElement("div", { className: "header" },
                 React.createElement("a", { href: `index.html?empId=${empId}`, className: "back-btn" }, React.createElement("i", { className: "ti ti-chevron-left" }), "返回主選單"),
                 React.createElement("div", { style: { fontSize: '12px' } }, React.createElement("span", { style: { color: 'var(--primary)' } }, "主管審閱"))
@@ -328,6 +353,11 @@
                         React.createElement("a", { href: "#", className: "back-btn", onClick: e => { e.preventDefault(); setSelected(null); } }, React.createElement("i", { className: "ti ti-chevron-left" }), "返回清單"),
                         StatusBadge(it['狀態'])
                     ),
+                    React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' } },
+                        React.createElement("button", { disabled: navPos <= 0, onClick: () => goRel(-1), style: navBtnStyle(navPos <= 0) }, "‹ 上一篇"),
+                        React.createElement("div", { style: { flex: 1, textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' } }, navRows.length ? ((navPos + 1) + " / " + navRows.length) : ''),
+                        React.createElement("button", { disabled: navPos >= navRows.length - 1, onClick: () => goRel(1), style: navBtnStyle(navPos >= navRows.length - 1) }, "下一篇 ›")
+                    ),
                     React.createElement("div", { className: "card" },
                         React.createElement("div", { style: { fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px' } }, "編號 #" + it['編號']),
                         fieldRow("事故日期 / 時間", (it['日期'] || '') + "　" + (it['時間'] || '')),
@@ -345,8 +375,8 @@
                     ),
                     React.createElement("div", { className: "card" },
                         React.createElement("div", { style: { fontSize: '13px', color: 'var(--primary)', marginBottom: '10px', fontWeight: 700 } }, "更新處理狀態"),
-                        React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
-                            ALL_STATUS.map(st => {
+                        React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' } },
+                            REPORT_STATUS.map(st => {
                                 const active = it['狀態'] === st;
                                 const c = STATUS_COLORS[st];
                                 return React.createElement("button", { key: st, disabled: updating, onClick: () => changeStatus(it, st),
@@ -359,9 +389,16 @@
             }
 
             // 清單頁
-            const filtered = list.filter(r => filter === 'all' ? true : (filter === 'done' ? r['狀態'] === '已處理' : r['狀態'] !== '已處理'));
+            const filtered = list.filter(r => {
+                const s = r['狀態'] || '未讀';
+                if (filter === 'all') return true;
+                if (filter === 'unread') return s === '未讀';
+                if (filter === 'pending') return s === '待處理';
+                if (filter === 'done') return s === '已處理';
+                return true;
+            });
             const tabBtn = (key, label) => React.createElement("button", { onClick: () => setFilter(key),
-                style: { flex: 1, padding: '8px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                style: { flex: 1, padding: '8px 4px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
                     border: '1px solid var(--border)', background: filter === key ? 'var(--primary)' : 'transparent', color: filter === key ? '#0A0C10' : 'var(--text-muted)' } }, label);
 
             return React.createElement("div", { className: "container" }, header,
@@ -370,12 +407,12 @@
                     React.createElement("div", { className: "title-sub" }, "TIANYING SECURITY · DATA SYSTEM")
                 ),
                 React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '14px' } },
-                    tabBtn('pending', '未處理'), tabBtn('done', '已處理'), tabBtn('all', '全部')
+                    tabBtn('unread', '未讀'), tabBtn('pending', '待處理'), tabBtn('done', '已處理'), tabBtn('all', '全部')
                 ),
                 loading ? React.createElement("div", { className: "card", style: { textAlign: 'center', padding: '40px' } }, React.createElement("i", { className: "ti ti-loader-2 spin", style: { fontSize: '28px', color: 'var(--primary)' } })) :
                 filtered.length === 0 ? React.createElement("div", { className: "card", style: { textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' } }, "目前沒有符合條件的報告") :
                 React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
-                    filtered.map(it => React.createElement("div", { key: it.row, className: "card", style: { cursor: 'pointer', padding: '14px' }, onClick: () => setSelected(it) },
+                    filtered.map(it => React.createElement("div", { key: it.row, className: "card", style: { cursor: 'pointer', padding: '14px' }, onClick: () => openDetail(it, filtered.map(r => r.row)) },
                         React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' } },
                             React.createElement("span", { style: { fontSize: '13px', fontWeight: 700, color: 'var(--text)' } }, "#" + it['編號'] + "　" + (it['類別'] || '')),
                             StatusBadge(it['狀態'])

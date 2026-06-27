@@ -32,7 +32,7 @@ var SHEET_FEEDBACK   = '匿名表揚檢舉';  // 匿名表揚／舉報分頁（�
 var TZ               = 'Asia/Taipei';
 
 // 狀態白名單（主管畫面四態）
-var STATUS_LIST = ['未讀', '已讀', '處理中', '已處理'];
+var STATUS_LIST = ['未讀', '待處理', '已讀', '處理中', '已處理'];
 
 // 各分頁表頭（末欄一律為「狀態」）
 var HEADERS_REPORT = [
@@ -112,7 +112,7 @@ function handleReport_(d) {
 function handleFeedback_(d) {
   var sheet = getSheet_(SHEET_FEEDBACK, HEADERS_FEEDBACK);
 
-  var typeLabel = (d.type === 'praise') ? '表揚' : (d.type === 'report' ? '檢舉' : (d.type || ''));
+  var typeLabel = (d.type === 'praise') ? '表揚' : (d.type === 'report' ? '反應' : (d.type || ''));
   var urls = saveImages_(d.images, typeLabel + '_' + (d.target || '') + '_' + (d.date || ''));
 
   sheet.appendRow([
