@@ -156,7 +156,10 @@ select.txt{-webkit-appearance:none;}
 /* PREVIEW */
 .preview-link{display:block;width:100%;padding:11px;background:var(--gold-dim);border:1px solid rgba(99,102,241,.4);border-radius:var(--radius);color:var(--gold);font-size:13px;font-weight:700;text-align:center;margin-bottom:9px;text-decoration:none;transition:all .15s;}
 .preview-link:active{background:rgba(99,102,241,.2);}
-.preview-frame{width:100%;height:calc(100vh - 140px);min-height:300px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);}
+.preview-frame{width:100%;height:calc(100vh - 184px);min-height:280px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);}
+.prev-tabs{display:flex;gap:6px;margin-bottom:8px;}
+.prev-tab{flex:1;padding:9px 6px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text2);font-size:12px;font-weight:700;font-family:'Noto Sans TC',sans-serif;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.prev-tab.active{background:linear-gradient(135deg,rgba(99,102,241,.28),rgba(99,102,241,.14));border-color:rgba(99,102,241,.6);color:var(--gold2);text-shadow:0 0 10px rgba(129,140,248,.4);}
 /* MODAL */
 .moverlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:none;align-items:flex-end;}
 .moverlay.open{display:flex;}
@@ -316,8 +319,13 @@ select.txt{-webkit-appearance:none;}
 
 <!-- PREVIEW -->
 <div class="panel" id="panel-preview">
+  <div class="prev-tabs">
+    <button class="prev-tab active" onclick="switchPreviewSheet('921725644',this)">開店前</button>
+    <button class="prev-tab" onclick="switchPreviewSheet('1114763531',this)">B1F餐廳區</button>
+    <button class="prev-tab" onclick="switchPreviewSheet('1195313632',this)">4F餐廳區</button>
+  </div>
   <div style="display:flex;gap:8px;margin-bottom:9px;">
-    <a class="preview-link" style="flex:1;margin-bottom:0" href="https://docs.google.com/spreadsheets/d/1mxCRUxbuPBuReP1gWK3unFbjtOkAuSkBakQeaH9Rdyc/edit?gid=921725644#gid=921725644" target="_blank">🔗 新分頁開啟</a>
+    <a class="preview-link" id="prevOpenLink" style="flex:1;margin-bottom:0" href="https://docs.google.com/spreadsheets/d/1mxCRUxbuPBuReP1gWK3unFbjtOkAuSkBakQeaH9Rdyc/edit?gid=921725644#gid=921725644" target="_blank">🔗 新分頁開啟</a>
     <button class="preview-link" style="flex:none;width:auto;padding:11px 14px;margin-bottom:0;cursor:pointer;border:none;" onclick="refreshPreview()">🔄 刷新</button>
   </div>
   <iframe class="preview-frame" id="previewFrame"
@@ -1951,6 +1959,17 @@ init();
 function refreshPreview(){
   const frame = document.getElementById('previewFrame');
   if(frame){ const src=frame.src; frame.src=''; frame.src=src; showToast('🔄 預覽已刷新','ok'); }
+}
+
+/* ── 切換預覽分頁（開店前 / B1F餐廳區 / 4F餐廳區）── */
+const PREVIEW_SS_ID='1mxCRUxbuPBuReP1gWK3unFbjtOkAuSkBakQeaH9Rdyc';
+function switchPreviewSheet(gid, btn){
+  const frame=document.getElementById('previewFrame');
+  if(frame) frame.src='https://docs.google.com/spreadsheets/d/'+PREVIEW_SS_ID+'/preview?gid='+gid;
+  const lk=document.getElementById('prevOpenLink');
+  if(lk) lk.href='https://docs.google.com/spreadsheets/d/'+PREVIEW_SS_ID+'/edit?gid='+gid+'#gid='+gid;
+  document.querySelectorAll('.prev-tab').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
 }
 </script>
 <!-- ===== 施工單查詢浮動按鈕 ===== -->
