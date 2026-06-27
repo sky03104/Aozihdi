@@ -1017,14 +1017,22 @@
             const [selected, setSelected] = useState(null);
             const [updating, setUpdating] = useState(false);
             const role = getSessionRole();
-            const allowed = ['executive', 'admin'].includes(role);
+            const demo = params.get('demo') === '1'; // 預覽用假資料模式（免 GAS、免登入）
+            const allowed = demo || ['executive', 'admin'].includes(role);
 
             useEffect(() => {
                 setTimeout(() => { const s = document.getElementById('splash'); if (s) { s.classList.add('hide'); setTimeout(() => s.remove(), 500); } }, 500);
                 if (allowed) loadList();
             }, []);
 
+            const DEMO_FEEDBACK = [
+                { row: 6, '編號': 5, '時間戳記': '2026-06-27 10:20:00', '類型': '表揚', '對象': '王丞銘（011340）', '分類': '熱心助人', '描述': '主動協助行動不便長者進出，態度親切。', '發生日期': '2026-06-27', '附件': 'https://drive.google.com/file/d/DEMOA/view', '工號': '011360', '姓名': '張三', '狀態': '未讀' },
+                { row: 5, '編號': 4, '時間戳記': '2026-06-26 18:02:00', '類型': '檢舉', '對象': '某夜班同仁', '分類': '曠職遲到', '描述': '連續三日交接遲到逾 20 分鐘，影響輪班。', '發生日期': '2026-06-26', '附件': '', '工號': '011371', '姓名': '李四', '狀態': '已讀' },
+                { row: 4, '編號': 3, '時間戳記': '2026-06-25 09:30:00', '類型': '表揚', '對象': '陳小明（011355）', '分類': '客戶好評', '描述': '住戶來電讚許協助尋回遺失物。', '發生日期': '2026-06-25', '附件': '', '工號': '011340', '姓名': '王丞銘', '狀態': '處理中' }
+            ];
+
             const loadList = async () => {
+                if (demo) { setList(DEMO_FEEDBACK); setLoading(false); return; }
                 setLoading(true);
                 try {
                     const res = await fetch(ADMIN_GAS_URL + '?action=getFeedback');
@@ -1037,6 +1045,12 @@
 
             const changeStatus = async (item, status) => {
                 if (updating) return;
+                if (demo) {
+                    setList(prev => prev.map(r => r.row === item.row ? { ...r, '狀態': status } : r));
+                    setSelected(prev => (prev && prev.row === item.row) ? { ...prev, '狀態': status } : prev);
+                    fbToast('（預覽）狀態已更新為「' + status + '」', 'success');
+                    return;
+                }
                 setUpdating(true);
                 try {
                     const body = new URLSearchParams();
