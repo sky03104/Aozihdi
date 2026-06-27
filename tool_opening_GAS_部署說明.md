@@ -146,7 +146,7 @@ function doGet(e) {
   return jsonRes({status:'ok', msg:'天鷹保全 API 正常 ✓'});
 }
 
-// 今日紀錄：當班時段（20:00~隔日08:00）
+// 今日紀錄：開店前為早上作業，撈「今天整天」（00:00 ~ 隔日 00:00）
 function getTodayRows(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -155,15 +155,8 @@ function getTodayRows(e) {
     if (!sheet) return jsonRes({status:'error', msg:'找不到分頁: '+sheetNm});
 
     var now = new Date();
-    var nowHour = now.getHours();
-    var shiftStart, shiftEnd;
-    if (nowHour >= 20) {
-      shiftStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 20, 0, 0);
-      shiftEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 0, 0);
-    } else {
-      shiftStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()-1, 20, 0, 0);
-      shiftEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0);
-    }
+    var shiftStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    var shiftEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 0, 0, 0);
 
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) return jsonRes({status:'ok', rows:[]});
