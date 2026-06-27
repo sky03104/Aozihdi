@@ -1058,6 +1058,77 @@ python3 snapshot-generator-simple.py
 - `tool_feedback.html` GAS 試算表新增「狀態」欄位
 - **狀態**：⏳ 設計稿製作中（等確認再串接）
 
+### 🟢 本次（2026-06-27）額外完成
+
+#### [TODO-07] 開店/打烊工具「設定」分頁限管理員
+- 原 `['leader','vicecaptain','captain','executive','admin']` → 改 `['admin']`
+- **位置**：`tool_opening.html` 與 `index.html`(tpl-closing) 的 `checkRole()`
+- **狀態**：✅ 完成（2026-06-27）
+
+#### [TODO-08] 開店工具「預覽」分頁指向開店試算表 + 三分頁切換鈕
+- 預覽 iframe/開啟連結改指 `1mxCRUxbuPBuReP1gWK3unFbjtOkAuSkBakQeaH9Rdyc`
+- 新增切換鈕：開店前(`921725644`)/B1F餐廳區(`1114763531`)/4F餐廳區(`1195313632`)
+- **狀態**：✅ 完成（2026-06-27）
+
+#### [TODO-09] 緊急聯絡清單手機開頭 0 消失
+- 根因：Google Sheet 把 `09…` 當數字存，回傳掉開頭 0
+- 修正：`normalizePhone()`，9 碼且開頭 9 的台灣手機補回 0（前端拉取/還原時）
+- **位置**：`index.html`(tpl-emergency)
+- **狀態**：✅ 完成（2026-06-27）
+
+#### [TODO-10] 班表早班班別不顯示／不能修改
+- 根因：`SHIFT_TYPES` 只定義晚班代號（B/海/N），早班代號未定義 → 格子顯示「·」、編輯視窗選不到
+- 修正：補早班班別 `A/S/L/H/H2/LN` + `國例`，更新 `WORK_SHIFT`/`OFF_TYPES`
+- **位置**：`index.html` ScheduleApp `SHIFT_TYPES`
+- **待辦尾巴**：黃底「停休加班」與休假同字，無法以代號區分（等使用者提供獨立代號）
+- **狀態**：✅ 完成（2026-06-27），停休加班待補
+
+---
+
+## 🧠 技術經驗筆記 / Lessons Learned
+
+> 此區累積實作中踩過的坑與解法，供未來 AI 與工程師快速避雷。每次大更新後補充。
+
+### 📅 2026-06-27：開店前工具 + 多工具修正
+
+#### A. 工具嵌入有兩種模式（決定新工具怎麼放）
+1. **base64 內嵌**：`<script id="tpl-X" type="application/octet-stream">…</script>`，用 `b64decode()` → iframe `srcDoc`（closing/car/signin/emergency/upload）。
+2. **獨立檔 + iframe `src`**：獨立 HTML 放 repo 根，常數存 GitHub Pages URL（`POST_PAGE_URL`、`OPENING_PAGE_URL`），render 用 `src` 不用 `srcDoc`（post.html / tool_opening.html）。
+- **決策準則**：要獨立維護、檔案分離、好單獨預覽 → 選獨立檔模式。要單檔打包 → 選 base64。
+- **改 base64 內嵌工具 SOP**：Python regex 抓 `<script id="tpl-X"[^>]*>(.*?)</script>` → `base64.b64decode` → 編輯字串 → `base64.b64encode` → 取代回 index.html。改完一定 `node --check`。
+
+#### B. GAS `getActiveSpreadsheet()` 只能讀寫綁定的那份試算表
+- 跨試算表共用資料時必須**多個 GAS URL**。開店工具範例：`DB_GAS_URL`（打烊 GAS，共用 `_SharedDB` 廠商/監工/檢查者）+ `BUILT_IN_GAS_URL`（開店 GAS，寫各自記錄）。
+- 想單一 GAS 跨表寫入要改用 `openById()`，且 GAS 帳號需有目標表存取權。
+
+#### C. 常見錯誤 → 修法
+| 症狀 | 根因 | 修法 |
+|------|------|------|
+| 送出失敗「找不到分頁」 | 前端 `BUILT_IN_SHEET` 與實際分頁名不符 | 對齊實際分頁名；GAS `getSheetByName` 區分大小寫/全形 |
+| 「今日」讀不到剛送的資料 | 繼承的 `getTodayRows` 用夜班時段(20:00~隔日00:00)，早班資料落窗外 | 改日曆日(今天00:00~隔日00:00)；**GAS 改了要重新部署**（管理部署→編輯→新版本，網址不變） |
+| 手機/工號開頭 0 消失 | Google Sheet 把純數字字串當 number 存，回傳掉前導 0 | 前端 `normalizePhone()` 補回；或試算表欄位設「純文字」格式；或 GAS 寫入時加 `'` 前綴 |
+| 班別/代號不顯示、編輯選不到 | 代號未在 `SHIFT_TYPES` 定義（render 成「·」，編輯視窗 iterate `SHIFT_TYPES`） | 補定義（代號/label/time/color/bg/hours）+ 同步 `WORK_SHIFT`/`OFF_TYPES` |
+
+#### D. 權限控制（工具內角色判定）
+- 工具讀 `localStorage.hsh_session_user` 的 `role`。限管理員：`['admin'].includes(u.role)`。
+- `window.self===window.top` 旁路：獨立開啟（部署設定/githack 預覽）時放行；App 內嵌 iframe 則依角色。
+
+#### E. 分支預覽方法
+- 用 **raw.githack.com + commit SHA**（不要用分支名——分支名含斜線 `claude/...` 會造成路徑歧義）：
+  `https://raw.githack.com/<user>/<repo>/<full-SHA>/<path>`
+- base64 內嵌工具無法單獨預覽 → 解碼成獨立檔暫放 `preview/`，合併前刪。
+- Google Sheets 嵌入 `/preview?gid=X` 可切分頁；手機底部分頁列易被擠掉 → 自製按鈕改 iframe `src` 的 gid。
+
+#### F. 合併 main：base64 內嵌工具的衝突處理
+- base64 是「一行超長字串」→ git 視為單行衝突，**無法逐行 merge**。
+- 處理流程：解碼衝突雙方（HEAD vs 分支）→ `diff` 找真實差異 → 確認某方是 superset → 取較完整版重貼。
+- **教訓**：base64 內嵌讓 git diff/merge 失效，是內嵌模式最大缺點；高頻修改的工具建議改獨立檔。
+
+#### G. 驗證手法
+- HTML 內嵌 JS 驗證：Python 抽出 `<script>`（排除 `src=` 與 `octet-stream` 模板）合併 → `node --check`。
+- GAS 在 template literal 內：抽出 `const GAS_CODE=\`…\`` → 存 `.js` → `node --check`（`.gs` 副檔名 node 不認）。
+- 主鍵規範：純數字流水號 `nextRow-1`，**禁止** `genId()` 隨機英數。
+
 ---
 
 ## 📄 Document Versions
@@ -1067,6 +1138,7 @@ python3 snapshot-generator-simple.py
 | 1.0 | 2026-06-22 | Initial CLAUDE.md creation |
 | 1.1 | 2026-06-22 | 新增團隊架構、設計規範、GAS標準、TODO-01~06 |
 | 1.2 | 2026-06-27 | TODO-03 完成（開店前工具 `tool_opening.html` + 雙GAS + 部署說明），更新檔案結構 |
+| 1.3 | 2026-06-27 | TODO-07~10 完成（設定限管理員、開店預覽切換、緊急手機0、班表早班班別）；新增「技術經驗筆記」；合併上線 main |
 
 ---
 
