@@ -51,6 +51,8 @@ tianying-security/
 ├── tool_work.html                     ← Work tracking tool
 ├── tool_report.html                   ← Report tool (example)
 ├── tool_feedback.html                 ← Feedback tool
+├── tool_opening.html                  ← 開店前進出快速登錄（獨立檔，靛藍主題，雙GAS）
+├── tool_opening_GAS_部署說明.md        ← 開店 GAS 部署指南
 │
 └── tianying-monitor/                  ← Main automation system
     ├── README.md                      ← System documentation (English)
@@ -974,9 +976,30 @@ python3 snapshot-generator-simple.py
 
 ### 🟡 中優先 - 新工具開發
 
-#### [TODO-03] 開店前快速登錄工具 → 資料庫共用評估（已評估，待確認）
+#### [TODO-03] 開店前快速登錄工具 → 獨立檔 + 雙GAS共用資料庫
+- **狀態**：✅ 完成（2026-06-27）
 
-**評估結果（2026-06-22）**：
+**實作結果（2026-06-27）**：
+
+| 項目 | 值 |
+|------|-----|
+| 工具檔案 | `tool_opening.html`（獨立檔，非內嵌 base64） |
+| index.html 串接 | `OPENING_PAGE_URL` + TOOLS 卡片 `toolId:"opening"` + 標題 + iframe `src`（仿 `post.html` 模式） |
+| 主題色 | 靛藍（`#6366F1` / `#A5B4FC` / `rgba(99,102,241,*)`），與打烊金色區隔 |
+| 進出記錄分頁 | `開店進出資料表` |
+| 記錄試算表 | `1mxCRUxbuPBuReP1gWK3unFbjtOkAuSkBakQeaH9Rdyc`（開店） |
+| 記錄 GAS | `BUILT_IN_GAS_URL`（新部署開店 GAS，待使用者部署後填入） |
+| 資料庫 GAS | `DB_GAS_URL` = 打烊 GAS URL（共用 `_SharedDB`，廠商/監工/檢查者即時同步） |
+| 主鍵 | 純數字流水號（`nextRow-1`），符合主鍵規範（非隨機英數） |
+| GAS 部署說明 | `tool_opening_GAS_部署說明.md` |
+
+**架構決策**：採方案A（雙 GAS URL）。GAS 用 `getActiveSpreadsheet()` 只能讀寫綁定試算表，故資料庫走打烊 GAS、記錄走開店 GAS，各司其職。開店試算表無現成 GAS，已撰寫並附部署說明。
+
+**待使用者動作**：依 `tool_opening_GAS_部署說明.md` 部署開店 GAS → 取得 `/exec` 網址 → 填入 `BUILT_IN_GAS_URL`（或貼工具設定頁）。
+
+---
+
+**原評估結果（2026-06-22）**：
 
 打烊後快速登錄工具的三個資料庫：
 
@@ -998,7 +1021,7 @@ python3 snapshot-generator-simple.py
 - 方案B：開店前工具讀取同一 localStorage，直接共享本地端資料，不需新增GAS
 - 關鍵差異：進出記錄分頁名稱需區分（打烊用「進出資料表」，開店用「開店進出資料表」）
 
-**等待確認後動工**
+**→ 已於 2026-06-27 採方案A 變體（雙 GAS URL）完成，見上方實作結果。**
 
 #### [TODO-04] 班表查詢工具 → 移除上傳功能
 - 班表上傳 tab 目前僅 `canE`（管理員）角色可見（`k: "upload", l: "⬆ 上傳"`）
@@ -1043,9 +1066,10 @@ python3 snapshot-generator-simple.py
 |---------|------|---------|
 | 1.0 | 2026-06-22 | Initial CLAUDE.md creation |
 | 1.1 | 2026-06-22 | 新增團隊架構、設計規範、GAS標準、TODO-01~06 |
+| 1.2 | 2026-06-27 | TODO-03 完成（開店前工具 `tool_opening.html` + 雙GAS + 部署說明），更新檔案結構 |
 
 ---
 
-**Last Updated**: 2026-06-22  
+**Last Updated**: 2026-06-27  
 **For Questions**: Refer to project documentation or contact the project owner  
 **Branch**: `claude/claude-md-docs-4bz58p`
