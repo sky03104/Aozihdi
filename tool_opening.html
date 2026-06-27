@@ -540,7 +540,7 @@ let inspectors=JSON.parse(localStorage.getItem('hsh_ins')||'null')||DEF_INS.map(
 let workTypes=JSON.parse(localStorage.getItem('hsh_wt')||'null')||[...DEF_WT];
 let queue=JSON.parse(localStorage.getItem('hsh_q')||'[]');
 // ★ 預設連線設定（管理員填寫後，所有員工開啟就自動連線，不需手動設定）
-const BUILT_IN_GAS_URL   = ''; // ★ 開店GAS Web App URL（部署開店試算表的GAS後貼上，負責寫「開店進出資料表」記錄）
+const BUILT_IN_GAS_URL   = 'https://script.google.com/macros/s/AKfycbycVyNyYJ8IT37vfNbbVHLUjcc2RJ0ZM-MUA9m1DCdT6VWhiAG_WGlUu_BxK1q1mC6DUw/exec'; // ★ 開店GAS Web App URL（負責寫「開店進出資料表」記錄）
 const DB_GAS_URL         = 'https://script.google.com/macros/s/AKfycbwZ5f7h_Lv_MOCxPrqPpBPKA917-JKmEz5DDekYixLDsGf1QAKCTOuVxwo18OYKX7a4ng/exec'; // 打烊GAS URL（共用廠商/監工/檢查者資料庫 _SharedDB，只做 getDB/setDB）
 const BUILT_IN_SHEET     = '開店進出資料表'; // ← 要寫入的分頁名稱（開店試算表）
 const CON_GAS_URL = 'https://script.google.com/macros/s/AKfycbz7orMAA608y2GiDlirI0FlJW4lccqZvnzN4si7XFIxh7_euyx1zTA0uSmb5Rd4jnCkwg/exec'; // 施工單查詢 GAS
