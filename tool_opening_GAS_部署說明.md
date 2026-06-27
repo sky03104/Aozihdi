@@ -2,7 +2,7 @@
 
 **工具**：開店前進出快速登錄（`tool_opening.html`）
 **目標試算表**：`1mxCRUxbuPBuReP1gWK3unFbjtOkAuSkBakQeaH9Rdyc`
-**分頁名稱**：`開店進出資料表`（已存在）
+**分頁名稱**：`進出資料表`（已存在）
 
 ---
 
@@ -13,7 +13,7 @@
 | 連線 | 變數 | 指向 | 負責 |
 |------|------|------|------|
 | 資料庫 | `DB_GAS_URL` | **打烊 GAS URL**（既有，已內建） | 廠商／監工／檢查者資料庫 `getDB`／`setDB`（與打烊後工具共用同一份 `_SharedDB`） |
-| 進出記錄 | `BUILT_IN_GAS_URL` | **開店 GAS URL**（本說明要新部署） | 寫入「開店進出資料表」、今日清單、補退場 |
+| 進出記錄 | `BUILT_IN_GAS_URL` | **開店 GAS URL**（本說明要新部署） | 寫入「進出資料表」、今日清單、補退場 |
 
 > 為什麼要兩個？GAS 用 `getActiveSpreadsheet()` 只能讀寫它所綁定的那份試算表。資料庫在打烊試算表、開店記錄在開店試算表，是兩份不同的 spreadsheet，所以記錄寫入需要開店試算表自己的 GAS。資料庫則直接共用打烊 GAS，不需重複維護。
 
@@ -42,7 +42,7 @@
 ### 5. 確認試算表分頁
 開店試算表需有以下分頁（沒有請手動建立，欄位標題照下表）：
 
-**`開店進出資料表`**（主記錄，A~L 欄）
+**`進出資料表`**（主記錄，A~L 欄）
 
 | A 紀錄ID | B 專櫃ID | C 樓層 | D 專櫃名稱 | E 人數 | F 監工 | G 進場時間 | H 施工地點 | I 施工項目 | J 退場時間 | K 檢查者 | L 建立時間 |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -55,7 +55,7 @@
 
 ## 完整 GAS 程式碼
 
-> 此程式碼與工具內 **設定 → GAS 程式碼** 一致。寫入分頁由前端傳入（固定為 `開店進出資料表`），紀錄主鍵為純數字流水號。
+> 此程式碼與工具內 **設定 → GAS 程式碼** 一致。寫入分頁由前端傳入（固定為 `進出資料表`），紀錄主鍵為純數字流水號。
 
 ```javascript
 // ============================
@@ -104,7 +104,7 @@ function doPost(e) {
     }
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheetNm = e.parameter.sheetName || '開店進出資料表';
+    var sheetNm = e.parameter.sheetName || '進出資料表';
     var sheet = ss.getSheetByName(sheetNm);
     if (!sheet) return jsonRes({status:'error', msg:'找不到分頁: '+sheetNm});
 
@@ -150,7 +150,7 @@ function doGet(e) {
 function getTodayRows(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheetNm = (e && e.parameter && e.parameter.sheet) ? e.parameter.sheet : '開店進出資料表';
+    var sheetNm = (e && e.parameter && e.parameter.sheet) ? e.parameter.sheet : '進出資料表';
     var sheet = ss.getSheetByName(sheetNm);
     if (!sheet) return jsonRes({status:'error', msg:'找不到分頁: '+sheetNm});
 
@@ -200,7 +200,7 @@ function getTodayRows(e) {
 function updateExitTime(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheetNm = e.parameter.sheet || '開店進出資料表';
+    var sheetNm = e.parameter.sheet || '進出資料表';
     var sheet = ss.getSheetByName(sheetNm);
     if (!sheet) return jsonRes({status:'error', msg:'找不到分頁: '+sheetNm});
 
@@ -292,7 +292,7 @@ function jsonRes(obj) {
 
 - [ ] GAS 部署成功，`/exec` 網址可開啟並回 `天鷹保全 API 正常 ✓`
 - [ ] 工具設定頁貼上網址後顯示「✓ 連線成功」
-- [ ] 送出一筆進出 → 「開店進出資料表」新增一列，A 欄為純數字（1、2、3…）
+- [ ] 送出一筆進出 → 「進出資料表」新增一列，A 欄為純數字（1、2、3…）
 - [ ] 今日頁可載入剛送出的紀錄
 - [ ] 廠商／監工／檢查者清單與打烊後工具一致（共用 `_SharedDB`）
 - [ ] 打烊後工具不受影響
