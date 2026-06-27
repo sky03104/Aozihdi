@@ -1032,7 +1032,7 @@
             const DEMO_FEEDBACK = [
                 { row: 6, '編號': 5, '時間戳記': '2026-06-27 10:20:00', '類型': '表揚', '對象': '王丞銘（011340）', '分類': '熱心助人', '描述': '主動協助行動不便長者進出，態度親切。', '發生日期': '2026-06-27', '附件': 'https://drive.google.com/file/d/DEMOA/view', '工號': '011360', '姓名': '張三', '狀態': '未讀' },
                 { row: 5, '編號': 4, '時間戳記': '2026-06-26 18:02:00', '類型': '反應', '對象': '某夜班同仁', '分類': '曠職遲到', '描述': '連續三日交接遲到逾 20 分鐘，影響輪班。', '發生日期': '2026-06-26', '附件': '', '工號': '011371', '姓名': '李四', '狀態': '已讀' },
-                { row: 4, '編號': 3, '時間戳記': '2026-06-25 09:30:00', '類型': '表揚', '對象': '陳小明（011355）', '分類': '客戶好評', '描述': '住戶來電讚許協助尋回遺失物。', '發生日期': '2026-06-25', '附件': '', '工號': '011340', '姓名': '王丞銘', '狀態': '未讀' }
+                { row: 4, '編號': 3, '時間戳記': '2026-06-25 09:30:00', '類型': '表揚', '對象': '陳小明（011355）', '分類': '客戶好評', '描述': '住戶來電讚許協助尋回遺失物。', '發生日期': '2026-06-25', '附件': '', '工號': '011340', '姓名': '王丞銘', '狀態': '已處理', '處置': '同意表揚' }
             ];
 
             const loadList = async () => {
@@ -1047,29 +1047,34 @@
                 setLoading(false);
             };
 
-            const changeStatus = async (item, status) => {
+            const changeStatus = async (item, status, decision) => {
                 if (updating) return;
+                const patch = decision !== undefined ? { '狀態': status, '處置': decision } : { '狀態': status };
                 if (demo) {
-                    setList(prev => prev.map(r => r.row === item.row ? { ...r, '狀態': status } : r));
-                    setSelected(prev => (prev && prev.row === item.row) ? { ...prev, '狀態': status } : prev);
-                    fbToast('（預覽）狀態已更新為「' + status + '」', 'success');
+                    setList(prev => prev.map(r => r.row === item.row ? { ...r, ...patch } : r));
+                    setSelected(prev => (prev && prev.row === item.row) ? { ...prev, ...patch } : prev);
+                    fbToast('（預覽）' + (decision !== undefined ? '已記錄處置「' + decision + '」' : '狀態已更新為「' + status + '」'), 'success');
                     return;
                 }
                 setUpdating(true);
                 try {
+                    const payload = { sheet: 'feedback', row: item.row, status: status };
+                    if (decision !== undefined) payload.decision = decision;
                     const body = new URLSearchParams();
                     body.append('action', 'updateStatus');
-                    body.append('payload', JSON.stringify({ sheet: 'feedback', row: item.row, status: status }));
+                    body.append('payload', JSON.stringify(payload));
                     const res = await fetch(ADMIN_GAS_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, body: body.toString() });
                     const d = await res.json();
                     if (d.status === 'ok') {
-                        setList(prev => prev.map(r => r.row === item.row ? { ...r, '狀態': status } : r));
-                        setSelected(prev => (prev && prev.row === item.row) ? { ...prev, '狀態': status } : prev);
-                        fbToast('狀態已更新為「' + status + '」', 'success');
+                        setList(prev => prev.map(r => r.row === item.row ? { ...r, ...patch } : r));
+                        setSelected(prev => (prev && prev.row === item.row) ? { ...prev, ...patch } : prev);
+                        fbToast(decision !== undefined ? '已記錄處置「' + decision + '」' : '狀態已更新為「' + status + '」', 'success');
                     } else fbToast('更新失敗：' + (d.msg || ''), 'err');
                 } catch (e) { fbToast('網路連線錯誤', 'err'); }
                 setUpdating(false);
             };
+            // 主管裁決：同意/不同意 → 狀態轉「已處理」並記錄處置
+            const decide = (item, decision) => changeStatus(item, '已處理', decision);
 
             // 開啟詳情：凍結目前篩選順序供上一篇/下一篇，並自動將未讀標記為「已讀」
             const openDetail = (item, orderedRows) => {
@@ -1142,14 +1147,16 @@
                         )
                     ),
                     React.createElement("div", { className: "card" },
-                        React.createElement("div", { style: { fontSize: '13px', color: 'var(--primary)', marginBottom: '10px', fontWeight: 700 } }, "更新處理狀態"),
+                        React.createElement("div", { style: { fontSize: '13px', color: 'var(--primary)', marginBottom: '10px', fontWeight: 700 } }, "主管裁決"),
+                        it['處置'] ? React.createElement("div", { style: { fontSize: '13px', color: 'var(--text)', marginBottom: '10px' } },
+                            React.createElement("span", { style: { color: 'var(--text-muted)' } }, "目前處置："), it['處置']) : null,
                         React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
-                            FB_STATUS.map(st => {
-                                const active = it['狀態'] === st;
-                                const c = STATUS_COLORS[st];
-                                return React.createElement("button", { key: st, disabled: updating, onClick: () => changeStatus(it, st),
+                            ((it['類型'] === '表揚') ? ['同意表揚', '不同意表揚'] : ['同意懲處', '不同意懲處']).map((dec, di) => {
+                                const active = it['處置'] === dec;
+                                const c = (di === 0) ? '#4ADE80' : '#F87171';
+                                return React.createElement("button", { key: dec, disabled: updating, onClick: () => decide(it, dec),
                                     style: { padding: '12px', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: updating ? 'default' : 'pointer',
-                                        border: '1px solid ' + c + (active ? '' : '55'), background: active ? c : c + '15', color: active ? '#0A0C10' : c } }, st);
+                                        border: '1px solid ' + c + (active ? '' : '55'), background: active ? c : c + '15', color: active ? '#0A0C10' : c } }, dec);
                             })
                         )
                     )
@@ -1161,10 +1168,11 @@
                 const s = r['狀態'] || '未讀';
                 if (filter === 'all') return true;
                 if (filter === 'read') return s === '已讀';
-                return s !== '已讀'; // unread：未讀（含空值）
+                if (filter === 'done') return s === '已處理';
+                return s === '未讀'; // unread
             });
             const tabBtn = (key, label) => React.createElement("button", { onClick: () => setFilter(key),
-                style: { flex: 1, padding: '8px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                style: { flex: 1, padding: '8px 4px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
                     border: '1px solid var(--border)', background: filter === key ? 'var(--primary)' : 'transparent', color: filter === key ? '#0A0C10' : 'var(--text-muted)' } }, label);
 
             return React.createElement("div", { className: "container" }, header,
@@ -1173,7 +1181,7 @@
                     React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: '11px', letterSpacing: '1px' } }, "TIANYING SECURITY · DATA SYSTEM")
                 ),
                 React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '14px' } },
-                    tabBtn('unread', '未讀'), tabBtn('read', '已讀'), tabBtn('all', '全部')
+                    tabBtn('unread', '未讀'), tabBtn('read', '已讀'), tabBtn('done', '已處理'), tabBtn('all', '全部')
                 ),
                 loading ? React.createElement("div", { className: "card", style: { textAlign: 'center', padding: '40px' } }, React.createElement("i", { className: "ti ti-loader-2", style: { fontSize: '28px', color: 'var(--primary)' } })) :
                 filtered.length === 0 ? React.createElement("div", { className: "card", style: { textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' } }, "目前沒有符合條件的項目") :

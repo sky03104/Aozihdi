@@ -32,7 +32,7 @@ var SHEET_FEEDBACK   = '匿名表揚檢舉';  // 匿名表揚／舉報分頁（�
 var TZ               = 'Asia/Taipei';
 
 // 狀態白名單（主管畫面四態）
-var STATUS_LIST = ['未讀', '待處理', '已讀', '處理中', '已處理'];
+var STATUS_LIST = ['未讀', '待處理', '已知悉再觀察', '持續追蹤', '已讀', '處理中', '已處理'];
 
 // 各分頁表頭（末欄一律為「狀態」）
 var HEADERS_REPORT = [
@@ -41,7 +41,7 @@ var HEADERS_REPORT = [
 ];
 var HEADERS_FEEDBACK = [
   '時間戳記', '類型', '對象', '事由分類', '事件描述', '發生日期', '附件連結',
-  '【後台】工號', '【後台】姓名', '狀態'
+  '【後台】工號', '【後台】姓名', '狀態', '處置'
 ];
 
 // ====== 入口：單一 doPost，action 分流 ======
@@ -125,7 +125,8 @@ function handleFeedback_(d) {
     urls.join('\n'),
     "'" + (d.empId || '未登入'),  // 後台可見：填寫人工號
     "'" + (d.name || ''),         // 後台可見：填寫人姓名
-    '未讀'                        // 狀態（新增）
+    '未讀',                       // 狀態（新增）
+    ''                            // 處置（主管裁決後寫入）
   ]);
   return json_({ status: 'ok', msg: '提交成功', photos: urls.length });
 }
@@ -145,8 +146,15 @@ function handleUpdateStatus_(d) {
   var sheet = getSheet_(which, headers);
   if (row > sheet.getLastRow()) return json_({ status: 'error', msg: '列號超出範圍：' + row });
 
-  var statusCol = headers.length; // 狀態固定為末欄
+  var statusCol = headers.indexOf('狀態') + 1; // 依表頭名稱定位（不再假設末欄）
+  if (statusCol < 1) return json_({ status: 'error', msg: '找不到「狀態」欄' });
   sheet.getRange(row, statusCol).setValue(status);
+
+  // 主管裁決：寫入「處置」欄（同意表揚／不同意表揚／同意懲處／不同意懲處）
+  if (d.decision !== undefined && d.decision !== null) {
+    var decCol = headers.indexOf('處置') + 1;
+    if (decCol >= 1) sheet.getRange(row, decCol).setValue(String(d.decision));
+  }
   return json_({ status: 'ok', msg: '狀態已更新', row: row, status: status });
 }
 
@@ -250,7 +258,7 @@ function doGet(e) {
 
   if (action === 'getFeedback') {
     var fList = readSheetRows_(SHEET_FEEDBACK, HEADERS_FEEDBACK,
-      ['時間戳記', '類型', '對象', '分類', '描述', '發生日期', '附件', '工號', '姓名', '狀態']);
+      ['時間戳記', '類型', '對象', '分類', '描述', '發生日期', '附件', '工號', '姓名', '狀態', '處置']);
     return json_({ status: 'ok', list: fList });
   }
 
