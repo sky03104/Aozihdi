@@ -93,6 +93,37 @@
                 return u.name || u.empName || u.userName || u['姓名'] || ''; } catch(e){ return ''; }
         }
 
+        // ===== 主管模式（?mode=admin）共用 =====
+        const mode = params.get('mode') || '';
+        function getSessionRole(){
+            try { return (JSON.parse(localStorage.getItem('hsh_session_user') || '{}').role) || ''; } catch(e){ return ''; }
+        }
+        const STATUS_COLORS = { '未讀': '#F87171', '已讀': '#D4A800', '處理中': '#FB923C', '已處理': '#4ADE80' };
+        const ALL_STATUS = ['未讀', '已讀', '處理中', '已處理'];
+        const ADMIN_GAS_URL = "https://script.google.com/macros/s/AKfycbwHXlwTMmJyA79Cuzdh2IPRnBLUWm2YPEqXn5XJj4GVEUlCnNIv8hgRTJ7Xr198hZxG/exec";
+
+        // 狀態徽章
+        function StatusBadge(status){
+            const c = STATUS_COLORS[status] || '#8A95A8';
+            return React.createElement("span", { style: { background: c + '22', color: c, border: '1px solid ' + c + '55', borderRadius: '999px', padding: '2px 10px', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap' } }, status || '未讀');
+        }
+        // 詳情欄位列
+        function fieldRow(label, value){
+            return React.createElement("div", { style: { marginBottom: '12px' } },
+                React.createElement("div", { style: { fontSize: '12px', color: 'var(--primary)', marginBottom: '3px' } }, label),
+                React.createElement("div", { style: { fontSize: '14px', color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }, value || '—')
+            );
+        }
+        // 照片連結（以 \n 分隔）→ 可點開連結
+        function photoLinks(raw){
+            const urls = String(raw || '').split('\n').map(s => s.trim()).filter(Boolean);
+            if (!urls.length) return React.createElement("div", { style: { fontSize: '14px', color: 'var(--text-muted)' } }, "（無照片）");
+            return React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+                urls.map((u, i) => React.createElement("a", { key: i, href: u, target: "_blank", rel: "noopener", style: { fontSize: '13px', color: '#818CF8', wordBreak: 'break-all' } },
+                    React.createElement("i", { className: "ti ti-photo", style: { marginRight: '4px' } }), "查看照片 " + (i + 1)))
+            );
+        }
+
         function App() {
             const [formData, setFormData] = useState({
                 date: new Date().toISOString().split('T')[0],
@@ -216,6 +247,135 @@
             );
         }
 
+        // ===== 主管審閱畫面（事故報告）=====
+        function AdminApp(){
+            const [list, setList] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [filter, setFilter] = useState('pending'); // all | pending | done
+            const [selected, setSelected] = useState(null);
+            const [updating, setUpdating] = useState(false);
+            const role = getSessionRole();
+            const allowed = ['executive', 'admin'].includes(role);
+
+            useEffect(() => {
+                setTimeout(() => { const s = document.getElementById('splash'); if (s) { s.classList.add('hide'); setTimeout(() => s.remove(), 500); } }, 500);
+                if (allowed) loadList();
+            }, []);
+
+            const loadList = async () => {
+                setLoading(true);
+                try {
+                    const res = await fetch(ADMIN_GAS_URL + '?action=getReports');
+                    const d = await res.json();
+                    if (d.status === 'ok' && Array.isArray(d.list)) setList(d.list);
+                    else showToast('❌ 讀取失敗：' + (d.msg || '未知錯誤'), 'err');
+                } catch (e) { showToast('❌ 網路連線錯誤', 'err'); }
+                setLoading(false);
+            };
+
+            const changeStatus = async (item, status) => {
+                if (updating) return;
+                setUpdating(true);
+                try {
+                    const body = new URLSearchParams();
+                    body.append('action', 'updateStatus');
+                    body.append('payload', JSON.stringify({ sheet: 'report', row: item.row, status: status }));
+                    const res = await fetch(ADMIN_GAS_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, body: body.toString() });
+                    const d = await res.json();
+                    if (d.status === 'ok') {
+                        setList(prev => prev.map(r => r.row === item.row ? { ...r, '狀態': status } : r));
+                        setSelected(prev => (prev && prev.row === item.row) ? { ...prev, '狀態': status } : prev);
+                        showToast('✅ 狀態已更新為「' + status + '」', 'success');
+                    } else showToast('❌ 更新失敗：' + (d.msg || ''), 'err');
+                } catch (e) { showToast('❌ 網路連線錯誤', 'err'); }
+                setUpdating(false);
+            };
+
+            const header = React.createElement("div", { className: "header" },
+                React.createElement("a", { href: `index.html?empId=${empId}`, className: "back-btn" }, React.createElement("i", { className: "ti ti-chevron-left" }), "返回主選單"),
+                React.createElement("div", { style: { fontSize: '12px' } }, React.createElement("span", { style: { color: 'var(--primary)' } }, "主管審閱"))
+            );
+
+            if (!allowed) {
+                return React.createElement("div", { className: "container" }, header,
+                    React.createElement("div", { className: "card", style: { textAlign: 'center', padding: '40px 20px' } },
+                        React.createElement("div", { style: { fontSize: '40px', marginBottom: '12px' } }, "🔒"),
+                        React.createElement("div", { style: { fontSize: '16px', fontWeight: 700, marginBottom: '6px' } }, "無檢視權限"),
+                        React.createElement("div", { style: { fontSize: '13px', color: 'var(--text-muted)' } }, "此頁面僅限公司主管／管理員檢視")
+                    )
+                );
+            }
+
+            // 詳情頁
+            if (selected) {
+                const it = selected;
+                return React.createElement("div", { className: "container" },
+                    React.createElement("div", { className: "header" },
+                        React.createElement("a", { href: "#", className: "back-btn", onClick: e => { e.preventDefault(); setSelected(null); } }, React.createElement("i", { className: "ti ti-chevron-left" }), "返回清單"),
+                        StatusBadge(it['狀態'])
+                    ),
+                    React.createElement("div", { className: "card" },
+                        React.createElement("div", { style: { fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px' } }, "編號 #" + it['編號']),
+                        fieldRow("事故日期 / 時間", (it['日期'] || '') + "　" + (it['時間'] || '')),
+                        fieldRow("事故地點", it['地點']),
+                        fieldRow("事故類別", it['類別']),
+                        fieldRow("事故經過", it['描述']),
+                        fieldRow("處理經過與結果", it['處理經過']),
+                        fieldRow("現場相關人員", it['相關人員']),
+                        fieldRow("回報人員", (it['工號'] || '') + "　" + (it['姓名'] || '')),
+                        fieldRow("提交時間", it['提交時間']),
+                        React.createElement("div", { style: { marginBottom: '12px' } },
+                            React.createElement("div", { style: { fontSize: '12px', color: 'var(--primary)', marginBottom: '3px' } }, "現場照片"),
+                            photoLinks(it['照片連結'])
+                        )
+                    ),
+                    React.createElement("div", { className: "card" },
+                        React.createElement("div", { style: { fontSize: '13px', color: 'var(--primary)', marginBottom: '10px', fontWeight: 700 } }, "更新處理狀態"),
+                        React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
+                            ALL_STATUS.map(st => {
+                                const active = it['狀態'] === st;
+                                const c = STATUS_COLORS[st];
+                                return React.createElement("button", { key: st, disabled: updating, onClick: () => changeStatus(it, st),
+                                    style: { padding: '12px', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: updating ? 'default' : 'pointer',
+                                        border: '1px solid ' + c + (active ? '' : '55'), background: active ? c : c + '15', color: active ? '#0A0C10' : c } }, st);
+                            })
+                        )
+                    )
+                );
+            }
+
+            // 清單頁
+            const filtered = list.filter(r => filter === 'all' ? true : (filter === 'done' ? r['狀態'] === '已處理' : r['狀態'] !== '已處理'));
+            const tabBtn = (key, label) => React.createElement("button", { onClick: () => setFilter(key),
+                style: { flex: 1, padding: '8px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                    border: '1px solid var(--border)', background: filter === key ? 'var(--primary)' : 'transparent', color: filter === key ? '#0A0C10' : 'var(--text-muted)' } }, label);
+
+            return React.createElement("div", { className: "container" }, header,
+                React.createElement("div", { className: "logo-area", style: { marginBottom: '12px' } },
+                    React.createElement("div", { className: "title-main" }, "事故報告審閱"),
+                    React.createElement("div", { className: "title-sub" }, "TIANYING SECURITY · DATA SYSTEM")
+                ),
+                React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '14px' } },
+                    tabBtn('pending', '未處理'), tabBtn('done', '已處理'), tabBtn('all', '全部')
+                ),
+                loading ? React.createElement("div", { className: "card", style: { textAlign: 'center', padding: '40px' } }, React.createElement("i", { className: "ti ti-loader-2 spin", style: { fontSize: '28px', color: 'var(--primary)' } })) :
+                filtered.length === 0 ? React.createElement("div", { className: "card", style: { textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' } }, "目前沒有符合條件的報告") :
+                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+                    filtered.map(it => React.createElement("div", { key: it.row, className: "card", style: { cursor: 'pointer', padding: '14px' }, onClick: () => setSelected(it) },
+                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' } },
+                            React.createElement("span", { style: { fontSize: '13px', fontWeight: 700, color: 'var(--text)' } }, "#" + it['編號'] + "　" + (it['類別'] || '')),
+                            StatusBadge(it['狀態'])
+                        ),
+                        React.createElement("div", { style: { fontSize: '13px', color: 'var(--text-muted)' } },
+                            React.createElement("i", { className: "ti ti-calendar-event", style: { marginRight: '4px' } }), (it['日期'] || '') + " " + (it['時間'] || '')),
+                        React.createElement("div", { style: { fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' } },
+                            React.createElement("i", { className: "ti ti-map-pin", style: { marginRight: '4px' } }), it['地點'] || '—')
+                    ))
+                ),
+                React.createElement("div", { className: "footer" }, "© TIANYING SECURITY · INTERNAL SYSTEM")
+            );
+        }
+
         function showToast(msg, type) {
             const toast = document.createElement('div');
             toast.className = 'toast';
@@ -226,7 +386,7 @@
             setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
         }
 
-        ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+        ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(mode === 'admin' ? AdminApp : App));
     </script>
 </body>
 </html>

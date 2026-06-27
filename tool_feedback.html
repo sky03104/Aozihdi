@@ -567,6 +567,51 @@
                 return u.name || u.empName || u.userName || u['姓名'] || ''; } catch(e){ return ''; }
         }
 
+        // ===== 主管模式（?mode=admin）共用 =====
+        const mode = params.get('mode') || '';
+        function getSessionRole(){
+            try { return (JSON.parse(localStorage.getItem('hsh_session_user') || '{}').role) || ''; } catch(e){ return ''; }
+        }
+        const STATUS_COLORS = { '未讀': '#F87171', '已讀': '#D4A800', '處理中': '#FB923C', '已處理': '#4ADE80' };
+        const ALL_STATUS = ['未讀', '已讀', '處理中', '已處理'];
+        const ADMIN_GAS_URL = 'https://script.google.com/macros/s/AKfycbwHXlwTMmJyA79Cuzdh2IPRnBLUWm2YPEqXn5XJj4GVEUlCnNIv8hgRTJ7Xr198hZxG/exec';
+
+        // 輕量 Toast（此檔原本以 errorMessage 呈現，主管模式自帶提示）
+        function fbToast(msg, type){
+            const t = document.createElement('div');
+            t.style.cssText = 'position:fixed;left:50%;bottom:32px;transform:translateX(-50%);z-index:9999;padding:12px 18px;border-radius:10px;font-size:14px;color:#fff;box-shadow:0 4px 20px rgba(0,0,0,.4);transition:opacity .3s;max-width:90%;';
+            t.style.background = type === 'success' ? '#22C55E' : '#E53E3E';
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 2600);
+        }
+        // 狀態徽章
+        function StatusBadge(status){
+            const c = STATUS_COLORS[status] || '#8A95A8';
+            return React.createElement("span", { style: { background: c + '22', color: c, border: '1px solid ' + c + '55', borderRadius: '999px', padding: '2px 10px', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap' } }, status || '未讀');
+        }
+        // 類型徽章（表揚綠 / 檢舉橙）
+        function TypeBadge(t){
+            const c = (t === '表揚') ? '#4ADE80' : '#FB923C';
+            return React.createElement("span", { style: { background: c + '22', color: c, border: '1px solid ' + c + '55', borderRadius: '999px', padding: '2px 10px', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap' } }, t || '—');
+        }
+        // 詳情欄位列
+        function fieldRow(label, value){
+            return React.createElement("div", { style: { marginBottom: '12px' } },
+                React.createElement("div", { style: { fontSize: '12px', color: 'var(--primary)', marginBottom: '3px' } }, label),
+                React.createElement("div", { style: { fontSize: '14px', color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }, value || '—')
+            );
+        }
+        // 附件連結（以 \n 分隔）
+        function attachLinks(raw){
+            const urls = String(raw || '').split('\n').map(s => s.trim()).filter(Boolean);
+            if (!urls.length) return React.createElement("div", { style: { fontSize: '14px', color: 'var(--text-muted)' } }, "（無附件）");
+            return React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+                urls.map((u, i) => React.createElement("a", { key: i, href: u, target: "_blank", rel: "noopener", style: { fontSize: '13px', color: '#818CF8', wordBreak: 'break-all' } },
+                    React.createElement("i", { className: "ti ti-paperclip", style: { marginRight: '4px' } }), "查看附件 " + (i + 1)))
+            );
+        }
+
         // 表揚類別
         const praiseCategories = [
             '工作表現優異',
@@ -964,7 +1009,141 @@
             );
         }
 
-        ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+        // ===== 主管審閱畫面（匿名表揚／檢舉）=====
+        function AdminApp(){
+            const [list, setList] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [filter, setFilter] = useState('pending'); // all | pending | done
+            const [selected, setSelected] = useState(null);
+            const [updating, setUpdating] = useState(false);
+            const role = getSessionRole();
+            const allowed = ['executive', 'admin'].includes(role);
+
+            useEffect(() => {
+                setTimeout(() => { const s = document.getElementById('splash'); if (s) { s.classList.add('hide'); setTimeout(() => s.remove(), 500); } }, 500);
+                if (allowed) loadList();
+            }, []);
+
+            const loadList = async () => {
+                setLoading(true);
+                try {
+                    const res = await fetch(ADMIN_GAS_URL + '?action=getFeedback');
+                    const d = await res.json();
+                    if (d.status === 'ok' && Array.isArray(d.list)) setList(d.list);
+                    else fbToast('讀取失敗：' + (d.msg || '未知錯誤'), 'err');
+                } catch (e) { fbToast('網路連線錯誤', 'err'); }
+                setLoading(false);
+            };
+
+            const changeStatus = async (item, status) => {
+                if (updating) return;
+                setUpdating(true);
+                try {
+                    const body = new URLSearchParams();
+                    body.append('action', 'updateStatus');
+                    body.append('payload', JSON.stringify({ sheet: 'feedback', row: item.row, status: status }));
+                    const res = await fetch(ADMIN_GAS_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, body: body.toString() });
+                    const d = await res.json();
+                    if (d.status === 'ok') {
+                        setList(prev => prev.map(r => r.row === item.row ? { ...r, '狀態': status } : r));
+                        setSelected(prev => (prev && prev.row === item.row) ? { ...prev, '狀態': status } : prev);
+                        fbToast('狀態已更新為「' + status + '」', 'success');
+                    } else fbToast('更新失敗：' + (d.msg || ''), 'err');
+                } catch (e) { fbToast('網路連線錯誤', 'err'); }
+                setUpdating(false);
+            };
+
+            const header = React.createElement("div", { className: "header" },
+                React.createElement("a", { href: `index.html?empId=${empId}`, className: "back-btn" }, React.createElement("i", { className: "ti ti-chevron-left" }), "返回主選單"),
+                React.createElement("div", { style: { fontSize: '12px', color: 'var(--primary)' } }, "主管審閱")
+            );
+
+            if (!allowed) {
+                return React.createElement("div", { className: "container" }, header,
+                    React.createElement("div", { className: "card", style: { textAlign: 'center', padding: '40px 20px' } },
+                        React.createElement("div", { style: { fontSize: '40px', marginBottom: '12px' } }, "🔒"),
+                        React.createElement("div", { style: { fontSize: '16px', fontWeight: 700, marginBottom: '6px' } }, "無檢視權限"),
+                        React.createElement("div", { style: { fontSize: '13px', color: 'var(--text-muted)' } }, "此頁面僅限公司主管／管理員檢視")
+                    )
+                );
+            }
+
+            // 詳情頁
+            if (selected) {
+                const it = selected;
+                return React.createElement("div", { className: "container" },
+                    React.createElement("div", { className: "header" },
+                        React.createElement("a", { href: "#", className: "back-btn", onClick: e => { e.preventDefault(); setSelected(null); } }, React.createElement("i", { className: "ti ti-chevron-left" }), "返回清單"),
+                        StatusBadge(it['狀態'])
+                    ),
+                    React.createElement("div", { className: "card" },
+                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' } },
+                            React.createElement("div", { style: { fontSize: '13px', color: 'var(--text-muted)' } }, "編號 #" + it['編號']),
+                            TypeBadge(it['類型'])
+                        ),
+                        fieldRow("對象", it['對象']),
+                        fieldRow("事由分類", it['分類']),
+                        fieldRow("事件描述", it['描述']),
+                        fieldRow("發生日期", it['發生日期']),
+                        fieldRow("提交時間", it['時間戳記']),
+                        React.createElement("div", { style: { marginBottom: '12px' } },
+                            React.createElement("div", { style: { fontSize: '12px', color: 'var(--primary)', marginBottom: '3px' } }, "附件"),
+                            attachLinks(it['附件'])
+                        ),
+                        React.createElement("div", { style: { marginTop: '8px', paddingTop: '12px', borderTop: '1px dashed var(--border)' } },
+                            React.createElement("div", { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' } }, "⚠ 以下為後台辨識資訊（前台匿名，僅主管可見）"),
+                            fieldRow("填寫人工號", it['工號']),
+                            fieldRow("填寫人姓名", it['姓名'])
+                        )
+                    ),
+                    React.createElement("div", { className: "card" },
+                        React.createElement("div", { style: { fontSize: '13px', color: 'var(--primary)', marginBottom: '10px', fontWeight: 700 } }, "更新處理狀態"),
+                        React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
+                            ALL_STATUS.map(st => {
+                                const active = it['狀態'] === st;
+                                const c = STATUS_COLORS[st];
+                                return React.createElement("button", { key: st, disabled: updating, onClick: () => changeStatus(it, st),
+                                    style: { padding: '12px', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: updating ? 'default' : 'pointer',
+                                        border: '1px solid ' + c + (active ? '' : '55'), background: active ? c : c + '15', color: active ? '#0A0C10' : c } }, st);
+                            })
+                        )
+                    )
+                );
+            }
+
+            // 清單頁
+            const filtered = list.filter(r => filter === 'all' ? true : (filter === 'done' ? r['狀態'] === '已讀' : r['狀態'] !== '已讀'));
+            const tabBtn = (key, label) => React.createElement("button", { onClick: () => setFilter(key),
+                style: { flex: 1, padding: '8px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                    border: '1px solid var(--border)', background: filter === key ? 'var(--primary)' : 'transparent', color: filter === key ? '#0A0C10' : 'var(--text-muted)' } }, label);
+
+            return React.createElement("div", { className: "container" }, header,
+                React.createElement("div", { style: { textAlign: 'center', marginBottom: '12px' } },
+                    React.createElement("div", { style: { color: 'var(--primary)', fontSize: '18px', fontWeight: 700, letterSpacing: '2px' } }, "表揚／檢舉審閱"),
+                    React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: '11px', letterSpacing: '1px' } }, "TIANYING SECURITY · DATA SYSTEM")
+                ),
+                React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '14px' } },
+                    tabBtn('pending', '未處理'), tabBtn('done', '已讀'), tabBtn('all', '全部')
+                ),
+                loading ? React.createElement("div", { className: "card", style: { textAlign: 'center', padding: '40px' } }, React.createElement("i", { className: "ti ti-loader-2", style: { fontSize: '28px', color: 'var(--primary)' } })) :
+                filtered.length === 0 ? React.createElement("div", { className: "card", style: { textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' } }, "目前沒有符合條件的項目") :
+                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+                    filtered.map(it => React.createElement("div", { key: it.row, className: "card", style: { cursor: 'pointer', padding: '14px' }, onClick: () => setSelected(it) },
+                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', gap: '8px' } },
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, TypeBadge(it['類型']),
+                                React.createElement("span", { style: { fontSize: '13px', fontWeight: 700, color: 'var(--text)' } }, "#" + it['編號'])),
+                            StatusBadge(it['狀態'])
+                        ),
+                        React.createElement("div", { style: { fontSize: '13px', color: 'var(--text)', marginTop: '2px' } },
+                            React.createElement("span", { style: { color: 'var(--text-muted)' } }, "對象："), it['對象'] || '—'),
+                        React.createElement("div", { style: { fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' } },
+                            (it['分類'] || '') + "　·　" + (it['發生日期'] || ''))
+                    ))
+                )
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(mode === 'admin' ? AdminApp : App));
     </script>
 </body>
 </html>
