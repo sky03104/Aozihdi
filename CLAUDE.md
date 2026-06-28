@@ -44,6 +44,11 @@ tianying-security/
 ├── icon.png                           ← Brand logo
 ├── manifest.json                      ← PWA manifest
 ├── index.html                         ← Main dashboard
+├── brain_map.html                     ← 知識星空大腦（3D 知識圖譜，Three.js，瀏覽器直接開）
+├── CLAUDE_CODE_BRAIN_MAP.md           ← 知識圖譜維護規則原稿
+├── 事故與表揚_後端_GAS_v3.1.gs         ← 事故/表揚 後端（狀態/處置/讀清單/改狀態）
+├── 事故與表揚_GAS_部署說明.md          ← 事故/表揚 GAS 部署 + 照片權限修法
+├── 事故與表揚_appsscript.json          ← GAS manifest（oauthScopes 完整 Drive）
 ├── post.html                          ← Post/report tool
 ├── liff_leave.html                    ← LINE LIFF leave tool
 ├── tool_car.html                      ← Vehicle/car tool
@@ -958,6 +963,28 @@ python3 snapshot-generator-simple.py
 
 ---
 
+## 🧠 知識星空大腦 / brain_map.html
+
+專案含一個互動式 3D 知識圖譜 `brain_map.html`（Three.js r128，單一 HTML，瀏覽器直接開、免伺服器），把模組/功能/關聯視覺化。節點＝功能，連線＝關聯，點節點看說明。
+
+### 維護指令（對 AI）
+
+當使用者說「**請更新知識圖譜**」時：
+1. **掃描專案**：讀主要程式檔（.html/.gs/.py/.js…），識別功能模組、頁面、GAS endpoint、資料表。
+2. **決定主題 TOPICS**：3～6 個，繁中名＋色碼，更新 `TOPICS`。目前用 6 主題：`core` 主控台核心(金 #D4A800)、`tools` 前端工具(綠 #4ADE80)、`backend` 後端 GAS(靛 #818CF8)、`data` 資料儲存(橙 #FB923C)、`infra` 部署/監控(藍 #38BDF8)、`todo` 待辦/規劃(紅 #F87171)。
+3. **節點 NODES**：每個功能一個節點。`id` 純整數接續最大值；`title` 繁中 ≤15 字；`topic` 對應 key；`pos` [x,y,z] 範圍 ±1.4；`note` 一句話（可放規則/TODO/注意）。
+4. **關聯 EDGES**：函式呼叫、資料讀寫、頁面連結、功能依賴、流程相鄰 → 各建一條 `[idA, idB]`。
+5. **只改** `=== BRAIN_MAP_DATA_START ===` 與 `=== BRAIN_MAP_DATA_END ===` 之間（`BRAIN_CONFIG`/`TOPICS`/`NODES`/`EDGES`），**不得動標記外的 Three.js 程式**。改完跑資料完整性檢查（edges 不指向缺失節點、id 不重複、topic 有對應）。
+6. **回報摘要**：新增/修改節點（列標題）、新增關聯數、主題清單。
+
+座標分區參考：core 中央(z 正)、tools 右(x 0.5~1.4)、backend 左(x -1.4~-0.5)、data 下(y -1.4~-0.7)、infra 後(z -1.4~-0.7)、todo 頂(y 0.8~1.4)。同主題節點間距 ±0.25~0.45 避免重疊。
+
+**增量指令**也支援：「新增節點：X，屬於 Y 主題」「把節點 X 的說明改成…」「在 X 和 Y 之間新增關聯」「刪除節點 X」「把主題 X 顏色改成 #…」。
+
+> 詳細規則原稿見 `CLAUDE_CODE_BRAIN_MAP.md`。每次專案有較大結構變動（新工具、新 GAS、新資料表）後，建議順手「請更新知識圖譜」保持同步。
+
+---
+
 ## 📝 待辦事項追蹤 (Backlog)
 
 ### 🔴 高優先 - UI優化
@@ -1194,6 +1221,7 @@ python3 snapshot-generator-simple.py
 | 1.2 | 2026-06-27 | TODO-03 完成（開店前工具 `tool_opening.html` + 雙GAS + 部署說明），更新檔案結構 |
 | 1.3 | 2026-06-27 | TODO-07~10 完成（設定限管理員、開店預覽切換、緊急手機0、班表早班班別）；新增「技術經驗筆記」；合併上線 main |
 | 1.4 | 2026-06-28 | TODO-06/14 完成（事故/表揚主管審閱畫面 ?mode=admin、首頁待審兩格卡片、後端 GAS v3.1）；補登 TODO-11~13；新增 2026-06-28 技術經驗筆記（GAS 授權/Drive 連環坑）；合併上線 main |
+| 1.5 | 2026-06-28 | 整合「知識星空大腦」brain_map.html（填入天鷹專案真實節點 6 主題/29 節點/36 關聯）+ 維護規則寫進 CLAUDE.md |
 
 ---
 
