@@ -338,8 +338,10 @@ function fetchSheetJsonp(name){
       } catch(e){ reject(e); }
     };
     var s = document.createElement('script');
+    // 加防快取參數：報到換證後重讀要拿到最新 O 欄，避免 gviz 快取回舊值造成誤報「未生效」
     s.src = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
-            '/gviz/tq?tqx=out:json&sheet=' + encodeURIComponent(name);
+            '/gviz/tq?tqx=out:json&sheet=' + encodeURIComponent(name) +
+            '&_=' + Date.now();
     s.onerror = function(){
       clearTimeout(tid);
       reject(new Error('Script 載入失敗：請確認網路連線與試算表公開設定'));
