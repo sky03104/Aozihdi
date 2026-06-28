@@ -436,29 +436,35 @@ function filterRows(rows, view, search, histDate){
   var tmr   = new Date(today); tmr.setDate(tmr.getDate()+1);
   var res;
 
+  // 施工區間 [施工日期, 退場日期]：無退場日期視為單日，退場早於施工則修正為單日
+  function jobRange(r){
+    var sd=r['施工日期'];
+    if(!(sd instanceof Date)) return null;
+    var s=d0(sd), xd=r['退場日期'];
+    var e=(xd instanceof Date)?d0(xd):s;
+    if(e<s) e=s;
+    return {s:s, e:e};
+  }
+
   if(view==='tonight'){
-    // 今天：施工日期 == today（全天，不限時間）
+    // 今天：今天落在施工區間內（跨多天施工如 6/1~6/30，6/15 當天也會顯示）
     res = rows.filter(function(r){
-      var d=r['施工日期'];
-      return (d instanceof Date) && sameDay(d0(d), today);
+      var g=jobRange(r);
+      return g && g.s<=today && today<=g.e;
     });
   } else if(view==='morning'){
-    // 明天：明日日期 + 今日通宵（進場≥17:00，退場<12:00）
+    // 明天：明天落在施工區間內（涵蓋跨夜、跨多天）；退場日期缺漏時用通宵 fallback
     res = rows.filter(function(r){
-      var d=r['施工日期'];
-      if(!(d instanceof Date)) return false;
-      var rd=d0(d);
-      var ei=toInt(r['進場時間輸入']);
-      var xi=toInt(r['退場時間輸入']);
-      var overnight = sameDay(rd,today) && ei>=1700 && xi>=0 && xi<1200;
-      var tmrDay    = sameDay(rd,tmr);
-      return overnight || tmrDay;
+      var g=jobRange(r); if(!g) return false;
+      if(g.s<=tmr && tmr<=g.e) return true;
+      var ei=toInt(r['進場時間輸入']), xi=toInt(r['退場時間輸入']);
+      return sameDay(g.s,today) && ei>=1700 && xi>=0 && xi<1200;
     });
   } else {
-    // 歷史：施工日期 < today
+    // 歷史：施工已結束（退場日期 < today）；進行中的跨日施工歸「今天」不留歷史
     res = rows.filter(function(r){
-      var d=r['施工日期'];
-      return !(d instanceof Date) || d0(d)<today;
+      var g=jobRange(r);
+      return !g || g.e<today;
     });
     if(histDate){
       // 日期篩選：指定日
