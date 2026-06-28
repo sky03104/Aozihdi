@@ -155,7 +155,7 @@ function handleUpdateStatus_(d) {
     var decCol = headers.indexOf('處置') + 1;
     if (decCol >= 1) sheet.getRange(row, decCol).setValue(String(d.decision));
   }
-  return json_({ status: 'ok', msg: '狀態已更新', row: row, status: status });
+  return json_({ status: 'ok', msg: '狀態已更新', row: row, newStatus: status });
 }
 
 // ====== 取得可寫入的上傳資料夾 ======

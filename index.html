@@ -19019,20 +19019,30 @@ function App() {
     // 記住我：頁面載入時自動登入
     useEffect(() => {
         try {
+            let sessionUser = null;
+            // 1) 優先用「記住我」自動登入
             const saved = localStorage.getItem('hsh_remember_user');
-            if (!saved) return;
-            const rem = JSON.parse(saved);
-            if (!rem || !rem.empId || !rem.pw) return;
-            const rec = USER_DB[rem.empId];
-            if (!rec || rec.pw !== rem.pw) {
-                localStorage.removeItem('hsh_remember_user');
-                return;
+            if (saved) {
+                const rem = JSON.parse(saved);
+                if (rem && rem.empId && rem.pw) {
+                    const rec = USER_DB[rem.empId];
+                    if (rec && rec.pw === rem.pw) {
+                        sessionUser = { name: rec.name, role: rec.role, dept: rec.dept, empId: rem.empId };
+                    } else {
+                        localStorage.removeItem('hsh_remember_user');
+                    }
+                }
             }
-            const sessionUser = { name: rec.name, role: rec.role, dept: rec.dept, empId: rem.empId };
+            // 2) 沒記住我時，沿用現有登入態（從工具頁返回主選單不需重登）
+            if (!sessionUser) {
+                const sess = JSON.parse(localStorage.getItem('hsh_session_user') || 'null');
+                if (sess && sess.empId && sess.role) sessionUser = sess;
+            }
+            if (!sessionUser) return;
             setCurrentUser(sessionUser);
             localStorage.setItem('hsh_session_user', JSON.stringify(sessionUser));
-            setLoginForm(prev => ({ ...prev, id: rem.empId }));
-            const favKey = 'hsh_favs_' + rem.empId;
+            setLoginForm(prev => ({ ...prev, id: sessionUser.empId }));
+            const favKey = 'hsh_favs_' + sessionUser.empId;
             const savedFavs = localStorage.getItem(favKey);
             if (savedFavs) { try { setFavorites(JSON.parse(savedFavs)); } catch(e){} }
             if (CAN_MANAGE_ROLES.includes(sessionUser.role)) {
