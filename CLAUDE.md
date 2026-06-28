@@ -1,3 +1,7 @@
+@AGENTS.md
+
+---
+
 # CLAUDE.md: Tianying Security Codebase Guide
 
 **Project**: Tianying Security Tool Conversion & Monitoring System (天鷹保全)
