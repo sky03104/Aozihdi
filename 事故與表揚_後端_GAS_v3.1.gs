@@ -158,11 +158,27 @@ function handleUpdateStatus_(d) {
   return json_({ status: 'ok', msg: '狀態已更新', row: row, status: status });
 }
 
-// ====== 共用：base64 圖片陣列 → 公告資料夾，回連結陣列 ======
+// ====== 取得可寫入的上傳資料夾 ======
+// 優先用公告資料夾；若執行帳號對它沒有「編輯」權（存取遭拒），自動退回執行帳號
+// 自己的「天鷹_上傳照片」資料夾，確保照片一定上傳得了。
+function getUploadFolder_() {
+  try {
+    var f = DriveApp.getFolderById(PHOTO_FOLDER_ID);
+    var probe = f.createFile('._wtest_' + Date.now() + '.txt', 'permission probe', MimeType.PLAIN_TEXT);
+    probe.setTrashed(true); // 可寫 → 用公告資料夾
+    return f;
+  } catch (e) {
+    var name = '天鷹_上傳照片';
+    var it = DriveApp.getFoldersByName(name);
+    return it.hasNext() ? it.next() : DriveApp.createFolder(name);
+  }
+}
+
+// ====== 共用：base64 圖片陣列 → 上傳資料夾，回連結陣列 ======
 function saveImages_(arr, namePrefix) {
   var urls = [];
   if (!arr || !arr.length) return urls;
-  var folder = DriveApp.getFolderById(PHOTO_FOLDER_ID);
+  var folder = getUploadFolder_();
   for (var i = 0; i < arr.length; i++) {
     var raw = arr[i];
     if (!raw) continue;
