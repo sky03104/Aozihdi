@@ -1,0 +1,66 @@
+@page { size: A4; margin: 16mm 14mm 16mm 14mm; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  font-family: 'WenQuanYi Zen Hei', 'Noto Sans CJK TC', sans-serif;
+  color: #1f2430; font-size: 11.5pt; line-height: 1.65;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.gold { color: #B8860B; }
+.indigo { color: #4F46E5; }
+
+/* 封面 */
+.cover { height: 247mm; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; background: linear-gradient(160deg,#0A0C10 0%,#15171d 100%); color: #fff;
+  border-radius: 6px; page-break-after: always; }
+.cover .ring { width: 92px; height: 92px; border-radius: 50%; border: 3px solid rgba(212,168,0,.25);
+  border-top-color:#FFD700; display:flex; align-items:center; justify-content:center; font-size:40px; margin-bottom:26px;
+  box-shadow: 0 0 40px rgba(212,168,0,.35); }
+.cover h1 { font-size: 30pt; color:#FFD700; letter-spacing: 6px; margin-bottom: 6px; }
+.cover .en { color:#8A95A8; letter-spacing: 3px; font-size: 11pt; margin-bottom: 40px; }
+.cover .doctitle { font-size: 21pt; font-weight: 800; margin-bottom: 10px; }
+.cover .badge { display:inline-block; padding:6px 18px; border:1px solid rgba(212,168,0,.5);
+  border-radius:999px; color:#FFD700; font-size:12pt; margin-top:8px; }
+.cover .meta { margin-top: 46px; color:#9aa3b2; font-size: 10.5pt; line-height: 1.9; }
+
+/* 章節 */
+h2 { font-size: 16pt; color:#0A0C10; margin: 22px 0 10px; padding-bottom: 6px;
+  border-bottom: 3px solid #D4A800; page-break-after: avoid; }
+h2 .num { display:inline-block; background:#D4A800; color:#0A0C10; border-radius:6px;
+  padding: 1px 10px; margin-right:10px; font-size: 14pt; }
+h3 { font-size: 12.5pt; color:#4F46E5; margin: 16px 0 6px; page-break-after: avoid; }
+p { margin: 6px 0; }
+ul, ol { margin: 6px 0 6px 22px; }
+li { margin: 3px 0; }
+.section { page-break-inside: avoid; }
+
+/* 元件 */
+.step { background:#FBF7E9; border-left: 4px solid #D4A800; border-radius: 0 6px 6px 0;
+  padding: 9px 14px; margin: 8px 0; }
+.tip { background:#EEF1FE; border-left: 4px solid #6366F1; border-radius: 0 6px 6px 0;
+  padding: 9px 14px; margin: 8px 0; font-size: 10.8pt; }
+.warn { background:#FEF0F0; border-left: 4px solid #E53E3E; border-radius: 0 6px 6px 0;
+  padding: 9px 14px; margin: 8px 0; font-size: 10.8pt; }
+table { width:100%; border-collapse: collapse; margin: 10px 0; font-size: 10.6pt; page-break-inside: avoid; }
+th { background:#0A0C10; color:#FFD700; padding: 7px 9px; text-align:left; }
+td { border:1px solid #e2e2e2; padding: 6px 9px; vertical-align: top; }
+tr:nth-child(even) td { background:#faf9f6; }
+.pill { display:inline-block; padding:1px 9px; border-radius:999px; font-size:9.6pt; font-weight:700; }
+.p-red{background:#FDE2E2;color:#C0392B;} .p-org{background:#FCE6CF;color:#B5651D;}
+.p-gold{background:#F7EBC4;color:#9A7A00;} .p-grn{background:#D8F5E3;color:#1E8E4E;}
+.p-ind{background:#E3E5FB;color:#3E40B0;}
+.toolcard { border:1px solid #e6e6e6; border-radius:8px; padding:10px 14px; margin:8px 0; page-break-inside: avoid; }
+.toolcard .t { font-weight:800; font-size:12pt; color:#0A0C10; }
+.toolcard .c { font-size:9.8pt; color:#8a8a8a; }
+.kbd { background:#0A0C10; color:#FFD700; border-radius:4px; padding:1px 7px; font-size:10pt; }
+.foot { margin-top:34px; padding-top:10px; border-top:1px solid #ddd; color:#999; font-size:9pt; text-align:center; }
+.toc li { margin:5px 0; }
+
+/* 螢幕截圖 */
+figure { margin: 12px 0; text-align:center; page-break-inside: avoid; }
+figure img { max-height: 118mm; max-width: 66mm; border:1px solid #d8d8d8; border-radius:10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+figcaption { color:#8a8a8a; font-size:9.2pt; margin-top:5px; }
+.shotrow { display:flex; gap:12px; justify-content:center; align-items:flex-start; margin:12px 0; page-break-inside:avoid; }
+.shotrow figure { margin:0; flex:0 0 auto; }
+.shotrow img { max-height: 132mm; max-width: 50mm; }
+.demo-note { font-size:9pt; color:#aa8800; text-align:center; margin:-2px 0 10px; }

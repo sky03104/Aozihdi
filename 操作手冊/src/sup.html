@@ -1,0 +1,144 @@
+<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8">
+<title>天鷹保全 APP 操作手冊 · 主管版</title>
+<link rel="stylesheet" href="style.css"></head><body>
+
+<div class="cover">
+  <div class="ring">👔</div>
+  <h1>天鷹保全</h1>
+  <div class="en">TIANYING SECURITY · DATA SYSTEM</div>
+  <div class="doctitle">APP 操作使用手冊</div>
+  <div class="badge">主管版</div>
+  <div class="meta">適用對象：公司主管 / 管理員（含各級管理職）<br>版本 v1.0　·　2026 年 6 月<br>本手冊涵蓋主管專屬功能；一般操作請參閱員工版</div>
+</div>
+
+<div class="section">
+<h2><span class="num">0</span>目錄</h2>
+<ol class="toc">
+  <li>主管角色與權限</li>
+  <li>首頁主管專屬卡片</li>
+  <li>事故報告審閱</li>
+  <li>匿名表揚／反應審閱</li>
+  <li>請假審核</li>
+  <li>狀態定義總表</li>
+  <li>常見問題 FAQ</li>
+</ol>
+<div class="tip">👔 主管版＝員工版所有功能 ＋ 本手冊的審閱／審核功能。基本登入與工具操作請見《員工版手冊》。</div>
+<div class="demo-note">＊本手冊所有畫面均為示範資料（範例），非真實人員／紀錄。</div>
+</div>
+
+<div class="section">
+<h2><span class="num">1</span>主管角色與權限</h2>
+<table>
+<tr><th>角色</th><th>能看到的審核功能</th></tr>
+<tr><td>管理職（組長/副隊長/隊長）</td><td>首頁待審請假卡片、請假審核</td></tr>
+<tr><td><b>公司主管 executive</b></td><td>以上 ＋ 待審報告、待處理表揚反應、兩個審閱畫面</td></tr>
+<tr><td><b>管理員 admin</b></td><td>以上全部 ＋ 待審帳號審核</td></tr>
+</table>
+<div class="tip">「待審報告」「待處理表揚／反應」兩格卡片與兩個審閱畫面，<b>僅公司主管與管理員</b>看得到。</div>
+</div>
+
+<div class="section">
+<h2><span class="num">2</span>首頁主管專屬卡片</h2>
+<p>主管登入後，首頁四格卡片下方會多出兩格（紅／橙數字代表待處理量）：</p>
+<table>
+<tr><th>卡片</th><th>數字意義</th><th>點擊後</th></tr>
+<tr><td>📋 待審報告</td><td>事故報告中，狀態 <b>≠ 已處理</b> 的筆數</td><td>開啟「事故報告審閱」畫面</td></tr>
+<tr><td>🏅 待處理表揚／反應</td><td>表揚反應中，狀態 <b>≠ 已處理</b> 的筆數</td><td>開啟「表揚／反應審閱」畫面</td></tr>
+</table>
+<p>原有的卡片：<b>待審請假</b>（黃色數字＝待審件數）、<b>待審帳號</b>（管理員限定）。</p>
+<figure><img src="img/home_sup.png" alt="主管首頁"><figcaption>▲ 主管首頁，下方多出「待審報告」「待處理表揚／反應」兩格</figcaption></figure>
+</div>
+
+<div class="section">
+<h2><span class="num">3</span>事故報告審閱</h2>
+<h3>進入方式</h3>
+<p>首頁點「📋 待審報告」卡片，或工具開啟（網址加 <span class="kbd">?mode=admin</span>）。</p>
+<h3>清單頁</h3>
+<ul>
+  <li>頂部四個分頁：<span class="pill p-red">未讀</span> <span class="pill p-org">待處理</span> <span class="pill p-grn">已處理</span> <span class="pill p-gold">全部</span></li>
+  <li>「待處理」分頁包含所有處理中狀態（待處理／已知悉再觀察／持續追蹤）。</li>
+  <li>每張卡片顯示編號、類別、日期時間、地點與<b>狀態徽章</b>。點卡片進入詳情。</li>
+</ul>
+<h3>詳情頁</h3>
+<ul>
+  <li>顯示完整欄位、回報人員、<b>現場照片連結</b>（點開可看）。</li>
+  <li>頂部 <span class="kbd">‹ 上一篇</span> / <span class="kbd">下一篇 ›</span>：<b>依進入當下的分頁順序翻閱</b>（例如在「未讀」分頁進入，就沿未讀清單前後翻，不受自動轉狀態影響）。</li>
+  <li><b>打開未讀資料會自動轉為「待處理」</b>（代表已被主管看過）。</li>
+</ul>
+<h3>更新處理狀態</h3>
+<p>詳情頁底部四顆按鈕，依實際處置點選：</p>
+<table>
+<tr><th>狀態</th><th>意義</th></tr>
+<tr><td><span class="pill p-org">待處理</span></td><td>已看過、尚待處理</td></tr>
+<tr><td><span class="pill p-ind">已知悉再觀察</span></td><td>知悉，暫不處理、持續觀察</td></tr>
+<tr><td><span class="pill p-gold">持續追蹤</span></td><td>需後續追蹤</td></tr>
+<tr><td><span class="pill p-grn">已處理</span></td><td>結案，從待審計數移除</td></tr>
+</table>
+<div class="tip">按下後出現綠色「✅ 已更新」即成功，試算表同步更新；數字會即時反映在首頁卡片（重新整理）。</div>
+<div class="shotrow">
+  <figure><img src="img/report_admin_list.png" alt="事故報告清單"><figcaption>▲ 清單頁（分頁＋狀態徽章）</figcaption></figure>
+  <figure><img src="img/report_admin_detail.png" alt="事故報告詳情"><figcaption>▲ 詳情頁（上下篇＋狀態鈕）</figcaption></figure>
+</div>
+</div>
+
+<div class="section">
+<h2><span class="num">4</span>匿名表揚／反應審閱</h2>
+<h3>進入方式</h3>
+<p>首頁點「🏅 待處理表揚／反應」卡片進入。</p>
+<h3>清單頁</h3>
+<ul>
+  <li>分頁：<span class="pill p-red">未讀</span> <span class="pill p-gold">已讀</span> <span class="pill p-grn">已處理</span> <span class="pill p-gold">全部</span></li>
+  <li>類型徽章：<span class="pill p-grn">表揚</span>（綠） / <span class="pill p-org">反應</span>（橙）。</li>
+</ul>
+<h3>詳情頁</h3>
+<ul>
+  <li><b>打開未讀資料會自動轉為「已讀」</b>。</li>
+  <li>底部會顯示<b>後台辨識資訊（填寫人工號／姓名）</b> —— 此區<b>僅主管可見</b>，前台對員工匿名。</li>
+  <li>同樣支援上一篇／下一篇。</li>
+</ul>
+<h3>主管裁決</h3>
+<p>詳情頁底部依類型出現兩顆裁決鈕，按下後狀態轉「已處理」並記錄「處置」：</p>
+<table>
+<tr><th>類型</th><th>裁決按鈕</th></tr>
+<tr><td>表揚</td><td><span class="pill p-grn">同意表揚</span>　/　<span class="pill p-red">不同意表揚</span></td></tr>
+<tr><td>反應</td><td><span class="pill p-grn">同意懲處</span>　/　<span class="pill p-red">不同意懲處</span></td></tr>
+</table>
+<div class="tip">裁決後該筆移到「已處理」分頁，並在試算表「處置」欄留下你的決定。</div>
+<div class="shotrow">
+  <figure><img src="img/feedback_admin_list.png" alt="表揚反應清單"><figcaption>▲ 清單頁（表揚／反應徽章）</figcaption></figure>
+  <figure><img src="img/feedback_admin_detail.png" alt="表揚反應詳情"><figcaption>▲ 詳情頁（後台辨識＋裁決鈕）</figcaption></figure>
+</div>
+</div>
+
+<div class="section">
+<h2><span class="num">5</span>請假審核</h2>
+<ul>
+  <li>首頁「待審請假」卡片顯示待審件數，點擊進入清單。</li>
+  <li>逐筆查看員工請假（日期、原因），按<b>核准</b>或<b>駁回</b>。</li>
+  <li>員工透過 APP 或 LINE 送出的請假都會匯入此處；審核結果會透過 LINE 通知員工。</li>
+</ul>
+</div>
+
+<div class="section">
+<h2><span class="num">6</span>狀態定義總表</h2>
+<table>
+<tr><th>畫面</th><th>狀態流程</th><th>待審卡片計算</th></tr>
+<tr><td>事故報告</td><td>未讀 →（打開）待處理 → 已知悉再觀察／持續追蹤 → 已處理</td><td>狀態 ≠ 已處理</td></tr>
+<tr><td>表揚／反應</td><td>未讀 →（打開）已讀 →（裁決）已處理</td><td>狀態 ≠ 已處理</td></tr>
+<tr><td>請假</td><td>待審 → 核准／駁回</td><td>待審件數</td></tr>
+</table>
+</div>
+
+<div class="section">
+<h2><span class="num">7</span>常見問題 FAQ</h2>
+<table>
+<tr><th>問題</th><th>解決方式</th></tr>
+<tr><td>按狀態鈕說「更新失敗」但資料有變</td><td>已修正。請確認 APP 已更新到最新版。</td></tr>
+<tr><td>看不到審閱卡片</td><td>需公司主管／管理員角色，請確認帳號職務。</td></tr>
+<tr><td>照片連結點開要權限</td><td>照片存於公司雲端資料夾，主管帳號需有該資料夾存取權。</td></tr>
+<tr><td>翻頁順序怪怪的</td><td>正常：上一篇／下一篇依「進入詳情時的分頁順序」固定，不會因自動轉狀態而跳動。</td></tr>
+</table>
+<div class="foot">天鷹保全 · TIANYING SECURITY · DATA SYSTEM　|　主管版操作手冊 v1.0　|　內部使用</div>
+</div>
+
+</body></html>
