@@ -1110,6 +1110,39 @@ python3 snapshot-generator-simple.py
 
 > 此區累積實作中踩過的坑與解法，供未來 AI 與工程師快速避雷。每次大更新後補充。
 
+### 📅 2026-06-28：事故/表揚主管審閱畫面 + GAS 授權/Drive 連環坑
+
+> 本輪重點不是前端，而是 **GAS 部署授權與 Drive 寫檔**踩了一長串坑。前端反而單純。
+
+#### A. 同一支 GAS、多前端共用，以 `action` 分流
+- `tool_report.html`(report) / `tool_feedback.html`(feedback) / `index.html`(讀清單) 全打**同一支** `…AKfycbwHX…/exec`，用 `action` 路由（report/feedback/updateStatus/getReports/getFeedback）。
+- **讀清單走 `doGet`、寫入走 `doPost`（form-urlencoded）** → 都是簡單請求、無 CORS 預檢。
+- 改 GAS 後**一定要「編輯既有部署 → 版本：新版本」**，不可「建立新部署」（會換網址，前端全斷）。
+
+#### B. OAuth「未完成驗證／403 access_denied」
+- 同意畫面是「測試中」且當前帳號不在測試名單 → 被擋。修法：OAuth 同意畫面加 **測試使用者**，或發布應用程式，或改用**擁有者帳號**授權。
+- **多帳號陷阱**：授權彈窗預設帳號可能不是腳本擁有者（本案 `sky0310427` vs `sky03104`），用無痕只登一個帳號最乾淨。
+
+#### C. 照片上傳「存取遭拒：DriveApp」連環坑（最耗時）
+逐層剝洋蔥，**錯誤訊息會變、要逐一對症**：
+1. 「沒有呼叫 `createFile` 的權限」= OAuth scope 不足 → 在 `appsscript.json` 明確宣告 `oauthScopes` 含 `https://www.googleapis.com/auth/drive`（受限的 `drive.file` 寫不進既有資料夾）。
+2. 「存取遭拒：DriveApp」但**檔案其實已建到 Drive** = 真兇是**下一行 `file.setSharing(ANYONE_WITH_LINK, VIEW)`** 被帳號共用政策擋 → 整筆被 catch 成失敗。**修法：setSharing 包 try/catch 非致命**，檔案已建就照樣回傳連結。
+3. 判讀技巧：**試算表有寫進去、只有照片欄報錯** → 純 Drive 問題，不是腳本沒跑。**Drive 裡檔案在不在**是關鍵線索（在＝createFile 成功，問題在 setSharing/sharing）。
+- 耐用化：`getUploadFolder_()` 公告資料夾打不開時退回執行帳號自己的「天鷹_上傳照片」資料夾，確保必成。
+
+#### D. 「編輯器能跑、網頁卻失敗」怎麼判
+- `forceAuth()` 在**編輯器**以登入帳號跑會成功；**網頁應用程式**以「執行身分」設定的帳號跑。兩者帳號/權限可能不同 → 同一段 Drive 操作一邊成功一邊存取遭拒。
+- 先確認部署「執行身分＝我(擁有者)」、「存取權＝任何人」。試算表能寫但 Drive 全拒，常是執行帳號對該資料夾只有檢視權（資料夾屬另一帳號）。
+
+#### E. 狀態機設計（主管審閱）
+- 事故報告：未讀 →(開啟自動)待處理 → 待處理/已知悉再觀察/持續追蹤/已處理；分頁「待處理」=所有處理中群組（≠未讀且≠已處理）。
+- 表揚/反應：未讀 →(開啟自動)已讀 →(裁決)已處理＋寫「處置」欄（同意/不同意 表揚｜懲處）。
+- **上一篇/下一篇**：進詳情當下**凍結篩選順序**（存 row 陣列），自動轉狀態不改變瀏覽序 → 在「未讀」分頁開了仍沿未讀清單翻。
+- 改狀態端點以**表頭名稱定位欄位**（`headers.indexOf('狀態')`），不要假設「狀態固定末欄」——加了「處置」欄就會錯位。
+
+#### F. 上線前清理
+- 預覽用 `?demo=1` 假資料模式合併前**務必移除**，避免正式環境殘留假資料入口。
+
 ### 📅 2026-06-27：開店前工具 + 多工具修正
 
 #### A. 工具嵌入有兩種模式（決定新工具怎麼放）
@@ -1160,9 +1193,10 @@ python3 snapshot-generator-simple.py
 | 1.1 | 2026-06-22 | 新增團隊架構、設計規範、GAS標準、TODO-01~06 |
 | 1.2 | 2026-06-27 | TODO-03 完成（開店前工具 `tool_opening.html` + 雙GAS + 部署說明），更新檔案結構 |
 | 1.3 | 2026-06-27 | TODO-07~10 完成（設定限管理員、開店預覽切換、緊急手機0、班表早班班別）；新增「技術經驗筆記」；合併上線 main |
+| 1.4 | 2026-06-28 | TODO-06/14 完成（事故/表揚主管審閱畫面 ?mode=admin、首頁待審兩格卡片、後端 GAS v3.1）；補登 TODO-11~13；新增 2026-06-28 技術經驗筆記（GAS 授權/Drive 連環坑）；合併上線 main |
 
 ---
 
-**Last Updated**: 2026-06-27  
+**Last Updated**: 2026-06-28  
 **For Questions**: Refer to project documentation or contact the project owner  
 **Branch**: `claude/claude-md-docs-4bz58p`
