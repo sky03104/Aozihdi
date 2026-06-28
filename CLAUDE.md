@@ -1150,6 +1150,26 @@ python3 snapshot-generator-simple.py
 
 > 此區累積實作中踩過的坑與解法，供未來 AI 與工程師快速避雷。每次大更新後補充。
 
+### 📅 2026-06-28（手冊）：操作手冊 PDF + 工具實機自動截圖
+
+> 產出員工/主管/LINE 三份手冊 PDF，並自動擷取 APP 實機畫面（全用假資料）。
+
+#### A. HTML → PDF（沙箱內）
+- 用預載的 Chromium：`/opt/pw-browsers/chromium-1194/chrome-linux/chrome --headless --no-sandbox --no-pdf-header-footer --print-to-pdf=out.pdf file://…/x.html`。
+- 中文字型靠 `WenQuanYi Zen Hei`（沙箱已裝）、emoji 靠 `Noto Color Emoji`；CSS `font-family` 指定即可，免額外安裝。
+- 列印友善：白底深字＋金色標題、`@page{size:A4}`、`page-break-inside:avoid` 防卡頁。
+
+#### B. 自動擷取各工具畫面（playwright-core）
+- 沙箱**連不到 CDN**（unpkg/cdnjs/jsdelivr 全 403），但 **npm registry 可用**。
+- 關鍵手法：`npm i playwright-core react@18.3.1 react-dom@18.3.1` → 用 `chromium.launch({executablePath:既有chrome})` → **`page.route` 把 CDN 的 React 請求改 fulfill 本地 UMD 檔**，否則獨立工具頁（`tool_*.html` 從 cdnjs 載 React）會卡在 splash 永不 mount。`index.html` 因 React 內嵌故不受影響。
+- Tabler 圖示 CSS 也走 CDN → route 成 `.ti{display:none}` 避免 tofu 方框。
+- **造假資料免真實**：`context.addInitScript` 先 `localStorage.setItem('hsh_session_user', 假主管)`、覆寫 `window.fetch` 依 `action` 回假清單（getReports/getFeedback/getLeaveRequests）、並 stub `window.liff`（給 `liff_leave.html` 顯示請假表單）。全部用「（範例）」前綴，零真實資料。
+- 詳情頁截圖：`page.getByText('A棟大廳').click()` 觸發卡片 onClick 進詳情（事件冒泡）。
+- 判讀：截圖檔案大小**全部一樣**＝多半是同一張 splash（JS 沒 mount），就是 CDN 沒載到。
+
+#### C. 維護
+- 原始檔與截圖存 `操作手冊/src/`，PDF 存 `操作手冊/`。功能有變動且影響畫面/流程時，主動問使用者要不要「更新手冊」重擷圖重產。
+
 ### 📅 2026-06-28：事故/表揚主管審閱畫面 + GAS 授權/Drive 連環坑
 
 > 本輪重點不是前端，而是 **GAS 部署授權與 Drive 寫檔**踩了一長串坑。前端反而單純。
