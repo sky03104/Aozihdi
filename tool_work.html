@@ -526,8 +526,8 @@ function cardHtml(rec, view, isHot, idx){
   if(isHot) bdgs+='<span class="bdg b-fw"><i class="ti ti-flame"></i> 動火</span>';
 
   var extra='';
+  // 施工單不再顯示備註欄（過去被上傳工具塞入分頁名，純雜訊）；動火維持顯示使用器具
   if(isHot&&note) extra='<div class="cfire"><i class="ti ti-flame"></i>使用器具：'+esc(note)+'</div>';
-  else if(!isHot&&note) extra='<div class="cnote">'+esc(note)+'</div>';
 
   // 日期左上角（取代原本 ID）
   var dateLbl=dateTag
