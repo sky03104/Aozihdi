@@ -159,14 +159,11 @@ function handleUpdateStatus_(d) {
 }
 
 // ====== 取得可寫入的上傳資料夾 ======
-// 優先用公告資料夾；若執行帳號對它沒有「編輯」權（存取遭拒），自動退回執行帳號
-// 自己的「天鷹_上傳照片」資料夾，確保照片一定上傳得了。
+// 優先用公告資料夾；若執行帳號連資料夾都打不開（存取遭拒），退回執行帳號自己的
+// 「天鷹_上傳照片」資料夾，確保照片一定上傳得了。
 function getUploadFolder_() {
   try {
-    var f = DriveApp.getFolderById(PHOTO_FOLDER_ID);
-    var probe = f.createFile('._wtest_' + Date.now() + '.txt', 'permission probe', MimeType.PLAIN_TEXT);
-    probe.setTrashed(true); // 可寫 → 用公告資料夾
-    return f;
+    return DriveApp.getFolderById(PHOTO_FOLDER_ID);
   } catch (e) {
     var name = '天鷹_上傳照片';
     var it = DriveApp.getFoldersByName(name);
@@ -197,7 +194,11 @@ function saveImages_(arr, namePrefix) {
       var fileName = namePrefix + '_' + (i + 1) + '.' + ext;
       var blob = Utilities.newBlob(Utilities.base64Decode(b64), mime, fileName);
       var file = folder.createFile(blob);
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      // 設為「任何知道連結的人可檢視」；部分帳號政策禁止任意連結共用會丟錯，
+      // 包成非致命：即使共用設不起來，檔案已建立，仍回傳連結（不讓整筆變失敗）。
+      try {
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      } catch (shareErr) {}
       urls.push(file.getUrl());
     } catch (err) {
       urls.push('（第' + (i + 1) + '張上傳失敗：' + err.message + '）');
