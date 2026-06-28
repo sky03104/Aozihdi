@@ -70,6 +70,7 @@ function doPost(e) {
     if (action === 'report')         return handleReport_(d);
     if (action === 'feedback')       return handleFeedback_(d);
     if (action === 'updateStatus')   return handleUpdateStatus_(d);
+    if (action === 'deleteRow')      return handleDeleteRow_(d);
     if (action === 'recognizePlate') return recognizePlate(d);
     if (action === 'vehicleReg')     return vehicleReg(d);
 
@@ -156,6 +157,23 @@ function handleUpdateStatus_(d) {
     if (decCol >= 1) sheet.getRange(row, decCol).setValue(String(d.decision));
   }
   return json_({ status: 'ok', msg: '狀態已更新', row: row, newStatus: status });
+}
+
+// ====== 主管（限管理員）：永久刪除一列 ======
+// 注意：deleteRow 會使下方列號位移，前端刪除後須重新讀清單以同步列號。
+function handleDeleteRow_(d) {
+  var which = (d.sheet === 'feedback') ? SHEET_FEEDBACK : (d.sheet === 'report' ? SHEET_REPORT : '');
+  if (!which) return json_({ status: 'error', msg: '未知分頁：' + d.sheet });
+
+  var row = parseInt(d.row, 10);
+  if (!row || row < 2) return json_({ status: 'error', msg: '列號無效：' + d.row });
+
+  var headers = (which === SHEET_FEEDBACK) ? HEADERS_FEEDBACK : HEADERS_REPORT;
+  var sheet = getSheet_(which, headers);
+  if (row > sheet.getLastRow()) return json_({ status: 'error', msg: '列號超出範圍：' + row });
+
+  sheet.deleteRow(row);
+  return json_({ status: 'ok', msg: '已刪除', deletedRow: row });
 }
 
 // ====== 取得可寫入的上傳資料夾 ======

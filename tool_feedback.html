@@ -1022,6 +1022,7 @@
             const FB_STATUS = ['未讀', '已讀'];
             const role = getSessionRole();
             const allowed = ['executive', 'admin'].includes(role);
+            const canDelete = role === 'admin'; // 永久刪除僅限管理員
 
             useEffect(() => {
                 setTimeout(() => { const s = document.getElementById('splash'); if (s) { s.classList.add('hide'); setTimeout(() => s.remove(), 500); } }, 500);
@@ -1061,6 +1062,26 @@
             };
             // 主管裁決：同意/不同意 → 狀態轉「已處理」並記錄處置
             const decide = (item, decision) => changeStatus(item, '已處理', decision);
+
+            // 永久刪除（限管理員）：刪後重讀清單以同步列號
+            const deleteItem = async (item) => {
+                if (updating) return;
+                if (!window.confirm('確定永久刪除編號 #' + item['編號'] + '？\n此動作無法復原。')) return;
+                setUpdating(true);
+                try {
+                    const body = new URLSearchParams();
+                    body.append('action', 'deleteRow');
+                    body.append('payload', JSON.stringify({ sheet: 'feedback', row: item.row }));
+                    const res = await fetch(ADMIN_GAS_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, body: body.toString() });
+                    const d = await res.json();
+                    if (d.status === 'ok') {
+                        fbToast('已刪除編號 #' + item['編號'], 'success');
+                        setSelected(null);
+                        await loadList();
+                    } else fbToast('刪除失敗：' + (d.msg || ''), 'err');
+                } catch (e) { fbToast('網路連線錯誤', 'err'); }
+                setUpdating(false);
+            };
 
             // 開啟詳情：凍結目前篩選順序供上一篇/下一篇，並自動將未讀標記為「已讀」
             const openDetail = (item, orderedRows) => {
@@ -1145,7 +1166,11 @@
                                         border: '1px solid ' + c + (active ? '' : '55'), background: active ? c : c + '15', color: active ? '#0A0C10' : c } }, dec);
                             })
                         )
-                    )
+                    ),
+                    canDelete && React.createElement("button", { disabled: updating, onClick: () => deleteItem(it),
+                        style: { width: '100%', marginTop: '12px', padding: '13px', borderRadius: '10px', fontSize: '14px', fontWeight: 700,
+                            cursor: updating ? 'default' : 'pointer', border: '1px solid #F87171', background: 'rgba(248,113,113,.12)', color: '#F87171' } },
+                        "🗑️ 永久刪除此筆")
                 );
             }
 
@@ -1172,8 +1197,10 @@
                 loading ? React.createElement("div", { className: "card", style: { textAlign: 'center', padding: '40px' } }, React.createElement("i", { className: "ti ti-loader-2", style: { fontSize: '28px', color: 'var(--primary)' } })) :
                 filtered.length === 0 ? React.createElement("div", { className: "card", style: { textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' } }, "目前沒有符合條件的項目") :
                 React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
-                    filtered.map(it => React.createElement("div", { key: it.row, className: "card", style: { cursor: 'pointer', padding: '14px' }, onClick: () => openDetail(it, filtered.map(r => r.row)) },
-                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', gap: '8px' } },
+                    filtered.map(it => React.createElement("div", { key: it.row, className: "card", style: { cursor: 'pointer', padding: '14px', position: 'relative' }, onClick: () => openDetail(it, filtered.map(r => r.row)) },
+                        canDelete && React.createElement("button", { onClick: e => { e.stopPropagation(); deleteItem(it); }, title: "刪除",
+                            style: { position: 'absolute', top: '8px', right: '8px', background: 'rgba(248,113,113,.12)', border: '1px solid #F8717155', color: '#F87171', borderRadius: '8px', padding: '3px 8px', fontSize: '13px', cursor: 'pointer', lineHeight: 1, zIndex: 2 } }, "🗑️"),
+                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', gap: '8px', paddingRight: canDelete ? '34px' : '0' } },
                             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, TypeBadge(it['類型']),
                                 React.createElement("span", { style: { fontSize: '13px', fontWeight: 700, color: 'var(--text)' } }, "#" + it['編號'])),
                             StatusBadge(it['狀態'])
