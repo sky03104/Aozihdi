@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>知識星空大腦</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0A0C10;
+      overflow: hidden;
+      font-family: -apple-system, 'Microsoft JhengHei', sans-serif;
+      color: #F5F5F5;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #canvas { display: block; }
+
+    /* ── Tooltip ─────────────────────────── */
+    #tooltip {
+      position: fixed;
+      background: rgba(10, 12, 16, 0.97);
+      border: 1px solid rgba(212, 168, 0, 0.35);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      padding: 10px 16px 12px;
+      border-radius: 10px;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(6px) scale(0.97);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      z-index: 300;
+      max-width: 230px;
+      box-shadow: 0 0 0 1px rgba(212,168,0,0.08), 0 8px 32px rgba(0,0,0,0.65);
+    }
+    #tooltip.vis { opacity: 1; transform: translateY(0) scale(1); }
+    #tip-title { font-size: 13px; font-weight: 700; color: #F0EDE6; line-height: 1.45; }
+    #tip-note  { font-size: 11px; color: #8A95A8; margin-top: 5px; line-height: 1.55; display: none; }
+    #tip-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 6px; font-size: 10px; color: #6B7280; letter-spacing: 0.8px;
+    }
+    #tip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Header ─────────────────────────── */
+    #header {
+      position: fixed; top: 0; left: 0; right: 0;
+      padding: 20px 26px 52px;
+      background: linear-gradient(to bottom, rgba(10,12,16,0.92) 0%, transparent 100%);
+      pointer-events: none; z-index: 100;
+    }
+    #header h1 {
+      font-size: 18px; font-weight: 700; letter-spacing: 3px;
+      color: #D4A800;
+      text-shadow: 0 0 18px rgba(212,168,0,0.65), 0 0 40px rgba(212,168,0,0.22);
+    }
+    #header p { font-size: 9.5px; color: #374151; letter-spacing: 2.5px; margin-top: 4px; }
+    #stats { position: fixed; top: 70px; left: 26px; font-size: 10px; color: #374151; letter-spacing: 1.5px; z-index: 100; pointer-events: none; }
+    #stats b { color: #D4A800; font-weight: 600; }
+
+    /* ── Legend ─────────────────────────── */
+    #legend {
+      position: fixed; bottom: 24px; right: 24px; z-index: 100;
+      background: rgba(10, 12, 16, 0.92);
+      border: 1px solid rgba(255,255,255,0.06);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      padding: 14px 18px 13px; border-radius: 12px;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.55); min-width: 150px;
+    }
+    #legend h3 { font-size: 8.5px; color: #374151; letter-spacing: 2.5px; text-transform: uppercase; margin-bottom: 11px; }
+    #legend-list .lr { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; font-size: 11.5px; color: #C9D1D9; }
+    #legend-list .lr:last-child { margin-bottom: 0; }
+    #legend-list .ld { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    #legend-list .lc { margin-left: auto; font-size: 9.5px; color: #374151; }
+
+    /* ── Hint ───────────────────────────── */
+    #hint {
+      position: fixed; bottom: 26px; left: 26px;
+      font-size: 10px; color: #2D3748; letter-spacing: 0.5px;
+      line-height: 2.1; z-index: 100; pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div id="tooltip">
+  <div id="tip-title">—</div>
+  <div id="tip-note"></div>
+  <div id="tip-badge">
+    <div id="tip-dot"></div>
+    <span id="tip-topic">—</span>
+  </div>
+</div>
+
+<div id="header">
+  <h1 id="main-title">⬡ 知識星空大腦</h1>
+  <p  id="main-sub">PROJECT KNOWLEDGE MAP</p>
+</div>
+
+<div id="stats">
+  <b id="s-nodes">0</b> 節點 &nbsp;·&nbsp; <b id="s-edges">0</b> 關聯
+</div>
+
+<div id="legend">
+  <h3>主題分類</h3>
+  <div id="legend-list"></div>
+</div>
+
+<div id="hint">
+  <div>🖱 拖曳旋轉</div>
+  <div>⚙ 滾輪縮放</div>
+  <div>👁 滑過節點查看說明</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ★ CLAUDE CODE 更新區塊 ★                                       ║
+// ║  只修改此區塊內的資料，Three.js 渲染代碼請勿異動                 ║
+// ║  指令：「請更新知識圖譜」即可自動維護                             ║
+// ╚══════════════════════════════════════════════════════════════════╝
+// === BRAIN_MAP_DATA_START ===
+
+const BRAIN_CONFIG = {
+  title:    '天鷹保全 APP',
+  subtitle: 'TIANYING SECURITY · KNOWLEDGE MAP',
+};
+
+const TOPICS = {
+  // 格式：key: { name: '顯示名稱', color: '#HEX色碼' }
+  core:     { name: '主控台核心', color: '#D4A800' }, // 金
+  tools:    { name: '前端工具',   color: '#4ADE80' }, // 綠
+  backend:  { name: '後端 GAS',   color: '#818CF8' }, // 靛
+  data:     { name: '資料儲存',   color: '#FB923C' }, // 橙
+  infra:    { name: '部署/監控',  color: '#38BDF8' }, // 藍
+  todo:     { name: '待辦/規劃',  color: '#F87171' }, // 紅
+};
+
+// pos 座標建議範圍 ±1.4，主題空間分佈：
+//   core:  中央  x∈[-0.3,0.3] y∈[-0.3,0.3] z∈[0.3,0.8]
+//   tools: 右方  x∈[0.5,1.4]
+//   backend:左方 x∈[-1.4,-0.5]
+//   data:  下方  y∈[-1.4,-0.7]
+//   infra: 後方  z∈[-1.4,-0.7]
+//   todo:  頂部  y∈[0.8,1.4]
+const NODES = [
+  // ── 主控台核心 ──
+  { id: 0,  title: '主控台 index.html', topic: 'core',    pos: [ 0.0,  0.0,  0.6], note: '主選單/登入/公告/工具權限/首頁卡片，編譯後 React.createElement（非 JSX）' },
+  { id: 1,  title: '登入與角色系統',     topic: 'core',    pos: [-0.25, 0.25, 0.45], note: 'localStorage hsh_session_user；CAN_MANAGE_ROLES 控管理職可見' },
+  { id: 2,  title: '首頁待審卡片',       topic: 'core',    pos: [ 0.25,-0.2,  0.5], note: '待審請假/帳號/報告/表揚反應；報告、表揚兩格限 executive/admin' },
+
+  // ── 前端工具 ──
+  { id: 3,  title: '事故報告工具',       topic: 'tools',   pos: [ 0.7,  0.5,  0.4], note: 'tool_report.html；?mode=admin 主管審閱（未讀/待處理/已處理）' },
+  { id: 4,  title: '匿名表揚/反應',      topic: 'tools',   pos: [ 1.0,  0.3,  0.2], note: 'tool_feedback.html；前台匿名，主管裁決寫「處置」欄' },
+  { id: 5,  title: '開店前進出登錄',     topic: 'tools',   pos: [ 1.2,  0.0, -0.1], note: 'tool_opening.html 獨立檔，雙 GAS（共用 _SharedDB）' },
+  { id: 6,  title: '打烊後快速登錄',     topic: 'tools',   pos: [ 0.9, -0.25, 0.3], note: 'index 內嵌 tpl-closing（base64）' },
+  { id: 7,  title: '明日哨表',           topic: 'tools',   pos: [ 1.3,  0.55, 0.15], note: 'post.html，iframe src 串接' },
+  { id: 8,  title: '班表查詢',           topic: 'tools',   pos: [ 1.25,-0.2,  0.45], note: 'ScheduleApp；SHIFT_TYPES 班別代號（早/晚班）' },
+  { id: 9,  title: '緊急聯絡清單',       topic: 'tools',   pos: [ 0.55, 0.65, 0.0], note: 'tpl-emergency；normalizePhone 補回開頭 0' },
+  { id: 10, title: '資料上傳工具',       topic: 'tools',   pos: [ 1.1,  0.6, -0.2], note: 'tpl-upload，SheetJS 解析 Excel' },
+  { id: 11, title: '簽到/車輛/工作',     topic: 'tools',   pos: [ 0.55,-0.1, -0.2], note: 'tool_signin / tool_car / tool_work' },
+  { id: 12, title: '請假申請',           topic: 'tools',   pos: [ 0.95, 0.0,  0.55], note: 'liff_leave + 雲端請假清單' },
+
+  // ── 後端 GAS ──
+  { id: 13, title: '事故/表揚 GAS v3.1', topic: 'backend', pos: [-0.8,  0.2,  0.3], note: 'action 分流 report/feedback/updateStatus/getReports/getFeedback；狀態/處置欄' },
+  { id: 14, title: '帳號/請假 GAS',      topic: 'backend', pos: [-1.1,  0.45, 0.0], note: 'ACCOUNT_GAS_URL；登入/帳號申請/請假審核' },
+  { id: 15, title: '打烊/開店 GAS',      topic: 'backend', pos: [-1.2, -0.1,  0.2], note: '進出記錄 + _SharedDB（廠商/監工/檢查者即時同步）' },
+  { id: 16, title: '照片上傳處理',       topic: 'backend', pos: [-0.75,-0.25,-0.1], note: 'saveImages_；公告夾不可寫退回執行帳號夾；setSharing 非致命' },
+
+  // ── 資料儲存 ──
+  { id: 17, title: '主試算表',           topic: 'data',    pos: [-0.4, -1.0,  0.2], note: '事故報告 / 匿名表揚檢舉 分頁；主鍵純數字列號' },
+  { id: 18, title: '打烊資料庫',         topic: 'data',    pos: [-0.9, -1.1,  0.0], note: '廠商/監工/檢查者/施工類型（開店打烊共用）' },
+  { id: 19, title: '開店試算表',         topic: 'data',    pos: [ 0.4, -1.1,  0.1], note: '開店前/B1F餐廳/4F餐廳 分頁' },
+  { id: 20, title: '班表資料',           topic: 'data',    pos: [ 0.9, -0.95, 0.2], note: '班別代號 SHIFT_TYPES / WORK_SHIFT / OFF_TYPES' },
+  { id: 21, title: 'localStorage 本地',  topic: 'data',    pos: [ 0.0, -0.85, 0.5], note: 'hsh_session_user / hsh_favs / hsh_shops 等' },
+  { id: 22, title: 'Drive 公告資料夾',   topic: 'data',    pos: [-1.0, -0.8, -0.3], note: '照片統一存放（1K_RR…）；共用政策可能擋公開連結' },
+
+  // ── 部署/監控 ──
+  { id: 23, title: 'GitHub Pages 部署',  topic: 'infra',   pos: [ 0.0,  0.2, -1.0], note: 'sky03104.github.io/tianying-security；正式 APP 跑 main' },
+  { id: 24, title: 'Git 版本控制',       topic: 'infra',   pos: [-0.4, -0.1, -1.2], note: 'main + 功能分支；raw.githack + SHA 預覽' },
+  { id: 25, title: '監控自動化系統',     topic: 'infra',   pos: [ 0.4,  0.0, -1.2], note: 'tianying-monitor（失敗紀錄/技能迭代/回歸測試）' },
+
+  // ── 待辦/規劃 ──
+  { id: 26, title: 'TODO-11 角色 Agents',topic: 'todo',    pos: [-0.3,  1.1,  0.2], note: '5 角色落地成 .claude/agents/*.md' },
+  { id: 27, title: 'TODO-12 哨表自動化', topic: 'todo',    pos: [ 0.3,  1.2,  0.0], note: '排班自動產表/輪值/衝突檢查' },
+  { id: 28, title: 'TODO-13 對話助手',   topic: 'todo',    pos: [ 0.0,  1.0, -0.3], note: 'APP 內可「用說的」AI 助手' },
+];
+
+const EDGES = [
+  // 主控台內部
+  [0, 1], [0, 2],
+  // 主控台 → 各前端工具
+  [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10], [0, 11], [0, 12],
+  // 登入讀本地、首頁卡片讀 GAS
+  [1, 21], [2, 13], [2, 14],
+  // 工具 → 後端 GAS
+  [3, 13], [4, 13], [5, 15], [6, 15], [12, 14],
+  // 後端內部與照片流
+  [13, 16], [16, 22],
+  // 後端 → 資料
+  [13, 17], [14, 17], [15, 18], [15, 19], [8, 20], [10, 18], [10, 21], [9, 21],
+  // 部署/監控
+  [23, 0], [24, 23], [25, 24],
+  // 待辦關聯
+  [26, 1], [27, 8], [28, 0],
+];
+
+// === BRAIN_MAP_DATA_END ===
+// ╚══════════════════════════════════════════════════════════════════╝
+
+
+// ─────────────────────────────────────────────────────────────────
+//  以下為 Three.js 渲染引擎，請勿修改
+// ─────────────────────────────────────────────────────────────────
+
+// ── 初始化 DOM ──────────────────────────────────────────────────
+document.getElementById('main-title').textContent = '⬡ ' + BRAIN_CONFIG.title;
+document.getElementById('main-sub').textContent   = BRAIN_CONFIG.subtitle;
+document.getElementById('s-nodes').textContent    = NODES.length;
+document.getElementById('s-edges').textContent    = EDGES.length;
+
+// ── 動態建立 Legend ───────────────────────────────────────────
+(function buildLegend() {
+  const list   = document.getElementById('legend-list');
+  const counts = {};
+  NODES.forEach(n => { counts[n.topic] = (counts[n.topic] || 0) + 1; });
+  Object.entries(TOPICS).forEach(([key, tp]) => {
+    const c = counts[key] || 0;
+    if (!c) return;
+    const row = document.createElement('div');
+    row.className = 'lr';
+    row.innerHTML = `<div class="ld" style="background:${tp.color};box-shadow:0 0 7px ${tp.color};"></div>${tp.name}<span class="lc">${c}</span>`;
+    list.appendChild(row);
+  });
+})();
+
+// ── Hex → Three.js 色碼數字 ─────────────────────────────────
+function hex2num(hex) { return parseInt(hex.replace('#',''), 16); }
+
+// ── Three.js 初始化 ──────────────────────────────────────────
+const canvas   = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x0A0C10, 1);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.01, 200);
+const sph    = { theta: 0.35, phi: 1.22, r: 5.6 };
+
+function applySph() {
+  camera.position.set(
+    sph.r * Math.sin(sph.phi) * Math.sin(sph.theta),
+    sph.r * Math.cos(sph.phi),
+    sph.r * Math.sin(sph.phi) * Math.cos(sph.theta)
+  );
+  camera.lookAt(0, 0, 0);
+}
+applySph();
+
+// ── 輝光紋理 ──────────────────────────────────────────────────
+function buildGlowTex(hexColor, size) {
+  size = size || 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d'), cx = size / 2;
+  const g   = ctx.createRadialGradient(cx, cx, 0, cx, cx, cx);
+  g.addColorStop(0.00, hexColor + 'ff');
+  g.addColorStop(0.18, hexColor + 'ee');
+  g.addColorStop(0.45, hexColor + '66');
+  g.addColorStop(0.75, hexColor + '22');
+  g.addColorStop(1.00, hexColor + '00');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(c);
+}
+const glowTex = {};
+Object.keys(TOPICS).forEach(k => { glowTex[k] = buildGlowTex(TOPICS[k].color); });
+
+// ── 星空 ─────────────────────────────────────────────────────
+(function buildStars() {
+  const N = 3000, pos = new Float32Array(N * 3), cols = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
+    const r  = 22 + Math.random() * 60;
+    pos[i*3]   = r * Math.sin(ph) * Math.cos(th);
+    pos[i*3+1] = r * Math.sin(ph) * Math.sin(th);
+    pos[i*3+2] = r * Math.cos(ph);
+    const t = Math.random();
+    cols[i*3] = 0.7 + t*0.3; cols[i*3+1] = 0.75 + t*0.25; cols[i*3+2] = 0.9 + t*0.1;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(cols, 3));
+  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
+    size: 0.065, vertexColors: true, transparent: true, opacity: 0.55, sizeAttenuation: true,
+  })));
+})();
+
+// ── 節點建立 ─────────────────────────────────────────────────
+const SCALE      = 2.1;
+const nodeGroup  = new THREE.Group();
+scene.add(nodeGroup);
+const hitMeshes  = [], coreMeshes = [], glowSprites = [];
+
+const worldPos = NODES.map(n =>
+  new THREE.Vector3(n.pos[0] * SCALE, n.pos[1] * SCALE, n.pos[2] * SCALE)
+);
+
+NODES.forEach((node, i) => {
+  const tp = TOPICS[node.topic] || { color: '#ffffff' };
+  const wp = worldPos[i];
+
+  // 命中球（不可見）
+  const hit = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 8, 8),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+  hit.position.copy(wp);
+  hit.userData.nodeIdx = i;
+  nodeGroup.add(hit);
+  hitMeshes.push(hit);
+
+  // 核心球（可見）
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(0.058, 20, 20),
+    new THREE.MeshBasicMaterial({ color: hex2num(tp.color) })
+  );
+  core.position.copy(wp);
+  nodeGroup.add(core);
+  coreMeshes.push(core);
+
+  // 輝光 Sprite
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTex[node.topic] || glowTex[Object.keys(TOPICS)[0]],
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  sp.position.copy(wp);
+  sp.scale.set(0.56, 0.56, 1);
+  sp.userData.highlighted = false;
+  nodeGroup.add(sp);
+  glowSprites.push(sp);
+});
+
+// ── 邊建立 ───────────────────────────────────────────────────
+const edgeData = [];
+EDGES.forEach(([a, b]) => {
+  if (a >= NODES.length || b >= NODES.length) return;
+  const same  = NODES[a].topic === NODES[b].topic;
+  const alpha = same ? 0.32 : 0.12;
+  const color = same ? hex2num(TOPICS[NODES[a].topic]?.color || '#ffffff') : 0x6B7280;
+  const geo   = new THREE.BufferGeometry().setFromPoints([worldPos[a].clone(), worldPos[b].clone()]);
+  const line  = new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: alpha }));
+  nodeGroup.add(line);
+  edgeData.push({ line, a, b, sameTopic: same, baseAlpha: alpha, baseColor: color });
+});
+
+// ── Raycaster + Tooltip ──────────────────────────────────────
+const raycaster = new THREE.Raycaster();
+const mouseNDC  = new THREE.Vector2(-9, -9);
+const tooltip   = document.getElementById('tooltip');
+const tipTitle  = document.getElementById('tip-title');
+const tipNote   = document.getElementById('tip-note');
+const tipTopic  = document.getElementById('tip-topic');
+const tipDot    = document.getElementById('tip-dot');
+let txp = 0, typ = 0, hoveredIdx = -1;
+
+function showTip(node, x, y) {
+  const tp = TOPICS[node.topic] || { name: node.topic, color: '#ffffff' };
+  tipTitle.textContent = node.title;
+  tipTopic.textContent = tp.name;
+  tipDot.style.background = tp.color;
+  tipDot.style.boxShadow  = `0 0 6px ${tp.color}`;
+  if (node.note && node.note.trim()) {
+    tipNote.textContent    = node.note;
+    tipNote.style.display  = 'block';
+  } else {
+    tipNote.style.display  = 'none';
+  }
+  const W = window.innerWidth, H = window.innerHeight;
+  let tx = x + 18, ty = y - 10;
+  if (tx + 240 > W) tx = x - 248;
+  if (ty + 80  > H) ty = y - 84;
+  tooltip.style.left = tx + 'px';
+  tooltip.style.top  = ty + 'px';
+  tooltip.classList.add('vis');
+}
+function hideTip() { tooltip.classList.remove('vis'); }
+
+function setEdgeHL(idx, on) {
+  edgeData.forEach(ed => {
+    if (ed.a !== idx && ed.b !== idx) return;
+    const other = (ed.a === idx) ? ed.b : ed.a;
+    if (on) {
+      ed.line.material.opacity = Math.min(0.9, ed.baseAlpha * 4.5);
+      ed.line.material.color.setHex(hex2num(TOPICS[NODES[other].topic]?.color || '#ffffff'));
+    } else {
+      ed.line.material.opacity = ed.baseAlpha;
+      ed.line.material.color.setHex(ed.baseColor);
+    }
+  });
+}
+
+// ── 相機控制 ─────────────────────────────────────────────────
+let isDragging = false, lastPx = {x:0,y:0}, autoRotate = true, autoTimer = null;
+
+function startDrag(x, y) { isDragging = true; lastPx = {x,y}; autoRotate = false; clearTimeout(autoTimer); canvas.style.cursor = 'grabbing'; }
+function moveDrag(x, y)  {
+  if (!isDragging) return;
+  sph.theta -= (x - lastPx.x) * 0.0042;
+  sph.phi   -= (y - lastPx.y) * 0.0042;
+  sph.phi    = Math.max(0.12, Math.min(Math.PI - 0.12, sph.phi));
+  lastPx = {x, y};
+  applySph();
+}
+function endDrag()  { isDragging = false; canvas.style.cursor = 'grab'; autoTimer = setTimeout(() => { autoRotate = true; }, 5000); }
+function doZoom(d)  { sph.r = Math.max(2.2, Math.min(11, sph.r + d * 0.0025)); applySph(); }
+
+canvas.addEventListener('mousedown', e => startDrag(e.clientX, e.clientY));
+window.addEventListener('mousemove', e => {
+  mouseNDC.x =  (e.clientX / window.innerWidth)  * 2 - 1;
+  mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  txp = e.clientX; typ = e.clientY;
+  moveDrag(e.clientX, e.clientY);
+});
+window.addEventListener('mouseup', endDrag);
+canvas.addEventListener('wheel', e => { e.preventDefault(); doZoom(e.deltaY); }, { passive: false });
+
+let pinchDist = 0;
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) startDrag(e.touches[0].clientX, e.touches[0].clientY);
+  else if (e.touches.length === 2) { pinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); isDragging = false; }
+}, { passive: true });
+canvas.addEventListener('touchmove', e => {
+  if (e.touches.length === 1) moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+  else if (e.touches.length === 2) { const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); doZoom((pinchDist - d) * 1.8); pinchDist = d; }
+}, { passive: true });
+canvas.addEventListener('touchend', endDrag);
+canvas.style.cursor = 'grab';
+
+window.addEventListener('resize', () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+// ── 動畫主迴圈 ──────────────────────────────────────────────
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  if (autoRotate && !isDragging) { sph.theta += 0.0014; applySph(); }
+
+  glowSprites.forEach((sp, i) => {
+    const hl = sp.userData.highlighted;
+    const s  = (hl ? 0.95 : 0.54) + Math.sin(t * (hl ? 2.2 : 1.3) + i * 0.68) * (hl ? 0.16 : 0.07);
+    sp.scale.set(s, s, 1);
+  });
+  coreMeshes.forEach((core, i) => {
+    const target = glowSprites[i].userData.highlighted ? 1.6 : 1.0;
+    core.scale.setScalar(core.scale.x + (target - core.scale.x) * 0.12);
+  });
+
+  raycaster.setFromCamera(mouseNDC, camera);
+  const hits = raycaster.intersectObjects(hitMeshes);
+  if (hits.length > 0) {
+    const idx = hits[0].object.userData.nodeIdx;
+    if (idx !== hoveredIdx) {
+      if (hoveredIdx !== -1) { glowSprites[hoveredIdx].userData.highlighted = false; setEdgeHL(hoveredIdx, false); }
+      hoveredIdx = idx;
+      glowSprites[idx].userData.highlighted = true;
+      setEdgeHL(idx, true);
+      showTip(NODES[idx], txp, typ);
+    }
+    if (!isDragging) canvas.style.cursor = 'pointer';
+  } else {
+    if (hoveredIdx !== -1) {
+      glowSprites[hoveredIdx].userData.highlighted = false;
+      setEdgeHL(hoveredIdx, false);
+      hoveredIdx = -1;
+      hideTip();
+    }
+    if (!isDragging) canvas.style.cursor = 'grab';
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
