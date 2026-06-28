@@ -149,6 +149,7 @@ tianying-security/
 - **事故與表揚_GAS_部署說明.md**：GAS 授權 + Drive 設定
 - **tool_opening_GAS_部署說明.md**：開店前工具 GAS 部署
 - **CLAUDE_CODE_BRAIN_MAP.md**：知識圖譜維護規則
+- **.claude/agents/_工作流程.md**：三層 AI Agents 團隊（執行/檢視/主協調者）編排手冊＋觸發語
 
 ---
 
