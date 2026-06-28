@@ -1129,6 +1129,14 @@ python3 snapshot-generator-simple.py
 - **位置**：`tool_report.html`、`tool_feedback.html`、`index.html`(renderHome)、`事故與表揚_後端_GAS_v3.1.gs`
 - **狀態**：🔄 進行中（2026-06-27）
 
+#### [TODO-15] cec-up 上傳工具 ↔ app 內資料上傳工具 版本核對
+- **背景**：施工單資料來源是咖哩每天用獨立部署的上傳工具 `https://sky03104.github.io/cec-up/`（repo `sky03104/cec-up`）把 Excel 寫進試算表；`tool_work.html` 只是讀那張表顯示
+- **疑慮**：cec-up 與 app 內的「天鷹保全資料上傳工具」（`index.html` 內嵌 `tpl-upload`，base64）是同一支工具的兩份，需核對 cec-up 有無落後（少了某次修正）
+- **已確認（app 側）**：兩者同名同功能；app 版無版本號字串；施工單解析欄位（申請單位／廠商專櫃名稱／施工地點／施工項目／進場時間／退場時間／監工／人數）與 `tool_work.html` 讀取欄位一致 → 資料管線通
+- **卡點**：cec-up 在另一 repo（不在授權範圍）＋代理層擋 `*.github.io`，本 session 無法抓取比對
+- **下一步**：將 `sky03104/cec-up` 加入 Claude Code 授權 repo → 拉原始碼與 `tpl-upload` 解碼版做 diff（app 版已暫存比對基準）→ 列差異、必要時同步修正
+- **狀態**：⏳ 待辦（等授權 cec-up repo）
+
 ### 🟢 本次（2026-06-27）額外完成
 
 #### [TODO-07] 開店/打烊工具「設定」分頁限管理員
