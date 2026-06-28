@@ -67,6 +67,31 @@
 
 ---
 
+## 四之二、照片上傳失敗修法（auth/drive 權限不足）
+
+**症狀**：清單「附件」欄出現「第1張上傳失敗：你沒有呼叫『DriveApp.Folder.createFile』的權限。必要權限：https://www.googleapis.com/auth/drive」。
+
+**根因**：授權時只拿到受限的 `drive.file` 範圍，但把照片寫進**既有的公告資料夾**需要**完整** `drive` 範圍。
+
+**修法**：
+1. Apps Script 編輯器 → **⚙ 專案設定** → 勾選 **「顯示 appsscript.json 資訊清單檔案」**。
+2. 打開左側 `appsscript.json`，把 `oauthScopes` 補上（內容見 repo 的 `事故與表揚_appsscript.json`）：
+   ```json
+   "oauthScopes": [
+     "https://www.googleapis.com/auth/drive",
+     "https://www.googleapis.com/auth/spreadsheets",
+     "https://www.googleapis.com/auth/script.external_request"
+   ]
+   ```
+   （若已有其他 scope 就合併進陣列，不要刪掉既有的。）
+3. 存檔 → 重新執行一次 **`forceAuth()`** → 這次同意畫面會要求**完整 Google 雲端硬碟**權限 → 按同意。
+4. **重新部署**（管理部署 → 編輯既有部署 → 版本：新版本）。
+5. 再送一筆帶照片的測試 → 「附件」欄應為正常的 Drive 連結（不再是錯誤訊息）。
+
+> 已上傳成功前送出的舊資料，附件欄會殘留錯誤字串，屬正常（修好後的新資料才會正確）。
+
+---
+
 ## 五、驗證清單
 
 - [ ] `forceAuth()` 執行成功（Drive + Sheet 已授權）。

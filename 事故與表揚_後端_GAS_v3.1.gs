@@ -266,10 +266,16 @@ function doGet(e) {
 }
 
 // ====== 首次部署用：手動執行一次以觸發授權 ======
+// ⚠ 照片上傳需「完整 Drive 權限」(auth/drive)。若只授到 drive.file，寫入既有資料夾會失敗。
+//   請先在「專案設定 → 顯示 appsscript.json」加上 oauthScopes（見部署說明），再執行本函式並同意授權。
 function forceAuth() {
-  DriveApp.getFolderById(PHOTO_FOLDER_ID);
+  // 觸發 Sheet 讀寫
   SpreadsheetApp.openById(SS_ID);
-  console.log('授權測試成功！Drive + Sheet 皆已授權');
+  // 觸發 Drive「建檔」權限（關鍵：在公告資料夾建一個測試檔再刪除，逼出 createFile 範圍）
+  var folder = DriveApp.getFolderById(PHOTO_FOLDER_ID);
+  var f = folder.createFile('授權測試_' + Date.now() + '.txt', 'auth test', MimeType.PLAIN_TEXT);
+  f.setTrashed(true);
+  console.log('授權測試成功！Sheet 讀寫 + Drive 建檔權限皆已授權');
 }
 
 // ====== 測試用 ======
