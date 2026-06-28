@@ -17231,6 +17231,7 @@ const TOOL_EMERGENCY_HTML = b64decode('tpl-emergency');
 const TOOL_SIGNIN_HTML   = b64decode('tpl-signin');
 const POST_PAGE_URL       = 'https://sky03104.github.io/tianying-security/post.html'; // 明日哨表改為 iframe 串接完整頁（永遠同步最新 post.html）
 const OPENING_PAGE_URL    = 'https://sky03104.github.io/tianying-security/tool_opening.html'; // 開店前進出快速登錄：獨立檔，iframe 串接（永遠同步最新 tool_opening.html）
+const REPORT_GAS_URL      = 'https://script.google.com/macros/s/AKfycbwHXlwTMmJyA79Cuzdh2IPRnBLUWm2YPEqXn5XJj4GVEUlCnNIv8hgRTJ7Xr198hZxG/exec'; // 事故報告／匿名表揚共用 GAS（主管待審卡片讀清單）
 const TOOL_CAR_HTML       = b64decode('tpl-car');
 // ─── COLOR TOKENS ────────────────────────────────────────────────
 // Primary: Deep Navy #0A0F1E   Surface: #111827   Card: #1A2235
@@ -18888,6 +18889,8 @@ function App() {
     const [editingAnn, setEditingAnn] = useState(null);
     const [showLeave, setShowLeave] = useState(false);
     const [leaveRequests, setLeaveRequests] = useState([]);
+    const [pendingReports, setPendingReports] = useState([]);   // 事故報告清單（主管待審卡片）
+    const [pendingFeedback, setPendingFeedback] = useState([]); // 匿名表揚/檢舉清單（主管待審卡片）
     const [leaveForm, setLeaveForm] = useState({
         type: '排休', selectedDates: [], reason: ''
     });
@@ -19035,6 +19038,7 @@ function App() {
             if (CAN_MANAGE_ROLES.includes(sessionUser.role)) {
                 loadPendingFromCloud(true);
             }
+            if (['executive', 'admin'].includes(sessionUser.role)) loadReviewCounts();
             loadLeaveFromCloud(true);
             loadLeaveSettings();
             setPage("main");
@@ -19075,6 +19079,7 @@ function App() {
         if (CAN_MANAGE_ROLES.includes(sessionUser.role)) {
             loadPendingFromCloud(true);
         }
+        if (['executive', 'admin'].includes(sessionUser.role)) loadReviewCounts();
         loadLeaveFromCloud(true);
         loadLeaveSettings();
         setPage("main");
@@ -19117,6 +19122,17 @@ function App() {
         } catch (e) {
             showToast('⚠️ 請假清單雲端連線失敗：' + e.message, 'err');
         }
+    };
+    /* ── 主管待審卡片：讀事故報告／匿名表揚清單（僅 executive/admin 觸發） ── */
+    const loadReviewCounts = async () => {
+        try {
+            const [r1, r2] = await Promise.all([
+                fetch(REPORT_GAS_URL + '?action=getReports').then(x => x.json()).catch(() => null),
+                fetch(REPORT_GAS_URL + '?action=getFeedback').then(x => x.json()).catch(() => null)
+            ]);
+            if (r1 && r1.status === 'ok' && Array.isArray(r1.list)) setPendingReports(r1.list);
+            if (r2 && r2.status === 'ok' && Array.isArray(r2.list)) setPendingFeedback(r2.list);
+        } catch (e) {}
     };
     /* ── 從雲端載入早晚班請假上限（系統設定分頁） ── */
     const loadLeaveSettings = async () => {
@@ -19614,6 +19630,15 @@ function App() {
                     React.createElement("div", { style: { fontSize: 18, marginBottom: 2 } }, "\uD83D\uDDD3\uFE0F"),
                     React.createElement("div", { className: "stat-num", style: { fontSize: 18, marginTop: 2 } }, new Date().toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' }).replace('/', '-')),
                     React.createElement("div", { className: "stat-lbl" }, "\u4ECA\u5929\u65E5\u671F")))),
+            (['executive', 'admin'].includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role)) && (React.createElement("div", { className: "stat-row" },
+                React.createElement("div", { className: "stat-card", style: { cursor: 'pointer' }, onClick: () => window.open('tool_report.html?mode=admin&empId=' + encodeURIComponent((currentUser && currentUser.empId) || ''), '_blank') },
+                    React.createElement("div", { style: { fontSize: 18, marginBottom: 2 } }, "\uD83D\uDCCB"),
+                    React.createElement("div", { className: "stat-num", style: { color: pendingReports.filter(r => r['\u72C0\u614B'] !== '\u5DF2\u8655\u7406').length > 0 ? '#F87171' : 'var(--success)' } }, pendingReports.filter(r => r['\u72C0\u614B'] !== '\u5DF2\u8655\u7406').length),
+                    React.createElement("div", { className: "stat-lbl" }, "\u5F85\u5BE9\u5831\u544A")),
+                React.createElement("div", { className: "stat-card", style: { cursor: 'pointer' }, onClick: () => window.open('tool_feedback.html?mode=admin&empId=' + encodeURIComponent((currentUser && currentUser.empId) || ''), '_blank') },
+                    React.createElement("div", { style: { fontSize: 18, marginBottom: 2 } }, "\uD83C\uDFC5"),
+                    React.createElement("div", { className: "stat-num", style: { color: pendingFeedback.filter(r => r['\u72C0\u614B'] !== '\u5DF2\u8655\u7406').length > 0 ? '#FB923C' : 'var(--success)' } }, pendingFeedback.filter(r => r['\u72C0\u614B'] !== '\u5DF2\u8655\u7406').length),
+                    React.createElement("div", { className: "stat-lbl" }, "\u5F85\u8655\u7406\u8868\u63DA/\u53CD\u61C9")))),
             React.createElement("div", { className: "section-title" }, "\u2B50 \u5E38\u7528\u5DE5\u5177\u5FEB\u6377"),
             favorites.filter(id => userTools.includes(id)).length === 0 ? (React.createElement("div", { style: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10,
                     padding: '20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 } },
