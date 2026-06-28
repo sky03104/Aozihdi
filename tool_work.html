@@ -152,6 +152,9 @@ input[type=date]{color-scheme:dark}
 .crow{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.3rem}
 .ctime{display:flex;align-items:center;gap:.22rem;background:rgba(212,168,0,.07);border:1px solid rgba(212,168,0,.17);border-radius:6px;padding:.3rem .5rem;font-size:.98rem;font-weight:600;color:var(--gld3);flex-shrink:0}
 .ctime i{font-size:.92rem}
+/* 時間爛資料：整段標紅警示，主管一眼抓到要修的格子 */
+.ctime.bad{background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.45);color:#F87171}
+.twarn{font-size:.82rem;font-weight:700;letter-spacing:.02em}
 .cinfo{display:flex;align-items:center;gap:.24rem;font-size:.9rem;color:var(--t2)}
 .cinfo i{font-size:.88rem;color:var(--t3)}.cinfo strong{color:var(--t1)}
 .cwork{display:flex;align-items:flex-start;gap:.28rem;padding:.26rem .44rem;background:rgba(255,255,255,.025);border-radius:6px;font-size:.94rem;color:var(--t2);margin-top:.3rem}
@@ -403,9 +406,12 @@ function fmtT(v){
   var n = parseInt(s.replace(/[^0-9]/g,''));
   if(isNaN(n)) return s;
   var h=Math.floor(n/100), m=n%100;
-  if(h>24||m>59) return s;
+  // 允許跨夜寫法 24:00~29:59（夜班到凌晨）；HH≥30 或 MM≥60 視為爛資料，原樣回傳供標記
+  if(h>29||m>59) return s;
   return (h<10?'0':'')+h+':'+(m<10?'0':'')+m;
 }
+// 判定 fmtT 結果是否為「非正常時間」（爛資料）：非「--」且不是 HH:MM 格式
+function isBadTime(s){ return s!=='--' && !/^\d{1,2}:\d{2}$/.test(s); }
 function d0(d){ var x=new Date(d); x.setHours(0,0,0,0); return x; }
 function sameDay(a,b){
   return a instanceof Date && b instanceof Date &&
@@ -502,6 +508,7 @@ function cardHtml(rec, view, isHot, idx){
   var unit=rec['申請單位']||'', vendor=rec['廠商專櫃名稱']||'';
   var loc=rec['施工地點']||'--', work=rec['施工項目']||'--';
   var ei=fmtT(rec['進場時間輸入']), xi=fmtT(rec['退場時間輸入']);
+  var timeBad = isBadTime(ei) || isBadTime(xi);  // 有爛時間就整段標紅提醒
   var ppl=rec['人數'], sv=rec['監工']||'--';
   var sd=rec['施工日期'], xd=rec['退場日期'], note=rec['備註']||'';
 
@@ -544,7 +551,7 @@ function cardHtml(rec, view, isHot, idx){
     +'<div class="cloc"><i class="ti ti-map-pin"></i>'+esc(loc)+'</div>'
     +'<div class="cdiv"></div>'
     +'<div class="crow">'
-      +'<div class="ctime"><i class="ti ti-clock"></i>'+esc(ei)+' → '+esc(xi)+'</div>'
+      +'<div class="ctime'+(timeBad?' bad':'')+'"><i class="ti '+(timeBad?'ti-alert-triangle':'ti-clock')+'"></i>'+esc(ei)+' → '+esc(xi)+(timeBad?' <span class="twarn">時間待確認</span>':'')+'</div>'
       +'<div class="cinfo"><i class="ti ti-users"></i><strong>'+esc(ppl!=null?ppl:'--')+'</strong> 人</div>'
       +'<div class="cinfo"><i class="ti ti-user-check"></i>'+esc(sv)+'</div>'
     +'</div>'
