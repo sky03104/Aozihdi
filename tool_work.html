@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>天鷹保全 · 施工管理系統</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <!--
@@ -140,28 +140,28 @@ input[type=date]{color-scheme:dark}
 .cdate-lbl{font-size:.78rem;font-weight:700;color:var(--t2);display:flex;align-items:center;gap:.22rem;flex-shrink:0;background:rgba(255,255,255,.05);border:1px solid var(--bdr);padding:.08rem .4rem;border-radius:5px}
 .cdate-lbl i{font-size:.72rem;color:var(--t3)}
 .cbdgs{display:flex;gap:.22rem;flex-wrap:wrap;justify-content:flex-end;flex:1}
-.bdg{font-size:.62rem;padding:.08rem .38rem;border-radius:4px;font-weight:600}
+.bdg{font-size:.74rem;padding:.1rem .42rem;border-radius:4px;font-weight:600}
 .b-un{background:rgba(255,255,255,.05);color:var(--t2);border:1px solid var(--bdr)}
 .b-fw{background:rgba(251,146,60,.11);color:var(--wrn);border:1px solid rgba(251,146,60,.24)}
 .b-ov{background:rgba(251,146,60,.1);color:var(--wrn);border:1px solid rgba(251,146,60,.25)}
-.cvendor{font-size:.96rem;font-weight:700;color:var(--t1);margin-bottom:.28rem;line-height:1.35}
+.cvendor{font-size:1.08rem;font-weight:700;color:var(--t1);margin-bottom:.3rem;line-height:1.35}
 /* 施工地點 圖標改紅色 */
-.cloc{display:flex;align-items:center;gap:.22rem;font-size:.78rem;color:var(--red);margin-bottom:.4rem}
-.cloc i{font-size:.76rem;color:var(--red)}
+.cloc{display:flex;align-items:center;gap:.26rem;font-size:1rem;font-weight:600;color:var(--red);margin-bottom:.42rem}
+.cloc i{font-size:1rem;color:var(--red)}
 .cdiv{height:1px;background:var(--bdr);margin:.4rem 0}
 .crow{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.3rem}
-.ctime{display:flex;align-items:center;gap:.22rem;background:rgba(212,168,0,.07);border:1px solid rgba(212,168,0,.17);border-radius:6px;padding:.24rem .44rem;font-size:.78rem;color:var(--gld3);flex-shrink:0}
-.ctime i{font-size:.76rem}
-.cinfo{display:flex;align-items:center;gap:.22rem;font-size:.76rem;color:var(--t2)}
-.cinfo i{font-size:.76rem;color:var(--t3)}.cinfo strong{color:var(--t1)}
-.cwork{display:flex;align-items:flex-start;gap:.28rem;padding:.26rem .44rem;background:rgba(255,255,255,.025);border-radius:6px;font-size:.76rem;color:var(--t2);margin-top:.28rem}
-.cwork i{font-size:.76rem;color:var(--t3);margin-top:1px;flex-shrink:0}
-.cfire{display:flex;align-items:center;gap:.28rem;margin-top:.3rem;padding:.26rem .44rem;background:rgba(251,146,60,.07);border:1px solid rgba(251,146,60,.18);border-radius:6px;font-size:.76rem;color:var(--wrn)}
-.cfire i{font-size:.78rem}
-.cnote{margin-top:.28rem;padding:.24rem .44rem;background:rgba(59,130,246,.06);border-left:2px solid rgba(59,130,246,.3);font-size:.74rem;color:var(--t2);line-height:1.45}
+.ctime{display:flex;align-items:center;gap:.22rem;background:rgba(212,168,0,.07);border:1px solid rgba(212,168,0,.17);border-radius:6px;padding:.3rem .5rem;font-size:.98rem;font-weight:600;color:var(--gld3);flex-shrink:0}
+.ctime i{font-size:.92rem}
+.cinfo{display:flex;align-items:center;gap:.24rem;font-size:.9rem;color:var(--t2)}
+.cinfo i{font-size:.88rem;color:var(--t3)}.cinfo strong{color:var(--t1)}
+.cwork{display:flex;align-items:flex-start;gap:.28rem;padding:.26rem .44rem;background:rgba(255,255,255,.025);border-radius:6px;font-size:.94rem;color:var(--t2);margin-top:.3rem}
+.cwork i{font-size:.92rem;color:var(--t3);margin-top:1px;flex-shrink:0}
+.cfire{display:flex;align-items:center;gap:.28rem;margin-top:.3rem;padding:.26rem .44rem;background:rgba(251,146,60,.07);border:1px solid rgba(251,146,60,.18);border-radius:6px;font-size:.9rem;color:var(--wrn)}
+.cfire i{font-size:.9rem}
+.cnote{margin-top:.28rem;padding:.24rem .44rem;background:rgba(59,130,246,.06);border-left:2px solid rgba(59,130,246,.3);font-size:.9rem;color:var(--t2);line-height:1.5}
 
 /* 報到換證按鈕 */
-.cbtn-checkin{width:100%;margin-top:.55rem;padding:.46rem .5rem;border-radius:8px;background:rgba(212,168,0,.07);border:1px solid rgba(212,168,0,.22);color:var(--gld3);font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:.32rem;letter-spacing:.03em}
+.cbtn-checkin{width:100%;margin-top:.6rem;padding:.85rem .5rem;min-height:48px;border-radius:8px;background:rgba(212,168,0,.07);border:1px solid rgba(212,168,0,.22);color:var(--gld3);font-size:.98rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:.32rem;letter-spacing:.03em}
 .cbtn-checkin:hover:not(:disabled){background:rgba(212,168,0,.16);border-color:var(--gld);color:var(--gld)}
 .cbtn-checkin:disabled{opacity:.65;cursor:not-allowed}
 .cbtn-checkin.done{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.35);color:#4ADE80;cursor:default}
@@ -644,11 +644,20 @@ async function checkIn(idx, isHot){
     return;
   }
 
+  // 送出前防呆：此筆要有可供後端比對的鍵（ID 或 廠商名），否則必定對不到，別送出造成假成功
+  var hasId = rec['ID']!=null && String(rec['ID']).trim()!=='' && String(rec['ID']).trim().toLowerCase()!=='null';
+  var hasVendor = rec['廠商專櫃名稱'] && String(rec['廠商專櫃名稱']).trim()!=='';
+  if(!hasId && !hasVendor){
+    toast('✗ 此筆缺少可比對欄位（ID／廠商），無法報到換證','err');
+    return;
+  }
+
+  var sheetName = isHot ? '動火申請查詢' : '施工單查詢';
   btn.disabled = true;
   btn.innerHTML = '<i class="ti ti-loader" style="animation:spin .6s linear infinite"></i>處理中…';
 
   var payload = JSON.stringify({
-    sheet  : isHot ? '動火申請查詢' : '施工單查詢',
+    sheet  : sheetName,
     id     : rec['ID'],
     vendor : rec['廠商專櫃名稱'] || '',
     month  : rec['月'],
@@ -657,24 +666,64 @@ async function checkIn(idx, isHot){
   });
 
   try {
-    // no-cors：GAS 仍會執行，response 為 opaque（無法讀取，但視為成功）
+    // no-cors 送出：回應為 opaque 無法讀取，故送出後改以「重新讀取試算表」實際確認是否真的寫入
     await fetch(GAS_URL, {
       method : 'POST',
       mode   : 'no-cors',
       headers: { 'Content-Type': 'text/plain' },
       body   : payload
     });
-    // no-cors 下無法確認成功，預設視為完成
-    btn.className = 'cbtn-checkin done';
-    btn.innerHTML = '<i class="ti ti-circle-check"></i>已報到換證';
-    toast('✓ 報到換證完成','ok');
+    btn.innerHTML = '<i class="ti ti-loader" style="animation:spin .6s linear infinite"></i>確認中…';
+    var ok = await verifyCheckin(rec, sheetName);
+    if(ok){
+      rec['__checkin'] = '已報到換證';   // 同步本地狀態，避免重整前不一致
+      btn.className = 'cbtn-checkin done';
+      btn.innerHTML = '<i class="ti ti-circle-check"></i>已報到換證';
+      toast('✓ 報到換證完成','ok');
+    } else {
+      btn.disabled = false;
+      btn.className = 'cbtn-checkin fail';
+      btn.innerHTML = '<i class="ti ti-badge-check"></i>報到換證';
+      setTimeout(function(){ btn.classList.remove('fail'); },2500);
+      toast('✗ 報到未生效：試算表查無此筆更新，請重試或確認資料','err');
+    }
   } catch(err) {
     btn.disabled = false;
+    btn.className = 'cbtn-checkin fail';
     btn.innerHTML = '<i class="ti ti-badge-check"></i>報到換證';
-    btn.classList.add('fail');
-    setTimeout(function(){ btn.classList.remove('fail'); },2000);
+    setTimeout(function(){ btn.classList.remove('fail'); },2500);
     toast('✗ 報到失敗：'+err.message,'err');
   }
+}
+
+/* ══════════════════════════════════════════
+   報到換證驗證：no-cors 無法讀回應，改重讀分頁確認 O 欄是否真的寫入「已報到換證」
+══════════════════════════════════════════ */
+function checkinMatchKey(r){
+  // 與 GAS 比對邏輯一致：優先 ID，否則 廠商+月+日+進場時間
+  var id = r['ID']!=null ? String(r['ID']).trim() : '';
+  if(id && id.toLowerCase()!=='null') return 'id:'+id;
+  return 'cb:'+['廠商專櫃名稱','月','日','進場時間輸入'].map(function(k){
+    return String(r[k]==null?'':r[k]).trim();
+  }).join('|');
+}
+async function verifyCheckin(rec, sheetName){
+  var key = checkinMatchKey(rec);
+  // GAS 寫入需時間，最多嘗試兩輪（約 1.3s × 2）
+  for(var attempt=0; attempt<2; attempt++){
+    await new Promise(function(res){ setTimeout(res, 1300); });
+    try {
+      var rows = await fetchSheetJsonp(sheetName);
+      for(var i=0;i<rows.length;i++){
+        if(checkinMatchKey(rows[i])===key){
+          var v = rows[i]['__checkin'];
+          if(v && String(v).trim() && String(v).trim().toLowerCase()!=='null') return true;
+          break; // 找到該筆但尚未寫入 → 再等一輪
+        }
+      }
+    } catch(e){ /* 讀取失敗，下一輪再試 */ }
+  }
+  return false;
 }
 
 /* ══════════════════════════════════════════
