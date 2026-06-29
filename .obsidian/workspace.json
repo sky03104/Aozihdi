@@ -200,6 +200,11 @@
   },
   "active": "10d9229f4028aefe",
   "lastOpenFiles": [
+    "天鷹AI助手_GAS_部署說明.md",
+    "天鷹AI助手_GAS.gs",
+    "tool_ai_chat.html",
+    "TASK_CARD.md",
+    "AGENTS.md",
     "index.md",
     "操作手冊/src/img/report_form.png",
     "操作手冊/src/img/report_admin_list.png",
@@ -219,9 +224,7 @@
     "操作手冊/天鷹保全_LINE機器人操作手冊.pdf",
     "操作手冊/天鷹保全_APP操作手冊_員工版.pdf",
     "操作手冊/天鷹保全_APP操作手冊_主管版.pdf",
-    "操作手冊/src",
     "操作手冊/README.md",
-    "操作手冊",
     "CLAUDE_CODE_BRAIN_MAP.md",
     "事故與表揚_GAS_部署說明.md",
     "tool_opening_GAS_部署說明.md",
@@ -242,7 +245,6 @@
     "tpl-car (1).md",
     "project-state.md",
     "tianying-monitor/DEPLOYMENT_GUIDE_LEVEL3.md",
-    "02-工具開發/_工具開發模板.md",
-    "00-天鷹-MOC/插件安裝清單.md"
+    "02-工具開發/_工具開發模板.md"
   ]
 }
