@@ -19,9 +19,9 @@
  * ───────────────────────────────────────────── */
 
 // ── 設定常數 ──────────────────────────────────
-// 依序嘗試（前面額度爆/不存在自動換下一個）。免費額度大的排前面：
-//   2.0-flash 與 2.0-flash-lite 每日額度較高，2.5-flash 額度小放後面備援
-var MODELS      = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest'];
+// 依序嘗試（前面額度爆/不存在自動換下一個）。只用「不思考」的 2.0 系列：
+//   2.5-flash 會花 token 思考→常把回答吃掉切斷，且免費額度小，故不用
+var MODELS      = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
 var PROP_KEY    = 'GEMINI_API_KEY';   // API Key 屬性名
 var PROP_RULES  = 'AI_ADMIN_RULES';   // 管理員自訂禁止規則
 var PROP_LEVEL  = 'AI_FORCE_LEVEL';   // 強制表達層級：auto/simple/normal
@@ -79,7 +79,7 @@ function handleChat(p) {
   var reqBody = {
     systemInstruction: { parts: [{ text: systemText }] },
     contents: contents,
-    generationConfig: { maxOutputTokens: 600, temperature: 0.7 }
+    generationConfig: { maxOutputTokens: 2048, temperature: 0.7 }
   };
 
   // 依序嘗試模型清單：模型不存在(404) 或 額度爆掉(429) 就換下一個（每個模型額度分開算）
@@ -151,8 +151,17 @@ function buildSystemPrompt(role, vocabLevel) {
     '第一次跟人打招呼時可以說「我是小天鷹，天鷹保全的 AI 助手 🦅」。\n\n' +
     '【你的工作】協助保全同事解決工作問題：\n' +
     '- 工作 SOP（巡邏、交接班、緊急事件怎麼處理）\n' +
-    '- 事故報告怎麼填、班表怎麼看、請假怎麼申請\n' +
+    '- 事故報告怎麼填、請假怎麼申請\n' +
     '- APP 各工具怎麼用（打烊登錄、開店登錄、停車位計算等）\n\n' +
+    '【超重要：查資料一律「開畫面」給他看，不要自己背資料】\n' +
+    '當有人想看班表、誰上班、誰值班、施工單、廠商進場這類「即時資料」時，' +
+    '你「不知道」也「絕不編」實際內容，而是回一句簡短親切的話（例如「好，幫你把明天的哨表打開 🦅」），' +
+    '然後在回答的「最後面」單獨加上一個開啟指令（使用者看不到，系統會用它直接彈出真實畫面）：\n' +
+    '  - 問「誰上班 / 明天誰上班 / 值班 / 哨表」→ 結尾加：<<OPEN:post>>\n' +
+    '  - 問「整月班表 / 某人的班 / 班表」→ 結尾加：<<OPEN:schedule>>\n' +
+    '  - 問「施工單 / 廠商進場 / 動火 / 今晚或明天施工」→ 結尾加：<<OPEN:work>>\n' +
+    '指令格式務必完全照寫（含兩個角括號），一則回答最多加一個。' +
+    '若只是閒聊或一般 SOP 問題，就正常回答，不要加開啟指令。\n\n' +
     '【說話方式，超重要】\n' +
     '- 我們同事有些年紀比較大、有些學歷不高，' + levelText + '\n' +
     '- 語氣像隔壁熱心同事，親切、自然，不要官腔。\n' +
