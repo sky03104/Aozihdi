@@ -161,7 +161,7 @@ const NODES = [
   { id: 7,  title: '明日哨表',           topic: 'tools',   pos: [ 1.3,  0.55, 0.15], note: 'post.html，iframe src 串接' },
   { id: 8,  title: '班表查詢',           topic: 'tools',   pos: [ 1.25,-0.2,  0.45], note: 'ScheduleApp；SHIFT_TYPES 班別代號（早/晚班）' },
   { id: 9,  title: '緊急聯絡清單',       topic: 'tools',   pos: [ 0.55, 0.65, 0.0], note: 'tpl-emergency；normalizePhone 補回開頭 0' },
-  { id: 10, title: '資料上傳工具',       topic: 'tools',   pos: [ 1.1,  0.6, -0.2], note: 'tpl-upload，SheetJS 解析 Excel' },
+  { id: 10, title: '資料上傳工具',       topic: 'tools',   pos: [ 1.1,  0.6, -0.2], note: 'tpl-upload（base64 內嵌）；施工單/班表/哨表，SheetJS 解析 Excel；獨立版見 cec-up(id32)' },
   { id: 11, title: '簽到/車輛/工作',     topic: 'tools',   pos: [ 0.55,-0.1, -0.2], note: 'tool_signin / tool_car / tool_work' },
   { id: 12, title: '請假申請',           topic: 'tools',   pos: [ 0.95, 0.0,  0.55], note: 'liff_leave + 雲端請假清單' },
 
@@ -185,9 +185,12 @@ const NODES = [
   { id: 25, title: '監控自動化系統',     topic: 'infra',   pos: [ 0.4,  0.0, -1.2], note: 'tianying-monitor（失敗紀錄/技能迭代/回歸測試）' },
 
   // ── 待辦/規劃 ──
-  { id: 26, title: 'TODO-11 角色 Agents',topic: 'todo',    pos: [-0.3,  1.1,  0.2], note: '5 角色落地成 .claude/agents/*.md' },
+  { id: 26, title: 'TODO-11 角色 Agents',topic: 'todo',    pos: [-0.3,  1.1,  0.2], note: '✅ 完成（2026-06-28）：11 Agent + 工作流程檔落地成 .claude/agents/*.md' },
   { id: 27, title: 'TODO-12 哨表自動化', topic: 'todo',    pos: [ 0.3,  1.2,  0.0], note: '排班自動產表/輪值/衝突檢查' },
   { id: 28, title: 'TODO-13 對話助手',   topic: 'todo',    pos: [ 0.0,  1.0, -0.3], note: '✅ 已完成：天鷹 AI 小助手（小天鷹）J.A.R.V.I.S. 風格' },
+
+  // ── cec-up 獨立部署（2026-06-30）──
+  { id: 32, title: 'cec-up 獨立上傳工具', topic: 'infra',   pos: [ 0.35, 0.15,-1.3], note: 'sky03104/cec-up；GitHub Pages 獨立版上傳工具；早/晚班切換已與 tpl-upload 同步（2026-06-30）' },
 
   // ── AI 小助手（小天鷹，2026-06-29）──
   { id: 29, title: '天鷹 AI 小助手',     topic: 'tools',   pos: [ 0.7, -0.5,  0.05], note: 'tool_ai_chat.html；J.A.R.V.I.S. 風格 LOGO 光環＋語音輸入/輸出；個人化習慣記憶 hsh_ai_profile；admin 控制台調禁止規則' },
@@ -214,6 +217,8 @@ const EDGES = [
   [26, 1], [27, 8], [28, 0],
   // AI 小助手：主控台→工具→GAS→Gemini；工具讀本地個人化檔；TODO-13 對應
   [0, 29], [29, 30], [30, 31], [29, 21], [28, 29],
+  // cec-up：與 tpl-upload 同步、部署在 GitHub Pages
+  [10, 32], [23, 32],
 ];
 
 // === BRAIN_MAP_DATA_END ===
