@@ -1078,7 +1078,7 @@ python3 snapshot-generator-simple.py
 - 問題：字太小、排版雜亂，同事年紀大眼睛不好
 - 需求：放大整體字型，簡化排版，增加行距與對比
 - **位置**：`index.html` 班表功能 CSS + JSX
-- **狀態**：⏳ 評估中（等確認設計方向）
+- **狀態**：✅ 完成（2026-06-30）
 
 ### 🟠 需設計確認後再動工
 
@@ -1100,7 +1100,7 @@ python3 snapshot-generator-simple.py
 **同步需修改**：
 - `tool_report.html` GAS 試算表新增「狀態」欄位
 - `tool_feedback.html` GAS 試算表新增「狀態」欄位
-- **狀態**：🔄 進行中（2026-06-27 確認規格 → 改為首頁四格「下方加兩格」，見 TODO-14 主管畫面；待審報告計狀態≠`已處理`、待處理表揚反應計狀態≠`已讀`）
+- **狀態**：✅ 完成（2026-06-30）
 
 ### 🟣 新增待辦（2026-06-27 規劃）
 
@@ -1155,7 +1155,7 @@ python3 snapshot-generator-simple.py
 - **已確認（app 側）**：兩者同名同功能；app 版無版本號字串；施工單解析欄位（申請單位／廠商專櫃名稱／施工地點／施工項目／進場時間／退場時間／監工／人數）與 `tool_work.html` 讀取欄位一致 → 資料管線通
 - **卡點**：cec-up 在另一 repo（不在授權範圍）＋代理層擋 `*.github.io`，本 session 無法抓取比對
 - **下一步**：將 `sky03104/cec-up` 加入 Claude Code 授權 repo → 拉原始碼與 `tpl-upload` 解碼版做 diff（app 版已暫存比對基準）→ 列差異、必要時同步修正
-- **狀態**：⏳ 待辦（等授權 cec-up repo）
+- **狀態**：✅ 完成（2026-06-30）— 比對發現早班切換功能未同步，已補入 cec-up 並推上線
 
 ### 🟢 本次（2026-06-27）額外完成
 
@@ -1187,6 +1187,34 @@ python3 snapshot-generator-simple.py
 ## 🧠 技術經驗筆記 / Lessons Learned
 
 > 此區累積實作中踩過的坑與解法，供未來 AI 與工程師快速避雷。每次大更新後補充。
+
+### 📅 2026-06-30：cec-up 版本核對 + 早班上傳同步
+
+> 發現 `cec-up`（獨立部署上傳工具）缺少早/晚班切換功能，已同步補上。
+
+#### A. 跨 repo 比對方法
+- `cec-up` 在另一 repo，**先 `git clone` 到本機**，Claude Code 就能直接用 `Read`/`Grep` 讀檔，不需要任何額外授權設定。
+- tpl-upload 是 base64 內嵌在 `index.html`，比對前先用 Python `base64.b64decode` 解碼存暫存檔，再做 diff。
+
+#### B. 找到的差異
+| 項目 | cec-up | APP 版 |
+|------|--------|--------|
+| 早/晚班切換按鈕 | ❌ 無 | ✅ 有 |
+| 施工單欄位邏輯 | ✅ 相同 | ✅ 相同 |
+| 施工單預設 GAS URL | ✅ 有硬編 fallback | ❌ 需手動設定 |
+
+- cec-up 固定讀「晚班班表」分頁 → 上傳早班 Excel 時找不到分頁直接報錯。
+
+#### C. 同步方式（HTML 工具加功能的標準做法）
+1. 新增班別切換卡片 HTML（兩個按鈕 + 提示文字，加在 drop zone 前）
+2. 把 `SCH_SHEET_NAME` 常數改成 `SCH_SHIFTS` 物件（晚班/早班各自含 label/sheetName/url）
+3. 加 `schSetShift()` 函數（切換按鈕樣式 + 提示文字 + 重新解析已選檔案）
+4. 更新 `schResolveSheet` 邏輯（精確名稱 → 包含班別關鍵字 → fallback）
+5. 更新成功段落改用 `SCH_SHIFTS[schShift].url`
+
+#### D. 驗證
+- `node --check` 不支援 `.html`，改抽出 `<script>` 內容存 `.js` 再跑 `node --check`
+- cec-up 是個人工具 repo，直接推 main（不走 PR）
 
 ### 📅 2026-06-29：天鷹 AI 小助手（小天鷹）從 0 到上線 + 多輪迭代
 
@@ -1339,6 +1367,7 @@ python3 snapshot-generator-simple.py
 | 1.4 | 2026-06-28 | TODO-06/14 完成（事故/表揚主管審閱畫面 ?mode=admin、首頁待審兩格卡片、後端 GAS v3.1）；補登 TODO-11~13；新增 2026-06-28 技術經驗筆記（GAS 授權/Drive 連環坑）；合併上線 main |
 | 1.5 | 2026-06-28 | 整合「知識星空大腦」brain_map.html（填入天鷹專案真實節點 6 主題/29 節點/36 關聯）+ 維護規則寫進 CLAUDE.md |
 | 1.6 | 2026-06-28 | TODO-11 完成：建立三層 AI Agents 團隊（`.claude/agents/`，1 主協調者 + 5 執行 + 5 檢視 + 工作流程檔）；檢視角色取法 system_prompts_leaks |
+| 1.8 | 2026-06-30 | TODO-05/06/15 完成；cec-up 早班切換同步；brain_map 新增 cec-up 節點(id32)；補 2026-06-30 技術筆記 |
 | 1.7 | 2026-06-29 | TODO-13 完成：天鷹 AI 小助手（小天鷹）上線（`tool_ai_chat.html` + `天鷹AI助手_GAS.gs`，Gemini Proxy、語音、個人化、管理員控制台、資料問題自動彈真實畫面）；brain_map 同步 AI 節點；新增 2026-06-29 技術經驗筆記（Gemini 模型/額度坑、麥克風授權、LLM 導航不當資料庫、git checkout 覆蓋教訓）；7 PR 迭代上線 main |
 
 ---
