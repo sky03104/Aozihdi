@@ -1105,16 +1105,42 @@ python3 snapshot-generator-simple.py
 ### 🟣 新增待辦（2026-06-27 規劃）
 
 #### [TODO-11] 團隊角色 → 生成各 AI Agents
-- 把 CLAUDE.md 既有 5 角色（資深全端工程師／UI-UX 視覺設計師／QA 測試工程師／專案經理／創意總監）落地成 `.claude/agents/*.md` 子代理定義
-- **狀態**：🟡 規劃中（待後續規格）
+- 把 CLAUDE.md 既有 5 角色落地成 `.claude/agents/*.md` 子代理，並擴充成三層團隊：
+  - **Tier 1 主協調者**（化身咖哩、第一人稱、最終把關）
+  - **Tier 2 執行團隊** 5 個（資深全端／UIUX／QA／專案經理／創意總監）
+  - **Tier 3 檢視團隊** 5 個批判型（代碼／安全／規範守門員／簡潔重構／行動體驗審查官）
+- 流程：執行→檢視（依觸發矩陣）→退回優化→全 PASS→主協調者 GO/NO-GO→交咖哩
+- 編排手冊：`.claude/agents/_工作流程.md`（含檢視觸發矩陣 + 統一輸出契約 VERDICT + 觸發語）
+- 檢視角色取法 `system_prompts_leaks`（Cursor/Claude Code 的代碼品質模式）
+- **狀態**：✅ 完成（2026-06-28，共 11 Agent + 1 工作流程檔）
 
 #### [TODO-12] 哨表自動化工作流
 - 班表／哨表排班自動化：自動產表、輪值規則、衝突檢查
 - **狀態**：🟡 規劃中（待規格）
 
-#### [TODO-13] APP AI 對話助手工具
+#### [TODO-13] APP AI 對話助手工具 → 天鷹 AI 小助手（小天鷹）
 - APP 內可「用說的」對話的 AI 助手工具（查詢工具、回報、引導操作）
-- **狀態**：🟡 規劃中（待規格）
+- **狀態**：✅ 完成（2026-06-29，已上線 main）
+
+**實作結果（2026-06-29）**：
+
+| 項目 | 值 |
+|------|-----|
+| 工具檔 | `tool_ai_chat.html`（獨立檔，iframe 串接，J.A.R.V.I.S. 風格）|
+| 後端 | `天鷹AI助手_GAS.gs`（Gemini Proxy，藏 API Key）|
+| 部署說明 | `天鷹AI助手_GAS_部署說明.md` |
+| AI 角色名 | 小天鷹（對員工自稱）；工具名「天鷹 AI 小助手」|
+| AI 模型 | Gemini `2.0-flash` → `2.0-flash-lite`（容錯換手，免費）|
+| index 串接 | `AI_CHAT_URL` + TOOLS `toolId:"aichat"`（id 17）+ iframe(allow microphone) |
+| 權限 | 先限 `admin`（DEFAULT_PERMS 僅 admin），日後再開放 |
+| 視覺 | LOGO 置中 + 三層金色光環，4 狀態動畫（待機/聆聽/思考/回應）|
+| 輸入 | 文字 + 語音（Web Speech API）；語音回應 TTS，可調語速/聲音 |
+| 回應 | 底部 sheet 由下往上彈出，右上角關閉 |
+| 查資料 | 問班表/誰上班/施工單 → AI 回一句 + **自動彈出真實 APP 畫面**（明日哨表/班表/施工單）|
+| 管理員控制台 | ⚙️ 浮動鈕（admin）：禁止話題、強制表達層級（存 GAS Script Properties）|
+| 人性化 | 口語化大字體、查不到不掰、問題不清楚反問、個人化習慣記憶（localStorage `hsh_ai_profile_{empId}`）|
+
+**待使用者動作**：之後要開放給其他角色 → 改 `DEFAULT_PERMS` 加 id 17。
 
 #### [TODO-14] 事故報告／匿名表揚 → 主管專用畫面
 - 兩支工具各加 `?mode=admin` 主管模式（限 `executive`/`admin`）：手機閱讀清單＋查看詳情＋修改狀態（未讀/已讀/處理中/已處理）
@@ -1122,6 +1148,14 @@ python3 snapshot-generator-simple.py
 - 搭配 TODO-06 首頁待審卡片
 - **位置**：`tool_report.html`、`tool_feedback.html`、`index.html`(renderHome)、`事故與表揚_後端_GAS_v3.1.gs`
 - **狀態**：🔄 進行中（2026-06-27）
+
+#### [TODO-15] cec-up 上傳工具 ↔ app 內資料上傳工具 版本核對
+- **背景**：施工單資料來源是咖哩每天用獨立部署的上傳工具 `https://sky03104.github.io/cec-up/`（repo `sky03104/cec-up`）把 Excel 寫進試算表；`tool_work.html` 只是讀那張表顯示
+- **疑慮**：cec-up 與 app 內的「天鷹保全資料上傳工具」（`index.html` 內嵌 `tpl-upload`，base64）是同一支工具的兩份，需核對 cec-up 有無落後（少了某次修正）
+- **已確認（app 側）**：兩者同名同功能；app 版無版本號字串；施工單解析欄位（申請單位／廠商專櫃名稱／施工地點／施工項目／進場時間／退場時間／監工／人數）與 `tool_work.html` 讀取欄位一致 → 資料管線通
+- **卡點**：cec-up 在另一 repo（不在授權範圍）＋代理層擋 `*.github.io`，本 session 無法抓取比對
+- **下一步**：將 `sky03104/cec-up` 加入 Claude Code 授權 repo → 拉原始碼與 `tpl-upload` 解碼版做 diff（app 版已暫存比對基準）→ 列差異、必要時同步修正
+- **狀態**：⏳ 待辦（等授權 cec-up repo）
 
 ### 🟢 本次（2026-06-27）額外完成
 
@@ -1153,6 +1187,51 @@ python3 snapshot-generator-simple.py
 ## 🧠 技術經驗筆記 / Lessons Learned
 
 > 此區累積實作中踩過的坑與解法，供未來 AI 與工程師快速避雷。每次大更新後補充。
+
+### 📅 2026-06-29：天鷹 AI 小助手（小天鷹）從 0 到上線 + 多輪迭代
+
+> 本日成果：APP 內 J.A.R.V.I.S. 風格 AI 對話助手，全程 0 成本（Gemini 免費 + GAS + Pages）。共 7 個 PR 迭代上線（#3,5,6,7,9 合併；#4 因衝突關閉）。
+
+#### A. 架構：Gemini 經 GAS Proxy（藏金鑰）
+- 前端 `tool_ai_chat.html`（純 vanilla JS，非 React）→ GAS Proxy → Gemini API。**API Key 存 GAS Script Properties**，絕不進前端原始碼。
+- 前端打 GAS 用 `Content-Type: text/plain;charset=utf-8` 送 JSON 字串 → **避開 CORS preflight**（GAS 端照常 `JSON.parse(e.postData.contents)`）。讀清單可走 doGet，寫走 doPost。
+
+#### B. Gemini 模型陷阱（踩很久）
+- **新版 API 金鑰開頭是 `AQ.`**（不是舊的 `AIzaSy`），兩種都能用 `?key=` 呼叫，免改碼。
+- **`gemini-1.5-flash` 已停用**：新金鑰呼叫回 `models/gemini-1.5-flash is not found`。改用 `2.0-flash`。
+- **`gemini-2.5-flash` 會「思考」吃掉 maxOutputTokens** → 回答只吐前幾個字就被切斷。**解法：避用 2.5（或設 thinkingBudget），改 2.0-flash/2.0-flash-lite（不思考），且 maxOutputTokens 給足（我用 2048）**。
+- **免費額度 429**：2.5-flash 每分鐘上限小（限 20）。**解法：模型清單依序 fallback，遇 404 或 429 自動換下一個（各模型額度分開算）**；全爆才回友善中文，不丟英文。2.0-flash/2.0-flash-lite 免費每日額度較高，排前面。
+
+#### C. 行動端 UX 坑
+- **雙重返回鈕**：工具自帶 header 的返回 + APP 外框 iframe 的返回會疊兩個，工具那個在 iframe 內 postMessage 沒人收→按了沒反應。**解法：偵測 `window.self !== window.top`（在 iframe 內）就 `body.embedded` 隱藏工具自身 header**；管理員齒輪改浮動鈕。
+- **麥克風每次都要授權**：聲波視覺化我額外開了 `getUserMedia`，跟 SpeechRecognition 是**兩個獨立授權**→一直跳。**解法：聲波改純 CSS/canvas 假動畫，不抓真麥克風**，只留語音辨識一個授權，瀏覽器記住後不再問。
+- **語音可調**：`SpeechSynthesisUtterance` 的 `rate`（語速）、`voice`（`speechSynthesis.getVoices()` 過濾 `zh*`）；getVoices 可能延遲→監聽 `onvoiceschanged` 重填。設定存 localStorage。iPhone 內建中文語音少、Android 多。
+
+#### D. AI「查真實資料」的兩種做法 + 抉擇
+- **做法一（RAG-lite，先做後棄）**：GAS 依關鍵字去抓班表 GAS(`getSchedule`)、施工單試算表(gviz)，把資料塞進 prompt 讓 AI 回答。
+  - 缺點實測：① 塞大量資料→**請求變大易撞額度(429)**；② AI **解析施工單欄位易出錯**；③ 配 2.5-flash 思考→**回答被切斷**。
+- **做法二（最終採用，咖哩提議）**：**不讓 AI 讀資料，改自動彈出 APP 真實畫面**。AI 判斷是資料類問題 → 回一句話 + 在結尾夾隱藏指令 `<<OPEN:post|schedule|work>>` → 前端正則抽出指令（使用者看不到）→ `postMessage({type:'openTool'})` 給父層 index → `setActiveToolId` 切換到明日哨表/班表/施工單。
+  - **教訓：資料正確性要求高時，與其讓 LLM 解析易錯，不如直接導去既有可信 UI**。LLM 負責「意圖辨識 + 導航」，不負責「當資料庫」。
+- 父子頁通訊：iframe 工具 `window.parent.postMessage`，index 端 `window.addEventListener('message')` 統一處理（沿用既有 `tianying_scheduleUpdate` handler 擴充 `openTool`）。施工單原是 `externalUrl`(開新分頁)，為了「彈畫面」改加內嵌 `activeToolId==='aiwork'` iframe。
+
+#### E. 個人化 + 權限 + 管理員控制台
+- 個人化：每個工號存 `hsh_ai_profile_{empId}`（msgCount/vocabLevel），前 10 則用最簡單講法，之後依輸入長度/用詞升級；傳 vocabLevel 給 GAS 調 system prompt。
+- 權限：role 從 `hsh_session_user` 帶給 GAS，分一般/幹部/主管三層寫進 prompt；工具本身先用 `DEFAULT_PERMS` 限 admin（只加 id 17 到 admin，靠既有「新工具僅補 DEFAULT_PERMS 有列角色」的遷移邏輯自動生效）。
+- 管理員控制台：⚙️ 限 admin，可設「禁止話題」+「強制表達層級」，存 GAS Script Properties，所有人下次請求自動套用。
+
+#### F. 流程/Git 教訓（自己踩的）
+- **`git checkout <branch> -- .` 會覆蓋工作樹未提交的修改**——我犯兩次，把剛寫好的功能洗掉重做。**教訓：要從別分支取單檔用明確路徑且確認；要換基底用 PR 流程，別在有未提交變更時亂 checkout**。
+- **squash 合併後，原功能分支與 main 歷史分歧**，再開 PR 會「merge conflict」。**解法：從最新 `origin/main` 開新分支、只重貼改動檔，再 PR**（別想 merge 舊分支）。
+- GAS 改任何東西 → **務必「管理部署 → 編輯 → 版本：新版本」**，不可「新增部署」(換網址前端全斷)。前端走 Pages 自動更新。
+
+### 📅 2026-06-28（施工單）：報到/行動體驗/時間防呆/備註雜訊 + 班別定義
+
+> **班別定義（領域常識，務必記住）**：早班 08:00~20:00、晚班 20:00~隔天 08:00（跨夜）。凡施工單今晚/明早、班表、哨表等涉及早/晚班時段一律以此為準。
+
+- **報到換證「假成功」**：`tool_work.html` 用 `fetch no-cors` 寫回，回應 opaque 讀不到 → 原本一律當成功（即使沒寫進去也顯示綠勾）。修法：送出後**重讀試算表驗證 O 欄**真有寫入才顯示成功，否則誠實報「未生效」；gviz 讀取加 `&_=timestamp` 防快取避免讀到舊值。
+- **時間爛資料防呆**：來源 Excel 進場/退場欄偶有爛值（如把名字打成「宇晴#6731」、或「4000」）。`fmtT` 放寬跨夜 24:00~29:59 為合法，HH≥30/夾中文 → 標紅 ⚠「時間待確認」。**防呆原則：不在上傳擋下員工（他改不了來源），照收但自動標紅給看得懂的人（主管）。**
+- **備註(N)欄是「分頁名稱」不是真備註**：上傳工具把 Excel 分頁名（如「05早」）寫進 N，與實際施工日對不上、又當卡片備註顯示成雜訊。處置：上傳 GAS 不再寫 N（留空）、施工單卡片不顯示備註、`getOrders` 改用 月/日+進場時間 判今晚/明早（依上方班別定義），不再依賴分頁名。
+- **`removeDuplicateBM` 去重 bug（已修）**：舊版只讀寫 A~M(13欄)，去重後 A~M 上移、N/O 留原位 → **備註/報到狀態整欄錯位**，且底部留下「只有 N/O、前面全空」的孤兒列。修法：改讀寫 A~O(15欄)整列一起搬，並在去重時**丟棄空殼列**（申請單位+廠商皆空）清除既有災情。教訓：**清列務必涵蓋所有有資料的欄（含無標題的狀態欄 O）**。
 
 ### 📅 2026-06-28（手冊）：操作手冊 PDF + 工具實機自動截圖
 
@@ -1259,9 +1338,11 @@ python3 snapshot-generator-simple.py
 | 1.3 | 2026-06-27 | TODO-07~10 完成（設定限管理員、開店預覽切換、緊急手機0、班表早班班別）；新增「技術經驗筆記」；合併上線 main |
 | 1.4 | 2026-06-28 | TODO-06/14 完成（事故/表揚主管審閱畫面 ?mode=admin、首頁待審兩格卡片、後端 GAS v3.1）；補登 TODO-11~13；新增 2026-06-28 技術經驗筆記（GAS 授權/Drive 連環坑）；合併上線 main |
 | 1.5 | 2026-06-28 | 整合「知識星空大腦」brain_map.html（填入天鷹專案真實節點 6 主題/29 節點/36 關聯）+ 維護規則寫進 CLAUDE.md |
+| 1.6 | 2026-06-28 | TODO-11 完成：建立三層 AI Agents 團隊（`.claude/agents/`，1 主協調者 + 5 執行 + 5 檢視 + 工作流程檔）；檢視角色取法 system_prompts_leaks |
+| 1.7 | 2026-06-29 | TODO-13 完成：天鷹 AI 小助手（小天鷹）上線（`tool_ai_chat.html` + `天鷹AI助手_GAS.gs`，Gemini Proxy、語音、個人化、管理員控制台、資料問題自動彈真實畫面）；brain_map 同步 AI 節點；新增 2026-06-29 技術經驗筆記（Gemini 模型/額度坑、麥克風授權、LLM 導航不當資料庫、git checkout 覆蓋教訓）；7 PR 迭代上線 main |
 
 ---
 
-**Last Updated**: 2026-06-28  
+**Last Updated**: 2026-06-29  
 **For Questions**: Refer to project documentation or contact the project owner  
 **Branch**: `claude/claude-md-docs-4bz58p`
