@@ -84,6 +84,7 @@
 <body>
 
 <canvas id="canvas"></canvas>
+<canvas id="char-canvas" style="position:fixed;top:0;left:0;pointer-events:none;z-index:50;"></canvas>
 
 <div id="tooltip">
   <div id="tip-title">—</div>
@@ -460,6 +461,193 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
 });
 
+// ── 航海日誌：角色人物系統 ───────────────────────────────────
+const WORKFLOW_GAS_URL = 'https://script.google.com/macros/s/AKfycbzxjedGAbxj3G85zkybqoFoB-P7uQ9ycqdJZ7mzQ2Ax-vaxKgOTG60120PlGPbcNJpR/exec';
+
+// 角色配色（對應海賊王人物）
+const CHAR_COLORS = {
+  '路飛':  { body: '#D4A800', hat: '#cc0000', skin: '#FBBF24' },
+  '索隆':  { body: '#22C55E', hat: '#22C55E', skin: '#FCD34D' },
+  '娜美':  { body: '#FB923C', hat: '#FB923C', skin: '#FDE68A' },
+  '烏索普':{ body: '#92400E', hat: '#78350F', skin: '#FCD34D' },
+  '山治':  { body: '#1D4ED8', hat: '#1E3A8A', skin: '#FDE68A' },
+  '布魯克':{ body: '#F5F5F5', hat: '#111827', skin: '#E5E7EB' },
+  '羅賓':  { body: '#7C3AED', hat: '#5B21B6', skin: '#FDE68A' },
+  '喬巴':  { body: '#F87171', hat: '#DC2626', skin: '#FCA5A5' },
+  '弗蘭奇':{ body: '#06B6D4', hat: '#0E7490', skin: '#FCD34D' },
+  '甚平':  { body: '#0D9488', hat: '#0F766E', skin: '#FDE68A' },
+};
+
+// 節點 → 角色映射（地盤）
+const NODE_CHAR = {
+  0:  '路飛',   // 主控台（黃金梅利號）
+  1:  '烏索普', // 登入與角色系統
+  3:  '羅賓',   // 事故報告工具
+  4:  '喬巴',   // 匿名表揚/反應
+  7:  '甚平',   // 明日哨表
+  8:  '娜美',   // 班表查詢
+  10: '弗蘭奇', // 資料上傳工具
+  11: '索隆',   // 簽到/車輛/工作
+  12: '山治',   // 請假申請
+  29: '布魯克', // AI 小助手
+};
+
+// 活躍角色狀態（從航海日誌讀來）
+let activeChars = {};     // { nodeId: { role, count, lastSeen } }
+let lastFetch = 0;
+const FETCH_INTERVAL = 60000; // 每 60 秒重新拉一次
+
+async function fetchWorkflowData() {
+  try {
+    const res = await fetch(`${WORKFLOW_GAS_URL}?mode=recent&hours=24`);
+    const data = await res.json();
+    if (data.status === 'ok' && Array.isArray(data.data)) {
+      const counts = {};
+      data.data.forEach(r => {
+        const nid = parseInt(r.nodeId);
+        if (!counts[nid]) counts[nid] = { role: r.role, count: 0, lastSeen: r.timestamp };
+        counts[nid].count++;
+        if (r.timestamp > counts[nid].lastSeen) counts[nid].lastSeen = r.timestamp;
+      });
+      activeChars = counts;
+    }
+  } catch(e) { /* 靜默失敗，不影響地圖運作 */ }
+}
+
+// 初次載入拉資料
+fetchWorkflowData();
+
+// 2D Canvas overlay
+const charCanvas = document.getElementById('char-canvas');
+const charCtx    = charCanvas.getContext('2d');
+charCanvas.width  = window.innerWidth;
+charCanvas.height = window.innerHeight;
+window.addEventListener('resize', () => {
+  charCanvas.width  = window.innerWidth;
+  charCanvas.height = window.innerHeight;
+});
+
+// 把 3D 世界座標投影到螢幕座標，回傳 null 表示在相機背後
+function worldToScreen(vec3) {
+  const v = vec3.clone().project(camera);
+  if (v.z > 1) return null; // 在相機背後，不畫
+  return {
+    x: (v.x + 1) / 2 * window.innerWidth,
+    y: (1 - v.y) / 2 * window.innerHeight
+  };
+}
+
+// 畫一個簡單卡通人物
+function drawCharacter(ctx, x, y, role, count, alpha) {
+  const c = CHAR_COLORS[role] || { body: '#D4A800', hat: '#888', skin: '#FDE68A' };
+  const label = role.charAt(0); // 取第一個字作標籤（如「路」「索」）
+  const r = 10; // 頭部半徑
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, alpha);
+
+  // 金色光暈（活躍度越高越亮）
+  const glowSize = r * 2.2 + Math.min(count * 2, 12);
+  const glow = ctx.createRadialGradient(x, y - r * 2.5, 0, x, y - r * 2.5, glowSize);
+  glow.addColorStop(0, c.body + '88');
+  glow.addColorStop(1, c.body + '00');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(x, y - r * 2.5, glowSize, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 身體
+  ctx.strokeStyle = c.body;
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+
+  // 軀幹
+  ctx.beginPath();
+  ctx.moveTo(x, y - r * 1.2);
+  ctx.lineTo(x, y + r * 0.6);
+  ctx.stroke();
+
+  // 雙臂
+  ctx.beginPath();
+  ctx.moveTo(x - r * 0.9, y - r * 0.5);
+  ctx.lineTo(x + r * 0.9, y - r * 0.5);
+  ctx.stroke();
+
+  // 雙腳
+  ctx.beginPath();
+  ctx.moveTo(x, y + r * 0.6);
+  ctx.lineTo(x - r * 0.7, y + r * 1.5);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x, y + r * 0.6);
+  ctx.lineTo(x + r * 0.7, y + r * 1.5);
+  ctx.stroke();
+
+  // 頭部
+  ctx.fillStyle = c.skin;
+  ctx.strokeStyle = c.body;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x, y - r * 2.2, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // 帽子（小長方形）
+  ctx.fillStyle = c.hat;
+  ctx.fillRect(x - r * 0.8, y - r * 3.4, r * 1.6, r * 0.7);
+  ctx.fillRect(x - r, y - r * 3.1, r * 2, r * 0.25);
+
+  // 名字標籤（角色首字）
+  ctx.fillStyle = '#F5F5F5';
+  ctx.font = `bold ${r * 1.1}px 'Microsoft JhengHei', sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x, y - r * 2.2);
+
+  // 活動計數氣泡（若 count > 0）
+  if (count > 0) {
+    const bubbleX = x + r * 0.9;
+    const bubbleY = y - r * 3.3;
+    ctx.fillStyle = '#D4A800';
+    ctx.beginPath();
+    ctx.arc(bubbleX, bubbleY, r * 0.65, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#0A0C10';
+    ctx.font = `bold ${r * 0.7}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(count > 99 ? '99+' : String(count), bubbleX, bubbleY);
+  }
+
+  ctx.restore();
+}
+
+// 每格畫面更新人物
+function drawAllCharacters() {
+  charCtx.clearRect(0, 0, charCanvas.width, charCanvas.height);
+  const now = Date.now();
+
+  // 無論有無日誌，在各節點固定地盤顯示淡淡待機人物
+  Object.entries(NODE_CHAR).forEach(([nodeIdStr, role]) => {
+    const nodeId = parseInt(nodeIdStr);
+    const nodeIdx = NODES.findIndex(n => n.id === nodeId);
+    if (nodeIdx < 0) return;
+
+    const wp  = worldPos[nodeIdx];
+    const scr = worldToScreen(wp);
+
+    // 在相機背後或螢幕外則跳過
+    if (!scr) return;
+    if (scr.x < -50 || scr.x > window.innerWidth + 50) return;
+    if (scr.y < -50 || scr.y > window.innerHeight + 50) return;
+
+    const activity = activeChars[nodeId];
+    const count    = activity ? activity.count : 0;
+    const alpha    = activity ? 0.95 : 0.75; // 有活動全亮，待機也清楚可見
+
+    drawCharacter(charCtx, scr.x, scr.y - 28, role, count, alpha);
+  });
+}
+
 // ── 動畫主迴圈 ──────────────────────────────────────────────
 const clock = new THREE.Clock();
 function animate() {
@@ -501,6 +689,16 @@ function animate() {
   }
 
   renderer.render(scene, camera);
+
+  // 定時拉航海日誌（每 60 秒）
+  const nowMs = Date.now();
+  if (nowMs - lastFetch > FETCH_INTERVAL) {
+    lastFetch = nowMs;
+    fetchWorkflowData();
+  }
+
+  // 畫 2D 角色人物
+  drawAllCharacters();
 }
 animate();
 </script>
