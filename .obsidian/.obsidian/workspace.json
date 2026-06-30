@@ -176,6 +176,8 @@
       "bases:建立新的 base": false
     }
   },
-  "active": "8b361639e9def2b9",
-  "lastOpenFiles": []
+  "active": "27eeff4c5ea5f84a",
+  "lastOpenFiles": [
+    "plugins/obsidian-git/obsidian_askpass.sh"
+  ]
 }

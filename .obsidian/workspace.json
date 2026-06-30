@@ -198,8 +198,9 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "10d9229f4028aefe",
+  "active": "6b3fb7aa7957b8e9",
   "lastOpenFiles": [
+    "auto-backup.ps1",
     "施工單時間修正_完整修正版.gs",
     "施工單_報到換證_GAS.gs",
     "天鷹AI助手_GAS_部署說明.md",
@@ -224,7 +225,6 @@
     "操作手冊/src/img",
     "操作手冊/src/emp.html",
     "操作手冊/天鷹保全_LINE機器人操作手冊.pdf",
-    "操作手冊/天鷹保全_APP操作手冊_員工版.pdf",
     "操作手冊/README.md",
     "CLAUDE_CODE_BRAIN_MAP.md",
     "事故與表揚_GAS_部署說明.md",
