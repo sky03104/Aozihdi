@@ -1,20 +1,20 @@
 {
   "main": {
-    "id": "8593d2abb26a9e1f",
+    "id": "5fdca772a554678a",
     "type": "split",
     "children": [
       {
-        "id": "de63d6527ce9c413",
+        "id": "d1000312b50cce88",
         "type": "tabs",
         "children": [
           {
-            "id": "10d9229f4028aefe",
+            "id": "8b361639e9def2b9",
             "type": "leaf",
             "state": {
-              "type": "graph",
+              "type": "empty",
               "state": {},
-              "icon": "lucide-git-fork",
-              "title": "關聯圖檢視"
+              "icon": "lucide-file",
+              "title": "新分頁"
             }
           }
         ]
@@ -23,15 +23,15 @@
     "direction": "vertical"
   },
   "left": {
-    "id": "a221534778d46f61",
+    "id": "f04988af3edae157",
     "type": "split",
     "children": [
       {
-        "id": "b034f67078bc7a12",
+        "id": "1a6a21b2e96e42c9",
         "type": "tabs",
         "children": [
           {
-            "id": "4bd3f0665edb2dd3",
+            "id": "27eeff4c5ea5f84a",
             "type": "leaf",
             "state": {
               "type": "file-explorer",
@@ -44,7 +44,7 @@
             }
           },
           {
-            "id": "120cba8ff2c9861e",
+            "id": "569bbe9378f35cc7",
             "type": "leaf",
             "state": {
               "type": "search",
@@ -61,7 +61,7 @@
             }
           },
           {
-            "id": "bf5f771059be75aa",
+            "id": "0c881d5c3b893b62",
             "type": "leaf",
             "state": {
               "type": "bookmarks",
@@ -74,18 +74,18 @@
       }
     ],
     "direction": "horizontal",
-    "width": 200
+    "width": 300
   },
   "right": {
-    "id": "c61ce621823b56e7",
+    "id": "644bf94c6fd2b919",
     "type": "split",
     "children": [
       {
-        "id": "9e2a8b67ce3fb323",
+        "id": "6805c4214e5691eb",
         "type": "tabs",
         "children": [
           {
-            "id": "162fc1e22d484d69",
+            "id": "02797e9a94df6e5a",
             "type": "leaf",
             "state": {
               "type": "backlink",
@@ -103,7 +103,7 @@
             }
           },
           {
-            "id": "363f13c45f55cbc3",
+            "id": "0aa80620ecf50c74",
             "type": "leaf",
             "state": {
               "type": "outgoing-link",
@@ -116,7 +116,7 @@
             }
           },
           {
-            "id": "c1c24e6ef98d8936",
+            "id": "7aa3a6b29e353d0f",
             "type": "leaf",
             "state": {
               "type": "tag",
@@ -131,7 +131,7 @@
             }
           },
           {
-            "id": "db7a0820052efdb8",
+            "id": "624f3078d175b17d",
             "type": "leaf",
             "state": {
               "type": "all-properties",
@@ -145,7 +145,7 @@
             }
           },
           {
-            "id": "425a2bc42fc74f0f",
+            "id": "474ee2c5821ec005",
             "type": "leaf",
             "state": {
               "type": "outline",
@@ -157,33 +157,13 @@
               "icon": "lucide-list",
               "title": "大綱"
             }
-          },
-          {
-            "id": "6b3fb7aa7957b8e9",
-            "type": "leaf",
-            "state": {
-              "type": "calendar",
-              "state": {},
-              "icon": "calendar-with-checkmark",
-              "title": "Calendar"
-            }
-          },
-          {
-            "id": "580ff41f511acbe4",
-            "type": "leaf",
-            "state": {
-              "type": "git-view",
-              "state": {},
-              "icon": "lucide-ghost",
-              "title": "git-view"
-            }
           }
-        ],
-        "currentTab": 5
+        ]
       }
     ],
     "direction": "horizontal",
-    "width": 200
+    "width": 300,
+    "collapsed": true
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -193,58 +173,9 @@
       "daily-notes:開啟今天的每日筆記": false,
       "templates:插入模板": false,
       "command-palette:開啟命令面板": false,
-      "bases:建立新的 base": false,
-      "templater-obsidian:Templater": false,
-      "obsidian-git:Open Git source control": false
+      "bases:建立新的 base": false
     }
   },
-  "active": "10d9229f4028aefe",
-  "lastOpenFiles": [
-    "施工單時間修正_完整修正版.gs",
-    "施工單_報到換證_GAS.gs",
-    "天鷹AI助手_GAS_部署說明.md",
-    "天鷹AI助手_GAS.gs",
-    "tool_ai_chat.html",
-    "TASK_CARD.md",
-    "AGENTS.md",
-    "index.md",
-    "操作手冊/src/img/report_form.png",
-    "操作手冊/src/img/report_admin_list.png",
-    "操作手冊/src/img/report_admin_detail.png",
-    "操作手冊/src/img/login.png",
-    "操作手冊/src/img/line_form.png",
-    "操作手冊/src/img/home_sup.png",
-    "操作手冊/src/img/home_emp.png",
-    "操作手冊/src/img/feedback_form.png",
-    "操作手冊/src/img/feedback_admin_list.png",
-    "操作手冊/src/img/feedback_admin_detail.png",
-    "操作手冊/src/sup.html",
-    "操作手冊/src/style.css",
-    "操作手冊/src/line.html",
-    "操作手冊/src/img",
-    "操作手冊/src/emp.html",
-    "操作手冊/天鷹保全_LINE機器人操作手冊.pdf",
-    "操作手冊/天鷹保全_APP操作手冊_員工版.pdf",
-    "操作手冊/README.md",
-    "CLAUDE_CODE_BRAIN_MAP.md",
-    "事故與表揚_GAS_部署說明.md",
-    "tool_opening_GAS_部署說明.md",
-    "CLAUDE.md",
-    "01-專案狀態/project-state.md",
-    "Logs/2026-06-26.md",
-    "log.md",
-    "_CLAUDE.md",
-    "00-天鷹-MOC/系統總覽.md",
-    "10-學習筆記/_學習筆記模板.md",
-    "README.md",
-    "99-Daily/2026-06-23.md",
-    "tianying-monitor/QUICK_REF.md",
-    "tianying-monitor/project-snapshots/2026-06-22_v1.md",
-    "天鷹保全/監控系統狀態.md",
-    "tpl-car.md",
-    "02-工具開發/tpl-car.md",
-    "tpl-car (1).md",
-    "project-state.md",
-    "tianying-monitor/DEPLOYMENT_GUIDE_LEVEL3.md"
-  ]
+  "active": "8b361639e9def2b9",
+  "lastOpenFiles": []
 }

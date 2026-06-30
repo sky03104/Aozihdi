@@ -1,14 +1,49 @@
 {
   "main": {
-    "id": "8593d2abb26a9e1f",
+    "id": "af3cb65efa019742",
     "type": "split",
     "children": [
       {
-        "id": "de63d6527ce9c413",
+        "id": "2e2266e8a8714d25",
         "type": "tabs",
         "children": [
           {
-            "id": "10d9229f4028aefe",
+            "id": "f28abcf547a937de",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "歡迎.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "歡迎"
+            }
+          },
+          {
+            "id": "2b92a79f61603836",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "測試.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "測試"
+            }
+          }
+        ],
+        "currentTab": 1
+      },
+      {
+        "id": "32cb5256d0f2cefe",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "5688db7fbe51db7e",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -23,15 +58,15 @@
     "direction": "vertical"
   },
   "left": {
-    "id": "a221534778d46f61",
+    "id": "f7a25fa95eba5378",
     "type": "split",
     "children": [
       {
-        "id": "b034f67078bc7a12",
+        "id": "88af3898f3e2fa6a",
         "type": "tabs",
         "children": [
           {
-            "id": "4bd3f0665edb2dd3",
+            "id": "a7cb8b532b9ceafe",
             "type": "leaf",
             "state": {
               "type": "file-explorer",
@@ -44,7 +79,7 @@
             }
           },
           {
-            "id": "120cba8ff2c9861e",
+            "id": "ab80df976fa790b9",
             "type": "leaf",
             "state": {
               "type": "search",
@@ -61,7 +96,7 @@
             }
           },
           {
-            "id": "bf5f771059be75aa",
+            "id": "6481b1bbc875f8a2",
             "type": "leaf",
             "state": {
               "type": "bookmarks",
@@ -74,22 +109,23 @@
       }
     ],
     "direction": "horizontal",
-    "width": 200
+    "width": 300
   },
   "right": {
-    "id": "c61ce621823b56e7",
+    "id": "845f411e332bbc98",
     "type": "split",
     "children": [
       {
-        "id": "9e2a8b67ce3fb323",
+        "id": "817607b11668f479",
         "type": "tabs",
         "children": [
           {
-            "id": "162fc1e22d484d69",
+            "id": "8331c304945067a5",
             "type": "leaf",
             "state": {
               "type": "backlink",
               "state": {
+                "file": "歡迎.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -99,24 +135,25 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "反向連結"
+              "title": "歡迎 的反向連結"
             }
           },
           {
-            "id": "363f13c45f55cbc3",
+            "id": "232d1a8ac279d89e",
             "type": "leaf",
             "state": {
               "type": "outgoing-link",
               "state": {
+                "file": "歡迎.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "對外連結"
+              "title": "歡迎 的對外連結"
             }
           },
           {
-            "id": "c1c24e6ef98d8936",
+            "id": "f4f6655199e88d82",
             "type": "leaf",
             "state": {
               "type": "tag",
@@ -131,7 +168,7 @@
             }
           },
           {
-            "id": "db7a0820052efdb8",
+            "id": "d5d6a9ed4f93bd45",
             "type": "leaf",
             "state": {
               "type": "all-properties",
@@ -145,45 +182,26 @@
             }
           },
           {
-            "id": "425a2bc42fc74f0f",
+            "id": "faed111c17b70fd3",
             "type": "leaf",
             "state": {
               "type": "outline",
               "state": {
+                "file": "歡迎.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "大綱"
-            }
-          },
-          {
-            "id": "6b3fb7aa7957b8e9",
-            "type": "leaf",
-            "state": {
-              "type": "calendar",
-              "state": {},
-              "icon": "calendar-with-checkmark",
-              "title": "Calendar"
-            }
-          },
-          {
-            "id": "580ff41f511acbe4",
-            "type": "leaf",
-            "state": {
-              "type": "git-view",
-              "state": {},
-              "icon": "lucide-ghost",
-              "title": "git-view"
+              "title": "歡迎 的大綱"
             }
           }
-        ],
-        "currentTab": 5
+        ]
       }
     ],
     "direction": "horizontal",
-    "width": 200
+    "width": 300,
+    "collapsed": true
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -193,58 +211,12 @@
       "daily-notes:開啟今天的每日筆記": false,
       "templates:插入模板": false,
       "command-palette:開啟命令面板": false,
-      "bases:建立新的 base": false,
-      "templater-obsidian:Templater": false,
-      "obsidian-git:Open Git source control": false
+      "bases:建立新的 base": false
     }
   },
-  "active": "10d9229f4028aefe",
+  "active": "a7cb8b532b9ceafe",
   "lastOpenFiles": [
-    "施工單時間修正_完整修正版.gs",
-    "施工單_報到換證_GAS.gs",
-    "天鷹AI助手_GAS_部署說明.md",
-    "天鷹AI助手_GAS.gs",
-    "tool_ai_chat.html",
-    "TASK_CARD.md",
-    "AGENTS.md",
-    "index.md",
-    "操作手冊/src/img/report_form.png",
-    "操作手冊/src/img/report_admin_list.png",
-    "操作手冊/src/img/report_admin_detail.png",
-    "操作手冊/src/img/login.png",
-    "操作手冊/src/img/line_form.png",
-    "操作手冊/src/img/home_sup.png",
-    "操作手冊/src/img/home_emp.png",
-    "操作手冊/src/img/feedback_form.png",
-    "操作手冊/src/img/feedback_admin_list.png",
-    "操作手冊/src/img/feedback_admin_detail.png",
-    "操作手冊/src/sup.html",
-    "操作手冊/src/style.css",
-    "操作手冊/src/line.html",
-    "操作手冊/src/img",
-    "操作手冊/src/emp.html",
-    "操作手冊/天鷹保全_LINE機器人操作手冊.pdf",
-    "操作手冊/天鷹保全_APP操作手冊_員工版.pdf",
-    "操作手冊/README.md",
-    "CLAUDE_CODE_BRAIN_MAP.md",
-    "事故與表揚_GAS_部署說明.md",
-    "tool_opening_GAS_部署說明.md",
-    "CLAUDE.md",
-    "01-專案狀態/project-state.md",
-    "Logs/2026-06-26.md",
-    "log.md",
-    "_CLAUDE.md",
-    "00-天鷹-MOC/系統總覽.md",
-    "10-學習筆記/_學習筆記模板.md",
-    "README.md",
-    "99-Daily/2026-06-23.md",
-    "tianying-monitor/QUICK_REF.md",
-    "tianying-monitor/project-snapshots/2026-06-22_v1.md",
-    "天鷹保全/監控系統狀態.md",
-    "tpl-car.md",
-    "02-工具開發/tpl-car.md",
-    "tpl-car (1).md",
-    "project-state.md",
-    "tianying-monitor/DEPLOYMENT_GUIDE_LEVEL3.md"
+    "歡迎.md",
+    "測試.md"
   ]
 }
