@@ -527,9 +527,10 @@ window.addEventListener('resize', () => {
   charCanvas.height = window.innerHeight;
 });
 
-// 把 3D 世界座標投影到螢幕座標
+// 把 3D 世界座標投影到螢幕座標，回傳 null 表示在相機背後
 function worldToScreen(vec3) {
   const v = vec3.clone().project(camera);
+  if (v.z > 1) return null; // 在相機背後，不畫
   return {
     x: (v.x + 1) / 2 * window.innerWidth,
     y: (1 - v.y) / 2 * window.innerHeight
@@ -634,13 +635,14 @@ function drawAllCharacters() {
     const wp  = worldPos[nodeIdx];
     const scr = worldToScreen(wp);
 
-    // 只在螢幕範圍內繪製
+    // 在相機背後或螢幕外則跳過
+    if (!scr) return;
     if (scr.x < -50 || scr.x > window.innerWidth + 50) return;
     if (scr.y < -50 || scr.y > window.innerHeight + 50) return;
 
     const activity = activeChars[nodeId];
     const count    = activity ? activity.count : 0;
-    const alpha    = activity ? 0.95 : 0.25; // 有活動全亮，待機半透明
+    const alpha    = activity ? 0.95 : 0.75; // 有活動全亮，待機也清楚可見
 
     drawCharacter(charCtx, scr.x, scr.y - 28, role, count, alpha);
   });
