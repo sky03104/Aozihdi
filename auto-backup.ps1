@@ -1,7 +1,7 @@
 ﻿# 天鷹保全 — 全自動雙向同步備份
 
 $ProjectRoot = "C:\Users\USER\tianying-security"
-$BackupPath = "D:\Backup\tianying-security"
+$BackupPath = "E:\Github備份"
 
 Set-Location $ProjectRoot
 
