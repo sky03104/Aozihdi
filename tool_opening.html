@@ -552,6 +552,12 @@ const BUILT_IN_GAS_URL   = 'https://script.google.com/macros/s/AKfycbycVyNyYJ8IT
 const DB_GAS_URL         = 'https://script.google.com/macros/s/AKfycbwZ5f7h_Lv_MOCxPrqPpBPKA917-JKmEz5DDekYixLDsGf1QAKCTOuVxwo18OYKX7a4ng/exec'; // 打烊GAS URL（共用廠商/監工/檢查者資料庫 _SharedDB，只做 getDB/setDB）
 const BUILT_IN_SHEET     = '進出資料表'; // ← 要寫入的分頁名稱（開店試算表）
 const CON_GAS_URL = 'https://script.google.com/macros/s/AKfycbz7orMAA608y2GiDlirI0FlJW4lccqZvnzN4si7XFIxh7_euyx1zTA0uSmb5Rd4jnCkwg/exec'; // 施工單查詢 GAS
+const WORKFLOW_GAS_URL = 'https://script.google.com/macros/s/AKfycbzxjedGAbxj3G85zkybqoFoB-P7uQ9ycqdJZ7mzQ2Ax-vaxKgOTG60120PlGPbcNJpR/exec';
+function logWorkflow(tool, actionType, status) {
+  const u = JSON.parse(localStorage.getItem('hsh_session_user') || '{}');
+  if (!u.empId) return;
+  try { fetch(WORKFLOW_GAS_URL, { method:'POST', body: JSON.stringify({ action:'logTask', tool, empId:u.empId, userName:u.name||'未知', actionType, status:status||'已完成' }) }); } catch(e) {}
+}
 
 // 優先用寫死的 URL；若沒有才用 localStorage（給個別員工自訂用）
 let gasUrl    = BUILT_IN_GAS_URL    || localStorage.getItem('hsh_gasUrl')    || '';
@@ -1038,6 +1044,7 @@ async function directSubmitToSheet(){
     const res=await fetch(gasUrl,{method:'POST',body});
     const d=await res.json();
     if(d.status==='ok'){
+      logWorkflow('opening', 'submit', '已完成');
       shops.forEach(s=>{if(s.isNew)delete s.isNew;});save();
       showToast('✅ 已直接送出 '+d.added+' 筆！','ok');
       resetForm();

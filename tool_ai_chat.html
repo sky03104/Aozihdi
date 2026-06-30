@@ -399,6 +399,12 @@
   /* ════════ 設定區 ════════ */
   // 部署 GAS 後，把下面網址換成你的 /exec 網址
   var GAS_URL = 'https://script.google.com/macros/s/AKfycbzsy2OlhP5e-nrpTiLVuG91ZuWxToAC23TRxjOjviAyAjMJ3pz8NZzNHP_7OP6Ns0dXQA/exec';
+  var WORKFLOW_GAS_URL = 'https://script.google.com/macros/s/AKfycbzxjedGAbxj3G85zkybqoFoB-P7uQ9ycqdJZ7mzQ2Ax-vaxKgOTG60120PlGPbcNJpR/exec';
+  function logWorkflow(tool, actionType, status) {
+    var u = sessionUser;
+    if (!u.empId) return;
+    try { fetch(WORKFLOW_GAS_URL, { method:'POST', body: JSON.stringify({ action:'logTask', tool, empId:u.empId, userName:u.name||'未知', actionType, status:status||'已完成' }) }); } catch(e) {}
+  }
 
   /* ════════ 狀態機 ════════ */
   var STATE = { IDLE:'idle', LISTENING:'listening', THINKING:'thinking', RESPONDING:'responding' };
@@ -492,6 +498,7 @@
       empId:empId, role:role, vocabLevel:profile.vocabLevel
     };
 
+    logWorkflow('aichat', 'submit');
     // 用 text/plain 避免 CORS preflight；GAS 端仍 JSON.parse
     fetch(GAS_URL, {
       method:'POST',

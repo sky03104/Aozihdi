@@ -100,6 +100,14 @@
         }
         const STATUS_COLORS = { '未讀': '#F87171', '待處理': '#FB923C', '已知悉再觀察': '#818CF8', '持續追蹤': '#FBBF24', '已讀': '#D4A800', '處理中': '#FB923C', '已處理': '#4ADE80' };
         const ADMIN_GAS_URL = "https://script.google.com/macros/s/AKfycbwHXlwTMmJyA79Cuzdh2IPRnBLUWm2YPEqXn5XJj4GVEUlCnNIv8hgRTJ7Xr198hZxG/exec";
+        const WORKFLOW_GAS_URL = "https://script.google.com/macros/s/AKfycbzxjedGAbxj3G85zkybqoFoB-P7uQ9ycqdJZ7mzQ2Ax-vaxKgOTG60120PlGPbcNJpR/exec";
+        async function logWorkflow(tool, actionType, status) {
+            const u = JSON.parse(localStorage.getItem('hsh_session_user') || '{}');
+            if (!u.empId) return;
+            try {
+                await fetch(WORKFLOW_GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'logTask', tool, empId: u.empId, userName: u.name || '未知', actionType, status: status || '已完成' }) });
+            } catch(e) {}
+        }
 
         // 狀態徽章
         function StatusBadge(status){
@@ -182,6 +190,7 @@
                     const result = await res.json();
 
                     if (result.status === 'ok') {
+                        logWorkflow('report', 'submit', '已完成');
                         showToast("✅ 報告與照片已成功存入雲端！", "success");
                         setTimeout(() => window.location.href = `index.html?empId=${empId}`, 2000);
                     } else {

@@ -575,6 +575,12 @@
         const STATUS_COLORS = { '未讀': '#F87171', '已讀': '#D4A800', '處理中': '#FB923C', '已處理': '#4ADE80' };
         const ALL_STATUS = ['未讀', '已讀', '處理中', '已處理'];
         const ADMIN_GAS_URL = 'https://script.google.com/macros/s/AKfycbwHXlwTMmJyA79Cuzdh2IPRnBLUWm2YPEqXn5XJj4GVEUlCnNIv8hgRTJ7Xr198hZxG/exec';
+        const WORKFLOW_GAS_URL = 'https://script.google.com/macros/s/AKfycbzxjedGAbxj3G85zkybqoFoB-P7uQ9ycqdJZ7mzQ2Ax-vaxKgOTG60120PlGPbcNJpR/exec';
+        async function logWorkflow(tool, actionType, status) {
+            const u = JSON.parse(localStorage.getItem('hsh_session_user') || '{}');
+            if (!u.empId) return;
+            try { await fetch(WORKFLOW_GAS_URL, { method:'POST', body: JSON.stringify({ action:'logTask', tool, empId:u.empId, userName:u.name||'未知', actionType, status:status||'已完成' }) }); } catch(e) {}
+        }
 
         // 輕量 Toast（此檔原本以 errorMessage 呈現，主管模式自帶提示）
         function fbToast(msg, type){
@@ -785,6 +791,7 @@
                     const result = await response.json();
 
                     if (result.status === 'ok') {
+                        logWorkflow('feedback', 'submit', '已完成');
                         setSubmitSuccess(true);
                         setFormData({
                             targetName: '',
