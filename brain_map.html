@@ -464,19 +464,33 @@ window.addEventListener('resize', () => {
 // ── 航海日誌：角色人物系統 ───────────────────────────────────
 const WORKFLOW_GAS_URL = 'https://script.google.com/macros/s/AKfycbzxjedGAbxj3G85zkybqoFoB-P7uQ9ycqdJZ7mzQ2Ax-vaxKgOTG60120PlGPbcNJpR/exec';
 
-// 角色配色（對應海賊王人物）
+// 角色光暈顏色
 const CHAR_COLORS = {
-  '路飛':  { body: '#D4A800', hat: '#cc0000', skin: '#FBBF24' },
-  '索隆':  { body: '#22C55E', hat: '#22C55E', skin: '#FCD34D' },
-  '娜美':  { body: '#FB923C', hat: '#FB923C', skin: '#FDE68A' },
-  '烏索普':{ body: '#92400E', hat: '#78350F', skin: '#FCD34D' },
-  '山治':  { body: '#1D4ED8', hat: '#1E3A8A', skin: '#FDE68A' },
-  '布魯克':{ body: '#F5F5F5', hat: '#111827', skin: '#E5E7EB' },
-  '羅賓':  { body: '#7C3AED', hat: '#5B21B6', skin: '#FDE68A' },
-  '喬巴':  { body: '#F87171', hat: '#DC2626', skin: '#FCA5A5' },
-  '弗蘭奇':{ body: '#06B6D4', hat: '#0E7490', skin: '#FCD34D' },
-  '甚平':  { body: '#0D9488', hat: '#0F766E', skin: '#FDE68A' },
+  '路飛':  '#D4A800',
+  '索隆':  '#22C55E',
+  '娜美':  '#FB923C',
+  '烏索普':'#92400E',
+  '山治':  '#1D4ED8',
+  '布魯克':'#F5F5F5',
+  '羅賓':  '#7C3AED',
+  '喬巴':  '#F87171',
+  '弗蘭奇':'#06B6D4',
+  '甚平':  '#0D9488',
 };
+
+// 角色圖片（預載）
+const CHAR_IMG_MAP = {
+  '路飛': 'luffy.png', '索隆': 'zoro.png',   '娜美': 'nami.png',
+  '烏索普':'usopp.png','山治': 'sanji.png',   '喬巴': 'chopper.png',
+  '羅賓': 'robin.png', '弗蘭奇':'franky.png', '布魯克':'brook.png',
+  '甚平': 'jinbe.png',
+};
+const CHAR_IMAGES = {};
+Object.entries(CHAR_IMG_MAP).forEach(([role, file]) => {
+  const img = new Image();
+  img.src = file;
+  CHAR_IMAGES[role] = img;
+});
 
 // 節點 → 角色映射（地盤）
 const NODE_CHAR = {
@@ -537,240 +551,52 @@ function worldToScreen(vec3) {
   };
 }
 
-// 各角色招牌特徵（頭部 hx/hy 為圓心，r 為半徑）
-function drawCharFeature(ctx, hx, hy, r, role, c) {
-  ctx.lineCap = 'round';
-  switch (role) {
-    case '路飛': {
-      // 寬邊草帽
-      ctx.fillStyle = '#D4A800'; ctx.strokeStyle = '#92400E'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.ellipse(hx, hy - r * 0.8, r * 1.9, r * 0.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#D4A800';
-      ctx.beginPath(); ctx.arc(hx, hy - r * 1.15, r * 0.72, Math.PI, Math.PI * 2); ctx.closePath(); ctx.fill(); ctx.stroke();
-      ctx.strokeStyle = '#DC2626'; ctx.lineWidth = 2.2;
-      ctx.beginPath(); ctx.moveTo(hx - r * 1.9, hy - r * 0.8); ctx.lineTo(hx + r * 1.9, hy - r * 0.8); ctx.stroke();
-      // 眼下疤（X）
-      ctx.strokeStyle = '#DC2626'; ctx.lineWidth = 1.2;
-      const sx = hx - r * 0.35, sy = hy + r * 0.18;
-      ctx.beginPath(); ctx.moveTo(sx - r*0.12, sy - r*0.12); ctx.lineTo(sx + r*0.12, sy + r*0.12); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(sx + r*0.12, sy - r*0.12); ctx.lineTo(sx - r*0.12, sy + r*0.12); ctx.stroke();
-      break;
-    }
-    case '索隆': {
-      // 綠色刺蝟頭
-      ctx.fillStyle = '#16A34A';
-      for (let i = -1; i <= 1; i++) {
-        ctx.beginPath(); ctx.ellipse(hx + i * r * 0.38, hy - r * 1.05, r * 0.22, r * 0.5, i * 0.25, 0, Math.PI * 2); ctx.fill();
-      }
-      // 三把刀（掛腰側）
-      for (let i = 0; i < 3; i++) {
-        const sx = hx + r * 0.72 + i * r * 0.32;
-        ctx.strokeStyle = '#CBD5E1'; ctx.lineWidth = 2.5;
-        ctx.beginPath(); ctx.moveTo(sx, hy + r * 0.3); ctx.lineTo(sx, hy + r * 3.2); ctx.stroke();
-        ctx.strokeStyle = '#92400E'; ctx.lineWidth = 3.5;
-        ctx.beginPath(); ctx.moveTo(sx, hy + r * 0.3); ctx.lineTo(sx, hy + r * 0.9); ctx.stroke();
-      }
-      break;
-    }
-    case '娜美': {
-      // 橙色長髮
-      ctx.fillStyle = '#FB923C';
-      ctx.beginPath(); ctx.ellipse(hx - r * 0.7, hy + r * 0.5, r * 0.35, r * 0.95, -0.25, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(hx + r * 0.7, hy + r * 0.5, r * 0.35, r * 0.95, 0.25, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(hx, hy - r * 0.9, r * 0.78, r * 0.42, 0, 0, Math.PI * 2); ctx.fill();
-      // Log Pose（左手腕小儀器）
-      ctx.fillStyle = '#F5F5F5'; ctx.strokeStyle = '#94A3B8'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(hx - r * 1.4, hy + r * 1.1, r * 0.24, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#3B82F6'; ctx.beginPath(); ctx.arc(hx - r * 1.4, hy + r * 1.1, r * 0.1, 0, Math.PI * 2); ctx.fill();
-      break;
-    }
-    case '烏索普': {
-      // 蓬鬆捲髮
-      ctx.fillStyle = '#78350F';
-      ctx.beginPath(); ctx.arc(hx, hy - r * 0.88, r * 0.88, Math.PI, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(hx - r * 0.55, hy - r * 0.55, r * 0.42, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(hx + r * 0.55, hy - r * 0.55, r * 0.42, 0, Math.PI * 2); ctx.fill();
-      // 超長鼻子
-      ctx.fillStyle = c.skin; ctx.strokeStyle = '#92400E88'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.ellipse(hx + r * 0.68, hy + r * 0.05, r * 0.65, r * 0.2, 0.35, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      break;
-    }
-    case '山治': {
-      // 金髮（斜蓋右眼）
-      ctx.fillStyle = '#FDE047';
-      ctx.beginPath(); ctx.ellipse(hx + r * 0.1, hy - r * 0.98, r * 0.92, r * 0.42, 0.18, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(hx + r * 0.4, hy - r * 0.4, r * 0.42, r * 0.55, 0.3, 0, Math.PI * 2); ctx.fill();
-      // 招牌捲眉（右側）
-      ctx.strokeStyle = '#FDE047'; ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.arc(hx + r * 0.42, hy - r * 0.22, r * 0.24, Math.PI, Math.PI * 1.8, false); ctx.stroke();
-      // 蝴蝶結
-      ctx.fillStyle = '#1D4ED8';
-      ctx.beginPath(); ctx.moveTo(hx - r * 0.18, hy + r * 0.65);
-      ctx.lineTo(hx - r * 0.52, hy + r * 0.42); ctx.lineTo(hx - r * 0.52, hy + r * 0.88); ctx.closePath(); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(hx + r * 0.18, hy + r * 0.65);
-      ctx.lineTo(hx + r * 0.52, hy + r * 0.42); ctx.lineTo(hx + r * 0.52, hy + r * 0.88); ctx.closePath(); ctx.fill();
-      break;
-    }
-    case '喬巴': {
-      // 鹿角
-      ctx.strokeStyle = '#92400E'; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(hx - r * 0.5, hy - r); ctx.lineTo(hx - r * 0.72, hy - r * 1.85); ctx.lineTo(hx - r * 1.15, hy - r * 1.55); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(hx + r * 0.5, hy - r); ctx.lineTo(hx + r * 0.72, hy - r * 1.85); ctx.lineTo(hx + r * 1.15, hy - r * 1.55); ctx.stroke();
-      // 粉紅X帽
-      ctx.fillStyle = '#F87171'; ctx.strokeStyle = '#DC262666'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(hx, hy - r * 0.82, r * 0.62, Math.PI, Math.PI * 2); ctx.closePath(); ctx.fill(); ctx.stroke();
-      ctx.strokeStyle = '#F5F5F5'; ctx.lineWidth = 2.2;
-      ctx.beginPath(); ctx.moveTo(hx - r*0.26, hy - r*1.18); ctx.lineTo(hx + r*0.26, hy - r*0.66); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(hx + r*0.26, hy - r*1.18); ctx.lineTo(hx - r*0.26, hy - r*0.66); ctx.stroke();
-      // 藍鼻
-      ctx.fillStyle = '#3B82F6';
-      ctx.beginPath(); ctx.ellipse(hx, hy + r * 0.12, r * 0.2, r * 0.15, 0, 0, Math.PI * 2); ctx.fill();
-      break;
-    }
-    case '羅賓': {
-      // 黑色長髮
-      ctx.fillStyle = '#1E1B4B';
-      ctx.beginPath(); ctx.ellipse(hx - r * 0.68, hy + r * 0.42, r * 0.34, r * 0.9, -0.15, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(hx + r * 0.68, hy + r * 0.42, r * 0.34, r * 0.9, 0.15, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(hx, hy - r * 0.82, r * 0.82, Math.PI, Math.PI * 2); ctx.fill();
-      // 細框眼鏡
-      ctx.strokeStyle = '#7C3AED'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(hx - r * 0.38, hy - r * 0.12, r * 0.22, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(hx + r * 0.38, hy - r * 0.12, r * 0.22, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(hx - r * 0.16, hy - r * 0.12); ctx.lineTo(hx + r * 0.16, hy - r * 0.12); ctx.stroke();
-      break;
-    }
-    case '弗蘭奇': {
-      // 藍色莫西幹
-      ctx.fillStyle = '#06B6D4';
-      ctx.beginPath(); ctx.ellipse(hx, hy - r * 1.35, r * 0.42, r * 0.68, 0, 0, Math.PI * 2); ctx.fill();
-      // 金屬大手臂
-      ctx.fillStyle = '#94A3B8'; ctx.strokeStyle = '#64748B'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.rect(hx - r * 1.62, hy + r * 0.05, r * 0.58, r * 1.3); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.rect(hx + r * 1.04, hy + r * 0.05, r * 0.58, r * 1.3); ctx.fill(); ctx.stroke();
-      // 胸口星星
-      ctx.fillStyle = '#D4A800'; ctx.font = `bold ${r * 0.9}px sans-serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('★', hx, hy + r * 1.15);
-      break;
-    }
-    case '布魯克': {
-      // 骷髏臉（覆蓋正常膚色）
-      ctx.fillStyle = '#F5F5F5'; ctx.strokeStyle = '#33333344'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(hx, hy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      // 骷髏眼洞
-      ctx.fillStyle = '#111827';
-      ctx.beginPath(); ctx.ellipse(hx - r * 0.35, hy - r * 0.15, r * 0.19, r * 0.22, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(hx + r * 0.35, hy - r * 0.15, r * 0.19, r * 0.22, 0, 0, Math.PI * 2); ctx.fill();
-      // 鼻孔
-      ctx.beginPath(); ctx.arc(hx - r * 0.1, hy + r * 0.1, r * 0.07, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(hx + r * 0.1, hy + r * 0.1, r * 0.07, 0, Math.PI * 2); ctx.fill();
-      // 牙齒
-      ctx.strokeStyle = '#111827'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(hx, hy + r * 0.32, r * 0.3, 0.1, Math.PI - 0.1); ctx.stroke();
-      for (let i = -1; i <= 1; i++) {
-        ctx.beginPath(); ctx.moveTo(hx + i * r * 0.2, hy + r * 0.33); ctx.lineTo(hx + i * r * 0.2, hy + r * 0.62); ctx.stroke();
-      }
-      // 爆炸頭
-      ctx.fillStyle = '#111827';
-      ctx.beginPath(); ctx.arc(hx, hy - r * 1.12, r * 0.92, Math.PI, Math.PI * 2); ctx.fill();
-      // 大禮帽
-      ctx.fillRect(hx - r * 0.68, hy - r * 2.1, r * 1.36, r); ctx.fillRect(hx - r * 0.95, hy - r * 1.12, r * 1.9, r * 0.28);
-      break;
-    }
-    case '甚平': {
-      // 深藍魚人臉（覆蓋）
-      ctx.fillStyle = '#0C4A6E'; ctx.strokeStyle = '#33333344'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(hx, hy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      // 大白眼
-      ctx.fillStyle = '#FAFAFA';
-      ctx.beginPath(); ctx.ellipse(hx - r * 0.36, hy - r * 0.1, r * 0.21, r * 0.24, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(hx + r * 0.36, hy - r * 0.1, r * 0.21, r * 0.24, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#111';
-      ctx.beginPath(); ctx.arc(hx - r * 0.36, hy - r * 0.1, r * 0.11, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(hx + r * 0.36, hy - r * 0.1, r * 0.11, 0, Math.PI * 2); ctx.fill();
-      // 腮條（魚鰓紋）
-      ctx.strokeStyle = '#075985'; ctx.lineWidth = 2;
-      for (let i = 0; i < 3; i++) {
-        const ly = hy + (i - 1) * r * 0.22 + r * 0.1;
-        ctx.beginPath(); ctx.moveTo(hx - r, ly); ctx.lineTo(hx - r * 0.65, ly); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(hx + r * 0.65, ly); ctx.lineTo(hx + r, ly); ctx.stroke();
-      }
-      // 白色衣領（道衣V領）
-      ctx.fillStyle = '#F5F5F5';
-      ctx.beginPath(); ctx.moveTo(hx - r * 0.42, hy + r * 0.75); ctx.lineTo(hx, hy + r * 0.3); ctx.lineTo(hx + r * 0.42, hy + r * 0.75); ctx.closePath(); ctx.fill();
-      break;
-    }
-  }
-}
-
-// 畫一個卡通人物（填色身體＋臉部＋角色特徵）
+// 用角色圖片繪製人物（圖片預載後直接 drawImage）
 function drawCharacter(ctx, x, y, role, count, alpha) {
-  const c = CHAR_COLORS[role] || { body: '#D4A800', hat: '#888', skin: '#FDE68A' };
-  const r = 14; // 頭部半徑（放大，更清晰）
-  const hx = x, hy = y; // 頭部圓心
+  const glowColor = CHAR_COLORS[role] || '#D4A800';
+  const img = CHAR_IMAGES[role];
+  const iw = 80, ih = 80; // 顯示尺寸
+  const ix = x - iw / 2;
+  const iy = y - ih;      // 圖片底部對齊節點上方
 
   ctx.save();
   ctx.globalAlpha = Math.min(1, alpha);
 
   // 光暈
-  const glowSize = r * 2.8 + Math.min(count * 2, 14);
-  const glow = ctx.createRadialGradient(hx, hy, 0, hx, hy, glowSize);
-  glow.addColorStop(0, c.body + '66');
-  glow.addColorStop(1, c.body + '00');
-  ctx.fillStyle = glow;
-  ctx.beginPath(); ctx.arc(hx, hy, glowSize, 0, Math.PI * 2); ctx.fill();
+  const gr = ctx.createRadialGradient(x, y - ih * 0.5, 0, x, y - ih * 0.5, iw * 0.75);
+  gr.addColorStop(0, glowColor + '55');
+  gr.addColorStop(1, glowColor + '00');
+  ctx.fillStyle = gr;
+  ctx.beginPath(); ctx.arc(x, y - ih * 0.5, iw * 0.75, 0, Math.PI * 2); ctx.fill();
 
-  // 填色身體（橢圓）
-  ctx.fillStyle = c.body;
-  ctx.beginPath(); ctx.ellipse(hx, hy + r * 2.3, r * 0.7, r * 1.05, 0, 0, Math.PI * 2); ctx.fill();
+  // 角色圖片
+  if (img && img.complete && img.naturalWidth > 0) {
+    ctx.drawImage(img, ix, iy, iw, ih);
+  } else {
+    // 圖片未載入：顯示彩色圓圈佔位
+    ctx.fillStyle = glowColor + '88';
+    ctx.beginPath(); ctx.arc(x, y - ih * 0.5, iw * 0.4, 0, Math.PI * 2); ctx.fill();
+  }
 
-  // 雙臂
-  ctx.strokeStyle = c.body; ctx.lineWidth = r * 0.35; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(hx - r * 0.65, hy + r * 1.6); ctx.lineTo(hx - r * 1.35, hy + r * 2.6); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(hx + r * 0.65, hy + r * 1.6); ctx.lineTo(hx + r * 1.35, hy + r * 2.6); ctx.stroke();
-
-  // 雙腳
-  ctx.lineWidth = r * 0.32;
-  ctx.beginPath(); ctx.moveTo(hx - r * 0.35, hy + r * 3.25); ctx.lineTo(hx - r * 0.55, hy + r * 4.3); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(hx + r * 0.35, hy + r * 3.25); ctx.lineTo(hx + r * 0.55, hy + r * 4.3); ctx.stroke();
-
-  // 頭部（填色圓）
-  ctx.fillStyle = c.skin; ctx.strokeStyle = '#22222244'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.arc(hx, hy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-
-  // 眼睛
-  ctx.fillStyle = '#222';
-  ctx.beginPath(); ctx.arc(hx - r * 0.34, hy - r * 0.1, r * 0.14, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(hx + r * 0.34, hy - r * 0.1, r * 0.14, 0, Math.PI * 2); ctx.fill();
-
-  // 嘴巴
-  ctx.strokeStyle = '#33333366'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.arc(hx, hy + r * 0.22, r * 0.28, 0.15, Math.PI - 0.15); ctx.stroke();
-
-  // 角色特有特徵（帽子/髮型/道具）
-  drawCharFeature(ctx, hx, hy, r, role, c);
-
-  // 角色名（底部）
-  ctx.fillStyle = '#F5F5F5'; ctx.strokeStyle = '#00000088'; ctx.lineWidth = 3;
-  ctx.font = `bold ${r * 0.82}px 'Microsoft JhengHei', sans-serif`;
+  // 角色名
+  ctx.fillStyle = '#F5F5F5'; ctx.strokeStyle = '#00000099'; ctx.lineWidth = 3;
+  ctx.font = "bold 12px 'Microsoft JhengHei', sans-serif";
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  ctx.strokeText(role, hx, hy + r * 4.55);
-  ctx.fillText(role, hx, hy + r * 4.55);
+  ctx.strokeText(role, x, y + 2);
+  ctx.fillText(role, x, y + 2);
 
   // 活動計數氣泡
   if (count > 0) {
-    const bx = hx + r * 1.15, bby = hy - r * 1.35;
+    const bx = x + iw * 0.38, bby = y - ih * 0.88;
     ctx.fillStyle = '#D4A800'; ctx.strokeStyle = '#0A0C10'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(bx, bby, r * 0.72, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#0A0C10'; ctx.font = `bold ${r * 0.68}px sans-serif`;
+    ctx.beginPath(); ctx.arc(bx, bby, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#0A0C10'; ctx.font = 'bold 9px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(count > 99 ? '99+' : String(count), bx, bby);
   }
 
   ctx.restore();
 }
-
 // 每格畫面更新人物
 function drawAllCharacters() {
   charCtx.clearRect(0, 0, charCanvas.width, charCanvas.height);
