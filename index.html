@@ -17987,7 +17987,7 @@ function ok(obj) {
             setSyncS("syncing");
             try {
                 const p = { action: "updateSchedule", shift: curShift, month: M, year: Y,
-                    data: sf.map(s => ({ name: s.name, shifts: Array.from({ length: DAYS }, (_, i) => { var _a; return ((_a = sc[s.id]) === null || _a === void 0 ? void 0 : _a[i + 1]) || '-'; }) })) };
+                    data: sf.map(s => ({ name: s.name, roleStr: ROLES[s.role] || '保全', shifts: Array.from({ length: DAYS }, (_, i) => { var _a; return ((_a = sc[s.id]) === null || _a === void 0 ? void 0 : _a[i + 1]) || '-'; }) })) };
                 await fetch(asUrl, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
                 setSyncS("ok");
                 setTimeout(() => setSyncS("idle"), 3000);
@@ -18054,8 +18054,13 @@ function ok(obj) {
                     cnt++;
                 });
                 if (!cnt) return 0;
-                setStaff(nStaff);
-                setSched(nSc);
+                // 雲端試算表為員工名單真相來源：本機有、雲端已無的人（其他裝置刪除過）在此裝置也移除
+                const cloudNames = new Set(d.rows.map(r => String(r.name || '').trim()));
+                const finalStaff = nStaff.filter(s => cloudNames.has(s.name));
+                const finalSc = {};
+                finalStaff.forEach(s => { finalSc[s.id] = nSc[s.id]; });
+                setStaff(finalStaff);
+                setSched(finalSc);
                 return cnt;
             }
             catch (e) { return 0; /* 離線或讀取失敗 → 沿用本機快取 */ }
@@ -18212,12 +18217,23 @@ function ok(obj) {
                 setStaff(nStaff);
                 setSched(nSc);
                 T(`新增：${ns.name}`);
+                if (asUrl) sync(nSc, nStaff);
             }
             else {
-                setStaff(p => p.map(s => s.id === stMod.id ? { ...s, ...stFrm, name: stFrm.name.trim() } : s));
+                const nStaff = staff.map(s => s.id === stMod.id ? { ...s, ...stFrm, name: stFrm.name.trim() } : s);
+                setStaff(nStaff);
                 T(`已修改：${stFrm.name.trim()}`);
+                if (asUrl) sync(sched, nStaff);
             }
             setStMod(null);
+        }
+        /* ── 刪除員工：本機移除後同步通知雲端刪除該員在試算表的整列，避免其他裝置重新載入時又復活 ── */
+        async function syncDeleteStaff(name) {
+            if (!asUrl || curShift === 'all') return;
+            try {
+                await fetch(asUrl, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "deleteStaff", shift: curShift, name }) });
+            } catch (e) { /* 離線：本機已刪除，待雲端下次同步時人工確認 */ }
         }
         function delSt(s) {
             ask(`確定刪除「${s.name}」？`, () => {
@@ -18225,6 +18241,7 @@ function ok(obj) {
                 setSched(p => { const n = { ...p }; delete n[s.id]; return n; });
                 T(`已刪除：${s.name}`, "err");
                 setStMod(null);
+                syncDeleteStaff(s.name);
             });
         }
         // 從 ZIP 取出指定檔案內容（瀏覽器原生 DecompressionStream）
