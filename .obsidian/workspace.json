@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "de63d6527ce9c413",
+        "id": "8c8003d32777521e",
         "type": "tabs",
         "children": [
           {
-            "id": "10d9229f4028aefe",
+            "id": "5f73ec61d1e09713",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -198,8 +198,10 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "10d9229f4028aefe",
+  "active": "5f73ec61d1e09713",
   "lastOpenFiles": [
+    "操作手冊/src/img/report_admin_detail.png",
+    "01-專案狀態/project-state.md",
     "班表管理_後端_GAS_v2.12.gs",
     "conflict-files-obsidian-git.md",
     "brook.png",
@@ -223,7 +225,6 @@
     "施工單_報到換證_GAS.gs",
     "天鷹AI助手_GAS_部署說明.md",
     "天鷹AI助手_GAS.gs",
-    "tool_ai_chat.html",
     "TASK_CARD.md",
     "AGENTS.md",
     "index.md",
@@ -232,7 +233,6 @@
     "事故與表揚_GAS_部署說明.md",
     "tool_opening_GAS_部署說明.md",
     "CLAUDE.md",
-    "01-專案狀態/project-state.md",
     "Logs/2026-06-26.md",
     "log.md",
     "_CLAUDE.md",
