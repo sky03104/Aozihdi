@@ -17767,8 +17767,7 @@ const ScheduleApp = (() => {
     }
     function buildSched(staffList) {
         const s = {};
-        staffList.forEach(st => { var _a; s[st.id] = {}; const d = ((_a = RAW[st.name]) === null || _a === void 0 ? void 0 : _a.d) || []; for (let i = 0; i < DAYS; i++)
-            s[st.id][i + 1] = d[i] || '-'; });
+        staffList.forEach(st => { s[st.id] = {}; for (let i = 0; i < DAYS; i++) s[st.id][i + 1] = '-'; });
         return s;
     }
     const INIT_STAFF = buildStaff();
@@ -17817,7 +17816,7 @@ const ScheduleApp = (() => {
             const roleStr = ws[rc] ? String(ws[rc].v || '').trim() : '';
             const role = ROLE_XL[roleStr] || 'staff';
             const shifts = {};
-            for (let d = 1; d <= 30; d++) {
+            for (let d = 1; d <= DAYS; d++) {
                 const addr = XLSX.utils.encode_cell({ r, c: d + 1 });
                 const cell = ws[addr];
                 if (!cell) {
@@ -17988,7 +17987,7 @@ function ok(obj) {
             setSyncS("syncing");
             try {
                 const p = { action: "updateSchedule", shift: curShift, month: M, year: Y,
-                    data: sf.map(s => ({ name: s.name, shifts: Array.from({ length: DAYS }, (_, i) => { var _a; return ((_a = sc[s.id]) === null || _a === void 0 ? void 0 : _a[i + 1]) || '-'; }) })) };
+                    data: sf.map(s => ({ name: s.name, roleStr: ROLES[s.role] || '保全', shifts: Array.from({ length: DAYS }, (_, i) => { var _a; return ((_a = sc[s.id]) === null || _a === void 0 ? void 0 : _a[i + 1]) || '-'; }) })) };
                 await fetch(asUrl, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
                 setSyncS("ok");
                 setTimeout(() => setSyncS("idle"), 3000);
@@ -18055,8 +18054,13 @@ function ok(obj) {
                     cnt++;
                 });
                 if (!cnt) return 0;
-                setStaff(nStaff);
-                setSched(nSc);
+                // 雲端試算表為員工名單真相來源：本機有、雲端已無的人（其他裝置刪除過）在此裝置也移除
+                const cloudNames = new Set(d.rows.map(r => String(r.name || '').trim()));
+                const finalStaff = nStaff.filter(s => cloudNames.has(s.name));
+                const finalSc = {};
+                finalStaff.forEach(s => { finalSc[s.id] = nSc[s.id]; });
+                setStaff(finalStaff);
+                setSched(finalSc);
                 return cnt;
             }
             catch (e) { return 0; /* 離線或讀取失敗 → 沿用本機快取 */ }
@@ -18213,12 +18217,23 @@ function ok(obj) {
                 setStaff(nStaff);
                 setSched(nSc);
                 T(`新增：${ns.name}`);
+                if (asUrl) sync(nSc, nStaff);
             }
             else {
-                setStaff(p => p.map(s => s.id === stMod.id ? { ...s, ...stFrm, name: stFrm.name.trim() } : s));
+                const nStaff = staff.map(s => s.id === stMod.id ? { ...s, ...stFrm, name: stFrm.name.trim() } : s);
+                setStaff(nStaff);
                 T(`已修改：${stFrm.name.trim()}`);
+                if (asUrl) sync(sched, nStaff);
             }
             setStMod(null);
+        }
+        /* ── 刪除員工：本機移除後同步通知雲端刪除該員在試算表的整列，避免其他裝置重新載入時又復活 ── */
+        async function syncDeleteStaff(name) {
+            if (!asUrl || curShift === 'all') return;
+            try {
+                await fetch(asUrl, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "deleteStaff", shift: curShift, name }) });
+            } catch (e) { /* 離線：本機已刪除，待雲端下次同步時人工確認 */ }
         }
         function delSt(s) {
             ask(`確定刪除「${s.name}」？`, () => {
@@ -18226,6 +18241,7 @@ function ok(obj) {
                 setSched(p => { const n = { ...p }; delete n[s.id]; return n; });
                 T(`已刪除：${s.name}`, "err");
                 setStMod(null);
+                syncDeleteStaff(s.name);
             });
         }
         // 從 ZIP 取出指定檔案內容（瀏覽器原生 DecompressionStream）
@@ -18371,7 +18387,7 @@ function ok(obj) {
                 return;
             let cnt = 0;
             const nStaff = [...staff];
-            const nSc = { ...sched };
+            const nSc = {};
             prev.forEach(row => {
                 let m = nStaff.find(s => s.name === row.name);
                 if (!m) {
@@ -18532,7 +18548,7 @@ function ok(obj) {
                             "\u627E\u4E0D\u5230\u300C",
                             staffSearch,
                             "\u300D")))),
-                React.createElement("div", { style: { overflowX: "auto" } },
+                React.createElement("div", { style: { overflowX: "auto", overflowY: "auto", maxHeight: "60vh", WebkitOverflowScrolling: "touch" } },
                     React.createElement("div", { style: { minWidth: 90 + cols.length * 30 } },
                         React.createElement("div", { style: { display: "flex", background: C.bg2, borderBottom: `1px solid ${C.cardBd}`, position: "sticky", top: 0, zIndex: 5 } },
                             React.createElement("div", { style: { width: 90, flexShrink: 0, padding: "6px 8px", fontSize: 12, color: C.textMute, fontWeight: 700, position: "sticky", left: 0, background: C.bg2, zIndex: 6 } }, "\u59D3\u540D"),
@@ -18834,7 +18850,7 @@ function ok(obj) {
             toast && React.createElement("div", { style: { position: "fixed", bottom: 68, left: "50%", transform: "translateX(-50%)", padding: "10px 18px", borderRadius: 9, fontSize: 13, fontWeight: 700, zIndex: 9999, whiteSpace: "nowrap", background: toast.type === "err" ? "rgba(127,29,29,0.95)" : "rgba(6,78,59,0.95)", border: `1px solid ${toast.type === "err" ? C.error : C.success}`, color: C.text, boxShadow: "0 4px 20px rgba(0,0,0,0.5)" } },
                 toast.type === "err" ? "✗ " : "✓ ",
                 toast.msg),
-            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, padding: "8px 12px", borderTop: `1px solid ${C.cardBd}`, background: C.bg2, position: "fixed", bottom: 0, width: "100%", maxWidth: 480, left: "50%", transform: "translateX(-50%)", boxSizing: "border-box" } }, Object.entries(SHIFT_TYPES).map(([k, v]) => React.createElement("div", { key: k, style: { display: "flex", alignItems: "center", gap: 2 } },
+            React.createElement("div", { style: { display: "flex", flexWrap: "nowrap", overflowX: "auto", WebkitOverflowScrolling: "touch", gap: 10, padding: "8px 12px", borderTop: `1px solid ${C.cardBd}`, background: C.bg2, position: "fixed", bottom: 0, width: "100%", maxWidth: 480, left: "50%", transform: "translateX(-50%)", boxSizing: "border-box" } }, Object.entries(SHIFT_TYPES).map(([k, v]) => React.createElement("div", { key: k, style: { display: "flex", alignItems: "center", gap: 2, flexShrink: 0 } },
                 React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: v.color, flexShrink: 0, display: "inline-block" } }),
                 React.createElement("span", { style: { fontSize: 10, color: v.color, fontWeight: 700 } }, k),
                 React.createElement("span", { style: { fontSize: 9, color: C.textMute } }, v.label))))));
