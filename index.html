@@ -17767,8 +17767,7 @@ const ScheduleApp = (() => {
     }
     function buildSched(staffList) {
         const s = {};
-        staffList.forEach(st => { var _a; s[st.id] = {}; const d = ((_a = RAW[st.name]) === null || _a === void 0 ? void 0 : _a.d) || []; for (let i = 0; i < DAYS; i++)
-            s[st.id][i + 1] = d[i] || '-'; });
+        staffList.forEach(st => { s[st.id] = {}; for (let i = 0; i < DAYS; i++) s[st.id][i + 1] = '-'; });
         return s;
     }
     const INIT_STAFF = buildStaff();
@@ -17817,7 +17816,7 @@ const ScheduleApp = (() => {
             const roleStr = ws[rc] ? String(ws[rc].v || '').trim() : '';
             const role = ROLE_XL[roleStr] || 'staff';
             const shifts = {};
-            for (let d = 1; d <= 30; d++) {
+            for (let d = 1; d <= DAYS; d++) {
                 const addr = XLSX.utils.encode_cell({ r, c: d + 1 });
                 const cell = ws[addr];
                 if (!cell) {
@@ -18371,7 +18370,7 @@ function ok(obj) {
                 return;
             let cnt = 0;
             const nStaff = [...staff];
-            const nSc = { ...sched };
+            const nSc = {};
             prev.forEach(row => {
                 let m = nStaff.find(s => s.name === row.name);
                 if (!m) {
