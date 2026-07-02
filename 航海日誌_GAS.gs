@@ -7,6 +7,7 @@
 //
 // v2.0 新增（2026-07-02）：
 //   - getActive：回傳線上使用者 + 最近事件（CacheService 快取 10 秒）
+//     不設閒置逾時，只認 logout/強制登出，呼應「記住我」持久登入
 //   - checkKick：APP 輪詢「我有沒有被強制登出」（一次性）
 //   - forceLogout：主管從 brain_map 強制登出某工號
 //   - 讀取只掃尾端 600 列（不再整表掃描）
@@ -36,7 +37,7 @@ const WORKFLOW_MAP = {
   'emergency':  { nodeId: 9,  role: '烏索普' },    // 緊急聯絡
   'post':       { nodeId: 7,  role: '甚平' },      // 明日哨表
   'hailing':    { nodeId: 7,  role: '甚平' },      // 明日哨表（舊名相容）
-  'logistics':  { nodeId: 37, role: '索隆' },      // 物流車輛統計
+  'logistics':  { nodeId: 37, role: '甚平' },      // 物流車輛統計（老司機甚平，掌舵經驗豐富）
 };
 
 // ── 試算表初始化 ─────────────────────────────────────────────────────
@@ -161,9 +162,10 @@ function doGet(e) {
 }
 
 // ── 線上使用者 + 最近事件（brain_map 每 10 秒輪詢）────────────────────
+// 注意：不設閒置逾時。是否顯示為「線上」只看最後一筆事件是不是 logout，
+// 呼應登入頁「記住我」= 持久登入 —— 只要沒按登出、沒被強制登出，
+// 就算閒置再久也該一直算在線上，不能被自動判離線。
 function handleGetActive(e) {
-  const minutes = Math.min(parseInt(e.parameter.minutes) || 10, 60);
-
   // CacheService 快取 10 秒：多個觀看者共用同一份答案，不重複翻試算表
   const cache = CacheService.getScriptCache();
   const cached = cache.get('active_v1');
@@ -171,11 +173,7 @@ function handleGetActive(e) {
     return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
   }
 
-  const cutoff = Date.now() - minutes * 60 * 1000;
-  const records = readRecentRows_(600).filter(function(r){
-    return new Date(r.timestamp).getTime() > cutoff;
-  });
-  // records 已按時間舊→新排列
+  const records = readRecentRows_(600); // 時間舊→新排列，不做時間篩選
 
   // 每個工號取「最後一筆事件」；最後一筆是 logout 就視為離線
   const latest = {};
@@ -315,7 +313,7 @@ function testLogTask() {
 }
 
 function testGetActive() {
-  const e = { parameter: { mode: 'getActive', minutes: '10' } };
+  const e = { parameter: { mode: 'getActive' } };
   Logger.log(doGet(e).getContent());
 }
 
