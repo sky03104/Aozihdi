@@ -141,79 +141,81 @@ const TOPICS = {
   todo:     { name: '待辦/規劃',  color: '#F87171' }, // 紅
 };
 
-// pos 座標建議範圍 ±1.4，主題空間分佈：
-//   core:  中央  x∈[-0.3,0.3] y∈[-0.3,0.3] z∈[0.3,0.8]
-//   tools: 右方  x∈[0.5,1.4]
-//   backend:左方 x∈[-1.4,-0.5]
-//   data:  下方  y∈[-1.4,-0.7]
-//   infra: 後方  z∈[-1.4,-0.7]
-//   todo:  頂部  y∈[0.8,1.4]
+// pos 座標建議範圍 ±3.5，各主題像不同「海域」一樣分開，中心距原點約 2.5：
+//   core:  中央樞紐 距原點約 0.75，x∈[-0.4,0.4] y∈[-0.3,0.4] z∈[0.6,0.9]
+//   tools: 東方海域 x 多在 1.7~3.2（主控台右側）
+//   backend:西方海域 x 多在 -3.1~-1.9（主控台左側）
+//   data:  南方海域 y 多在 -3.2~-1.6（下方）
+//   infra: 遠方海域 z 多在 -3.4~-0.8（後方）
+//   todo:  北方海域 y 多在 1.5~2.2（上方）
+// 新增節點時：先抓該主題任一既有節點座標當基準，在其附近 ±0.3~0.5 微調，
+// 不要拉回原點附近，否則會跟 core 或其他海域擠在一起
 const NODES = [
   // ── 主控台核心 ──
-  { id: 0,  title: '主控台 index.html', topic: 'core',    pos: [ 0.0, 0.0, 0.81], note: '主選單/登入/公告/工具權限/首頁卡片，編譯後 React.createElement（非 JSX）' },
-  { id: 1,  title: '登入與角色系統',     topic: 'core',    pos: [ -0.34, 0.34, 0.61], note: 'localStorage hsh_session_user；CAN_MANAGE_ROLES 控管理職可見' },
-  { id: 2,  title: '首頁待審卡片',       topic: 'core',    pos: [ 0.34, -0.27, 0.68], note: '待審請假/帳號/報告/表揚反應；報告、表揚兩格限 executive/admin' },
+  { id: 0,  title: '主控台 index.html', topic: 'core',    pos: [ 0.0, -0.0, 0.88], note: '主選單/登入/公告/工具權限/首頁卡片，編譯後 React.createElement（非 JSX）' },
+  { id: 1,  title: '登入與角色系統',     topic: 'core',    pos: [ -0.39, 0.39, 0.65], note: 'localStorage hsh_session_user；CAN_MANAGE_ROLES 控管理職可見' },
+  { id: 2,  title: '首頁待審卡片',       topic: 'core',    pos: [ 0.39, -0.31, 0.73], note: '待審請假/帳號/報告/表揚反應；報告、表揚兩格限 executive/admin' },
 
   // ── 前端工具 ──
-  { id: 3,  title: '事故報告工具',       topic: 'tools',   pos: [ 0.94, 0.68, 0.54], note: 'tool_report.html；?mode=admin 主管審閱（未讀/待處理/已處理）' },
-  { id: 4,  title: '匿名表揚/反應',      topic: 'tools',   pos: [ 1.35, 0.41, 0.27], note: 'tool_feedback.html；前台匿名，主管裁決寫「處置」欄' },
-  { id: 5,  title: '開店前進出登錄',     topic: 'tools',   pos: [ 1.62, 0.0, -0.14], note: 'tool_opening.html 獨立檔，雙 GAS（共用 _SharedDB）' },
-  { id: 6,  title: '打烊後快速登錄',     topic: 'tools',   pos: [ 1.22, -0.34, 0.41], note: 'index 內嵌 tpl-closing（base64）' },
-  { id: 7,  title: '明日哨表',           topic: 'tools',   pos: [ 1.76, 0.74, 0.2], note: 'post.html，iframe src 串接' },
-  { id: 8,  title: '班表查詢',           topic: 'tools',   pos: [ 1.69, -0.27, 0.61], note: 'ScheduleApp；SHIFT_TYPES 班別代號（早/晚班）' },
-  { id: 9,  title: '緊急聯絡清單',       topic: 'tools',   pos: [ 0.74, 0.88, 0.0], note: 'tpl-emergency；normalizePhone 補回開頭 0' },
-  { id: 10, title: '資料上傳工具',       topic: 'tools',   pos: [ 1.49, 0.81, -0.27], note: 'tpl-upload（base64 內嵌）；施工單/班表/哨表，SheetJS 解析 Excel；獨立版見 cec-up(id32)' },
-  { id: 11, title: '簽到/車輛/工作',     topic: 'tools',   pos: [ 0.74, -0.14, -0.27], note: 'tool_signin / tool_car / tool_work' },
-  { id: 12, title: '請假申請',           topic: 'tools',   pos: [ 1.28, 0.0, 0.74], note: 'liff_leave + 雲端請假清單' },
+  { id: 3,  title: '事故報告工具',       topic: 'tools',   pos: [ 2.03, 1.1, 0.86], note: 'tool_report.html；?mode=admin 主管審閱（未讀/待處理/已處理）' },
+  { id: 4,  title: '匿名表揚/反應',      topic: 'tools',   pos: [ 2.62, 0.7, 0.47], note: 'tool_feedback.html；前台匿名，主管裁決寫「處置」欄' },
+  { id: 5,  title: '開店前進出登錄',     topic: 'tools',   pos: [ 3.01, 0.11, -0.13], note: 'tool_opening.html 獨立檔，雙 GAS（共用 _SharedDB）' },
+  { id: 6,  title: '打烊後快速登錄',     topic: 'tools',   pos: [ 2.43, -0.38, 0.67], note: 'index 內嵌 tpl-closing（base64）' },
+  { id: 7,  title: '明日哨表',           topic: 'tools',   pos: [ 3.22, 1.18, 0.37], note: 'post.html，iframe src 串接' },
+  { id: 8,  title: '班表查詢',           topic: 'tools',   pos: [ 3.12, -0.28, 0.96], note: 'ScheduleApp；SHIFT_TYPES 班別代號（早/晚班）' },
+  { id: 9,  title: '緊急聯絡清單',       topic: 'tools',   pos: [ 1.74, 1.39, 0.08], note: 'tpl-emergency；normalizePhone 補回開頭 0' },
+  { id: 10, title: '資料上傳工具',       topic: 'tools',   pos: [ 2.83, 1.28, -0.32], note: 'tpl-upload（base64 內嵌）；施工單/班表/哨表，SheetJS 解析 Excel；獨立版見 cec-up(id32)' },
+  { id: 11, title: '簽到/車輛/工作',     topic: 'tools',   pos: [ 1.74, -0.09, -0.32], note: 'tool_signin / tool_car / tool_work' },
+  { id: 12, title: '請假申請',           topic: 'tools',   pos: [ 2.52, 0.11, 1.15], note: 'liff_leave + 雲端請假清單' },
 
   // ── 後端 GAS ──
-  { id: 13, title: '事故/表揚 GAS v3.1', topic: 'backend', pos: [ -1.08, 0.27, 0.41], note: 'action 分流 report/feedback/updateStatus/deleteRow/getReports/getFeedback；狀態/處置欄' },
-  { id: 14, title: '帳號/請假 GAS',      topic: 'backend', pos: [ -1.49, 0.61, 0.0], note: 'ACCOUNT_GAS_URL；登入/帳號申請/請假審核' },
-  { id: 15, title: '打烊/開店 GAS',      topic: 'backend', pos: [ -1.62, -0.14, 0.27], note: '進出記錄 + _SharedDB（廠商/監工/檢查者即時同步）' },
-  { id: 16, title: '照片上傳處理',       topic: 'backend', pos: [ -1.01, -0.34, -0.14], note: 'saveImages_；公告夾不可寫退回執行帳號夾；setSharing 非致命' },
+  { id: 13, title: '事故/表揚 GAS v3.1', topic: 'backend', pos: [ -2.42, 0.39, 0.68], note: 'action 分流 report/feedback/updateStatus/deleteRow/getReports/getFeedback；狀態/處置欄' },
+  { id: 14, title: '帳號/請假 GAS',      topic: 'backend', pos: [ -2.95, 0.83, 0.15], note: 'ACCOUNT_GAS_URL；登入/帳號申請/請假審核' },
+  { id: 15, title: '打烊/開店 GAS',      topic: 'backend', pos: [ -3.12, -0.14, 0.5], note: '進出記錄 + _SharedDB（廠商/監工/檢查者即時同步）' },
+  { id: 16, title: '照片上傳處理',       topic: 'backend', pos: [ -2.33, -0.4, -0.04], note: 'saveImages_；公告夾不可寫退回執行帳號夾；setSharing 非致命' },
 
   // ── 資料儲存 ──
-  { id: 17, title: '主試算表',           topic: 'data',    pos: [ -0.54, -1.35, 0.27], note: '事故報告 / 匿名表揚檢舉 分頁；主鍵純數字列號' },
-  { id: 18, title: '打烊資料庫',         topic: 'data',    pos: [ -1.22, -1.49, 0.0], note: '廠商/監工/檢查者/施工類型（開店打烊共用）' },
-  { id: 19, title: '開店試算表',         topic: 'data',    pos: [ 0.54, -1.49, 0.14], note: '開店前/B1F餐廳/4F餐廳 分頁' },
-  { id: 20, title: '班表資料',           topic: 'data',    pos: [ 1.22, -1.28, 0.27], note: '班別代號 SHIFT_TYPES / WORK_SHIFT / OFF_TYPES' },
-  { id: 21, title: 'localStorage 本地',  topic: 'data',    pos: [ 0.0, -1.15, 0.68], note: 'hsh_session_user / hsh_favs / hsh_shops 等' },
-  { id: 22, title: 'Drive 公告資料夾',   topic: 'data',    pos: [ -1.35, -1.08, -0.41], note: '照片統一存放（1K_RR…）；共用政策可能擋公開連結' },
+  { id: 17, title: '主試算表',           topic: 'data',    pos: [ -0.77, -2.58, 0.46], note: '事故報告 / 匿名表揚檢舉 分頁；主鍵純數字列號' },
+  { id: 18, title: '打烊資料庫',         topic: 'data',    pos: [ -1.65, -2.76, 0.11], note: '廠商/監工/檢查者/施工類型（開店打烊共用）' },
+  { id: 19, title: '開店試算表',         topic: 'data',    pos: [ 0.63, -2.76, 0.29], note: '開店前/B1F餐廳/4F餐廳 分頁' },
+  { id: 20, title: '班表資料',           topic: 'data',    pos: [ 1.52, -2.48, 0.46], note: '班別代號 SHIFT_TYPES / WORK_SHIFT / OFF_TYPES' },
+  { id: 21, title: 'localStorage 本地',  topic: 'data',    pos: [ -0.07, -2.32, 1.0], note: 'hsh_session_user / hsh_favs / hsh_shops 等' },
+  { id: 22, title: 'Drive 公告資料夾',   topic: 'data',    pos: [ -1.82, -2.22, -0.42], note: '照片統一存放（1K_RR…）；共用政策可能擋公開連結' },
 
   // ── 部署/監控 ──
-  { id: 23, title: 'GitHub Pages 部署',  topic: 'infra',   pos: [ 0.0, 0.27, -1.35], note: 'sky03104.github.io/tianying-security；正式 APP 跑 main' },
-  { id: 24, title: 'Git 版本控制',       topic: 'infra',   pos: [ -0.54, -0.14, -1.62], note: 'main + 功能分支；raw.githack + SHA 預覽' },
-  { id: 25, title: '監控自動化系統',     topic: 'infra',   pos: [ 0.7, -0.18, -1.55], note: 'tianying-monitor（失敗紀錄/技能迭代/回歸測試）' },
+  { id: 23, title: 'GitHub Pages 部署',  topic: 'infra',   pos: [ -0.16, 0.39, -2.35], note: 'sky03104.github.io/tianying-security；正式 APP 跑 main' },
+  { id: 24, title: 'Git 版本控制',       topic: 'infra',   pos: [ -0.86, -0.14, -2.7], note: 'main + 功能分支；raw.githack + SHA 預覽' },
+  { id: 25, title: '監控自動化系統',     topic: 'infra',   pos: [ 0.75, -0.19, -2.61], note: 'tianying-monitor（失敗紀錄/技能迭代/回歸測試）' },
 
   // ── 待辦/規劃 ──
-  { id: 26, title: 'TODO-11 角色 Agents',topic: 'todo',    pos: [ -0.41, 1.49, 0.27], note: '✅ 完成（2026-06-28）：11 Agent + 工作流程檔落地成 .claude/agents/*.md' },
-  { id: 27, title: 'TODO-12 哨表自動化', topic: 'todo',    pos: [ 0.41, 1.62, 0.0], note: '排班自動產表/輪值/衝突檢查' },
-  { id: 28, title: 'TODO-13 對話助手',   topic: 'todo',    pos: [ 0.0, 1.35, -0.41], note: '✅ 已完成：天鷹 AI 小助手（小天鷹）J.A.R.V.I.S. 風格' },
+  { id: 26, title: 'TODO-11 角色 Agents',topic: 'todo',    pos: [ -0.49, 2.5, 0.3], note: '✅ 完成（2026-06-28）：11 Agent + 工作流程檔落地成 .claude/agents/*.md' },
+  { id: 27, title: 'TODO-12 哨表自動化', topic: 'todo',    pos: [ 0.49, 2.66, -0.02], note: '排班自動產表/輪值/衝突檢查' },
+  { id: 28, title: 'TODO-13 對話助手',   topic: 'todo',    pos: [ 0.0, 2.33, -0.51], note: '✅ 已完成：天鷹 AI 小助手（小天鷹）J.A.R.V.I.S. 風格' },
 
   // ── cec-up 獨立部署（2026-06-30）──
-  { id: 32, title: 'cec-up 獨立上傳工具', topic: 'infra',   pos: [ 0.3, 0.35, -1.9], note: 'sky03104/cec-up；GitHub Pages 獨立版上傳工具；早/晚班切換已與 tpl-upload 同步（2026-06-30）' },
+  { id: 32, title: 'cec-up 獨立上傳工具', topic: 'infra',   pos: [ 0.23, 0.49, -3.07], note: 'sky03104/cec-up；GitHub Pages 獨立版上傳工具；早/晚班切換已與 tpl-upload 同步（2026-06-30）' },
 
   // ── AI 小助手（小天鷹，2026-06-29）──
-  { id: 29, title: '天鷹 AI 小助手',     topic: 'tools',   pos: [ 0.94, -0.68, 0.07], note: 'tool_ai_chat.html；J.A.R.V.I.S. 風格 LOGO 光環＋語音輸入/輸出；個人化習慣記憶 hsh_ai_profile；admin 控制台調禁止規則' },
-  { id: 30, title: '小天鷹 GAS Proxy',   topic: 'backend', pos: [ -1.35, -0.68, 0.07], note: '天鷹AI助手_GAS.gs；Gemini Proxy，藏 API Key；依 role/vocabLevel 組 system prompt；getConfig/saveConfig' },
-  { id: 31, title: 'Gemini 1.5 Flash',   topic: 'infra',   pos: [ -1.82, -0.74, -0.61], note: '外部 AI 服務（免費額度）；API Key 存 GAS Script Properties' },
+  { id: 29, title: '天鷹 AI 小助手',     topic: 'tools',   pos: [ 2.03, -0.88, 0.18], note: 'tool_ai_chat.html；J.A.R.V.I.S. 風格 LOGO 光環＋語音輸入/輸出；個人化習慣記憶 hsh_ai_profile；admin 控制台調禁止規則' },
+  { id: 30, title: '小天鷹 GAS Proxy',   topic: 'backend', pos: [ -2.77, -0.85, 0.24], note: '天鷹AI助手_GAS.gs；Gemini Proxy，藏 API Key；依 role/vocabLevel 組 system prompt；getConfig/saveConfig' },
+  { id: 31, title: 'Gemini 1.5 Flash',   topic: 'infra',   pos: [ -2.52, -0.92, -1.39], note: '外部 AI 服務（免費額度）；API Key 存 GAS Script Properties' },
 
   // ── obsidian-second-brain（咖哩個人第二大腦，2026-07-01）── 非員工功能，Claude Code 開發工具
-  { id: 33, title: 'obsidian-second-brain skill', topic: 'infra', pos: [ -0.42, 0.62, -1.4], note: '.claude/skills/obsidian-second-brain；44 個 /obsidian-* 指令，AI-first 讀寫規則；只給咖哩本人在 Claude Code 用，非 APP 員工功能' },
-  { id: 34, title: '第二大腦 Vault',      topic: 'data',  pos: [ 0.27, -0.94, 1.01], note: 'obsidian-vault/；_CLAUDE.md 操作手冊 + index.md + Logs/ + Bases/；咖哩私人筆記，與天鷹 APP 資料分開' },
-  { id: 35, title: 'SessionStart Hook',   topic: 'infra', pos: [ -0.81, 0.47, -1.35], note: '.claude/settings.json：OBSIDIAN_VAULT_PATH + load_vault_context.py；只在 cwd 進入 vault 目錄才注入 _CLAUDE.md，不影響其他 session' },
+  { id: 33, title: 'obsidian-second-brain skill', topic: 'infra', pos: [ -0.7, 0.85, -2.42], note: '.claude/skills/obsidian-second-brain；44 個 /obsidian-* 指令，AI-first 讀寫規則；只給咖哩本人在 Claude Code 用，非 APP 員工功能' },
+  { id: 34, title: '第二大腦 Vault',      topic: 'data',  pos: [ 0.28, -2.04, 1.43], note: 'obsidian-vault/；_CLAUDE.md 操作手冊 + index.md + Logs/ + Bases/；咖哩私人筆記，與天鷹 APP 資料分開' },
+  { id: 35, title: 'SessionStart Hook',   topic: 'infra', pos: [ -1.21, 0.65, -2.35], note: '.claude/settings.json：OBSIDIAN_VAULT_PATH + load_vault_context.py；只在 cwd 進入 vault 目錄才注入 _CLAUDE.md，不影響其他 session' },
 
   // ── 車牌辨識（過夜車輛登記，2026-07-02）──
-  { id: 36, title: '車牌辨識 GAS',        topic: 'backend', pos: [ -0.94, -0.2, 0.47], note: '車牌辨識_後端_GAS.gs（獨立部署）；recognizePlate Gemini Vision 辨識＋台灣車牌格式正規化、vehicleReg 寫車輛登記試算表 1K46ZEq…；Key 存指令碼屬性；每日 08:00 自動寄晚班登記摘要 email（SUMMARY_EMAILS）' },
+  { id: 36, title: '車牌辨識 GAS',        topic: 'backend', pos: [ -2.24, -0.22, 0.76], note: '車牌辨識_後端_GAS.gs（獨立部署）；recognizePlate Gemini Vision 辨識＋台灣車牌格式正規化、vehicleReg 寫車輛登記試算表 1K46ZEq…；Key 存指令碼屬性；每日 08:00 自動寄晚班登記摘要 email（SUMMARY_EMAILS）' },
 
   // ── 物流車輛統計（2026-07-02）──
-  { id: 37, title: '物流車輛統計',        topic: 'tools',   pos: [ 1.01, 0.34, -0.47], note: 'tool_logistics.html 獨立檔（iframe src）；三分類(1.9噸/3.5噸/8噸以上)登記＋快捷一鍵送出＋單日查詢＋整月統計；可修改/刪除；全員開放(id18)，快捷管理限 admin' },
-  { id: 38, title: '物流統計 GAS',        topic: 'backend', pos: [ -0.74, 0.07, 0.07], note: '物流車輛統計_GAS.gs（獨立部署）；add/update/delete/getDay/getMonth/exportMonth＋getShortcuts/addShortcut/updateShortcut/deleteShortcut；時間戳伺服器端蓋、主鍵 max(ID)+1' },
-  { id: 39, title: '物流試算表',          topic: 'data',    pos: [ 0.88, -1.62, -0.2], note: '新建試算表；物流車輛紀錄分頁(A~H)＋快捷設定分頁(A~C)＋YYYY-MM 月統計分頁（exportMonth 產生）；工號欄純文字保開頭0' },
+  { id: 37, title: '物流車輛統計',        topic: 'tools',   pos: [ 2.13, 0.6, -0.61], note: 'tool_logistics.html 獨立檔（iframe src）；三分類(1.9噸/3.5噸/8噸以上)登記＋快捷一鍵送出＋單日查詢＋整月統計；可修改/刪除；全員開放(id18)，快捷管理限 admin' },
+  { id: 38, title: '物流統計 GAS',        topic: 'backend', pos: [ -1.98, 0.13, 0.24], note: '物流車輛統計_GAS.gs（獨立部署）；add/update/delete/getDay/getMonth/exportMonth＋getShortcuts/addShortcut/updateShortcut/deleteShortcut；時間戳伺服器端蓋、主鍵 max(ID)+1' },
+  { id: 39, title: '物流試算表',          topic: 'data',    pos: [ 1.08, -2.93, -0.15], note: '新建試算表；物流車輛紀錄分頁(A~H)＋快捷設定分頁(A~C)＋YYYY-MM 月統計分頁（exportMonth 產生）；工號欄純文字保開頭0' },
 
   // ── 航海日誌即時航跡（2026-07-02）──
-  { id: 40, title: '航海日誌 GAS',        topic: 'backend', pos: [ -0.74, 0.74, 0.14], note: '航海日誌_GAS.gs v2.0；logTask/getActive/checkKick/forceLogout；CacheService 快取 10 秒 + 30 天自動清理；brain_map 每 10 秒輪詢畫即時人物' },
-  { id: 41, title: '航海日誌試算表',      topic: 'data',    pos: [ -0.74, -1.01, -0.2], note: '工作日誌分頁：時間/工號/姓名/工具/節點/角色/動作/狀態/備註；只留 30 天' },
+  { id: 40, title: '航海日誌 GAS',        topic: 'backend', pos: [ -1.98, 1.0, 0.33], note: '航海日誌_GAS.gs v2.0；logTask/getActive/checkKick/forceLogout；CacheService 快取 10 秒 + 30 天自動清理；brain_map 每 10 秒輪詢畫即時人物' },
+  { id: 41, title: '航海日誌試算表',      topic: 'data',    pos: [ -1.03, -2.13, -0.15], note: '工作日誌分頁：時間/工號/姓名/工具/節點/角色/動作/狀態/備註；只留 30 天' },
 ];
 
 const EDGES = [
@@ -288,7 +290,7 @@ renderer.setClearColor(0x0A0C10, 1);
 
 const scene  = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.01, 200);
-const sph    = { theta: 0.35, phi: 1.22, r: 5.6 };
+const sph    = { theta: 0.35, phi: 1.22, r: 8.5 };
 
 function applySph() {
   camera.position.set(
@@ -456,7 +458,7 @@ function moveDrag(x, y)  {
   applySph();
 }
 function endDrag()  { isDragging = false; canvas.style.cursor = 'grab'; autoTimer = setTimeout(() => { autoRotate = true; }, 5000); }
-function doZoom(d)  { sph.r = Math.max(2.2, Math.min(11, sph.r + d * 0.0025)); applySph(); }
+function doZoom(d)  { sph.r = Math.max(2.2, Math.min(24, sph.r + d * 0.0025)); applySph(); }
 
 canvas.addEventListener('mousedown', e => startDrag(e.clientX, e.clientY));
 window.addEventListener('mousemove', e => {
@@ -505,6 +507,8 @@ const CHAR_COLORS = {
 };
 
 // 角色圖片（預載）
+// 圖片資料夾：角色圖與地點圖統一放 brain_map_img/，根目錄才不會被塞爆
+const IMG_DIR = 'brain_map_img/';
 const CHAR_IMG_MAP = {
   '路飛': 'luffy.png', '索隆': 'zoro.png',   '娜美': 'nami.png',
   '烏索普':'usopp.png','山治': 'sanji.png',   '喬巴': 'chopper.png',
@@ -514,8 +518,20 @@ const CHAR_IMG_MAP = {
 const CHAR_IMAGES = {};
 Object.entries(CHAR_IMG_MAP).forEach(([role, file]) => {
   const img = new Image();
-  img.src = file;
+  img.src = IMG_DIR + file;
   CHAR_IMAGES[role] = img;
+});
+
+// 節點地點圖（工具節點專屬場景，取代發光球體；未列在這裡的節點照舊顯示球體）
+const NODE_IMG_MAP = {
+  3:  'loc_library.png',    // 事故報告工具（羅賓／圖書室）
+  4:  'loc_infirmary.png',  // 匿名表揚/反應（喬巴／醫務室）
+};
+const NODE_IMAGES = {};
+Object.entries(NODE_IMG_MAP).forEach(([nodeId, file]) => {
+  const img = new Image();
+  img.src = IMG_DIR + file;
+  NODE_IMAGES[nodeId] = img;
 });
 
 // 節點 → 角色映射（地盤）
@@ -582,10 +598,12 @@ function worldToScreen(vec3) {
 // 特定角色的顯示倍率：黃金梅利號是船不是人，該比其他角色明顯大一號
 const CHAR_SCALE = { '黃金梅利號': 1.75 };
 
-function drawCharacter(ctx, x, y, role, count, alpha) {
+// extraScale：動態縮放乘數（預設1）。跑動作路線的角色會傳較小值，看起來像在小跑；
+// 未來要升級成真正的跑步序列幀動畫時，這個參數就是掛動畫幀的入口
+function drawCharacter(ctx, x, y, role, count, alpha, extraScale) {
   const glowColor = CHAR_COLORS[role] || '#D4A800';
   const img = CHAR_IMAGES[role];
-  const scale = CHAR_SCALE[role] || 1;
+  const scale = (CHAR_SCALE[role] || 1) * (extraScale || 1);
   const boxW = 80 * scale, boxH = 80 * scale; // 顯示框：光暈/名字/計數氣泡都固定用這個尺寸排版
   let iw = boxW, ih = boxH;   // 圖片實際繪製尺寸：依原始長寬比縮放，避免船隻等非正方形圖被拉伸變形
   if (img && img.complete && img.naturalWidth > 0) {
@@ -658,6 +676,28 @@ function drawAllCharacters() {
     const alpha    = activity ? 0.95 : 0.75; // 有活動全亮，待機也清楚可見
 
     drawCharacter(charCtx, scr.x, scr.y - 28, role, count, alpha);
+  });
+}
+
+// 工具節點的地點圖（取代發光球體；圖片還沒到位的節點自動略過，照舊顯示 Three.js 球體）
+function drawNodeLocations() {
+  Object.entries(NODE_IMG_MAP).forEach(([nodeIdStr, file]) => {
+    const nodeId = parseInt(nodeIdStr);
+    const img = NODE_IMAGES[nodeId];
+    if (!img || !img.complete || img.naturalWidth === 0) return; // 未載入完成就不畫，底下球體照樣看得到
+
+    const nodeIdx = NODES.findIndex(n => n.id === nodeId);
+    if (nodeIdx < 0) return;
+    const scr = worldToScreen(worldPos[nodeIdx]);
+    if (!scr) return;
+    if (scr.x < -80 || scr.x > window.innerWidth + 80) return;
+    if (scr.y < -80 || scr.y > window.innerHeight + 80) return;
+
+    const boxW = 110, boxH = 110;
+    const ratio = img.naturalWidth / img.naturalHeight;
+    let iw = boxW, ih = boxH;
+    if (ratio >= 1) { ih = boxW / ratio; } else { iw = boxH * ratio; }
+    charCtx.drawImage(img, scr.x - iw / 2, scr.y - ih / 2, iw, ih);
   });
 }
 
@@ -737,14 +777,31 @@ function queueMoveTo(u, targetNodeId) {
   u.node = targetNodeId;
 }
 
-function queueRoundTrip(u, tool) {
+// ── 動作跑者（action runner）：送出資料時，由「地點所屬角色」代替使用者
+// 跑完 地點→GAS→資料表→地點 這段路，使用者球體留在地點原地等，跑者跑完
+// 才觸發使用者回主控台。跑者是每次事件各自獨立的實例（不共用/不重用），
+// 兩個人同時做同一動作就會同時出現兩個一樣角色的跑者。
+let actionRunners = [];
+let runnerSeq = 0;
+
+function buildRoundTripWaypoints(route) {
+  const wps = [];
+  for (let i = 1; i < route.length; i++) wps.push(route[i]);   // 去程：地點→GAS→資料表
+  for (let i = route.length - 2; i >= 0; i--) wps.push(route[i]); // 回程：原路折返
+  return wps;
+}
+
+function spawnActionRunner(tool, role, locationNodeId, onComplete) {
   const route = TOOL_ROUTE[tool];
-  if (!route) { return; }
-  queueMoveTo(u, route[0]);
-  // 去程：工具 → GAS → 資料表；回程原路折返
-  for (let i = 1; i < route.length; i++) u.waypoints.push(route[i]);
-  for (let i = route.length - 2; i >= 0; i--) u.waypoints.push(route[i]);
-  u.node = route[0];
+  const wp = nodeWorldById(locationNodeId);
+  if (!route || !wp) return null;
+  const runner = {
+    id: 'run_' + (runnerSeq++), role, color: CHAR_COLORS[role] || '#D4A800',
+    node: locationNodeId, pos: wp.clone(), waypoints: buildRoundTripWaypoints(route),
+    seg: null, alpha: 1, leaving: false, onComplete: onComplete || null,
+  };
+  actionRunners.push(runner);
+  return runner;
 }
 
 async function fetchActiveUsers() {
@@ -765,7 +822,12 @@ async function fetchActiveUsers() {
       lastEventTs = events.length ? new Date(events[events.length - 1].timestamp).getTime() : Date.now();
       firstActiveLoad = false;
     } else {
-      // 新事件依序驅動動畫（登入現身、開工具移動、送出跑 GAS 一圈、登出離場）
+      // 新事件依序驅動動畫：
+      //   登入 → 使用者現身主控台
+      //   開工具 → 使用者從目前位置走到該工具的地點
+      //   送出資料 → 使用者留在地點，該地點所屬角色代跑 GAS→資料表 一圈，
+      //             跑者跑完才觸發使用者回主控台
+      //   登出 → 使用者原地淡出
       events.forEach(ev => {
         const ts = new Date(ev.timestamp).getTime();
         if (ts <= lastEventTs) return;
@@ -775,9 +837,17 @@ async function fetchActiveUsers() {
         const u = ensureUser(id, ev.userName, ev.actionType === 'login' ? 0 : parseInt(ev.nodeId));
         u.name = ev.userName || u.name; u.tool = ev.tool;
         u.action = ev.actionType; u.lastSeen = ts; u.leaving = false;
-        if (ev.actionType === 'login') queueMoveTo(u, 0);
-        else if (SUBMIT_ACTIONS.has(ev.actionType)) queueRoundTrip(u, ev.tool);
-        else queueMoveTo(u, parseInt(ev.nodeId));
+        if (ev.actionType === 'login') {
+          queueMoveTo(u, 0);
+        } else if (SUBMIT_ACTIONS.has(ev.actionType)) {
+          const nodeId = parseInt(ev.nodeId);
+          queueMoveTo(u, nodeId); // 保險：若還沒收到對應的 open 事件，先確保使用者站在地點上
+          const role = ev.role || NODE_CHAR[nodeId] || '路飛';
+          const runner = spawnActionRunner(ev.tool, role, nodeId, () => queueMoveTo(u, 0));
+          if (!runner) queueMoveTo(u, 0); // 沒有巡航路線可跑（未知工具）就直接回主控台
+        } else {
+          queueMoveTo(u, parseInt(ev.nodeId));
+        }
       });
     }
 
@@ -819,6 +889,45 @@ function updateLiveUsers(dt) {
       u.pos.lerpVectors(u.seg.from, u.seg.to, ease);
       if (k >= 1) { u.pos.copy(u.seg.to); u.seg = null; }
     }
+  });
+}
+
+// 動作跑者移動：路線跑完（waypoints 清空且沒有移動中的 seg）就觸發
+// onComplete（讓使用者球體回主控台）並開始淡出
+function updateActionRunners(dt) {
+  actionRunners.forEach(r => {
+    if (!r.leaving && !r.seg && r.waypoints.length === 0) {
+      r.leaving = true;
+      if (r.onComplete) { r.onComplete(); r.onComplete = null; }
+    }
+    if (r.leaving) r.alpha -= dt * 1.8;
+
+    if (!r.seg && r.waypoints.length) {
+      const target = nodeWorldById(r.waypoints.shift());
+      if (target) {
+        const dist = r.pos.distanceTo(target);
+        r.seg = { from: r.pos.clone(), to: target.clone(), t: 0, dur: Math.max(0.4, dist / HOP_SPEED) };
+      }
+    }
+    if (r.seg) {
+      r.seg.t += dt;
+      const k = Math.min(1, r.seg.t / r.seg.dur);
+      const ease = k * k * (3 - 2 * k);
+      r.pos.lerpVectors(r.seg.from, r.seg.to, ease);
+      if (k >= 1) { r.pos.copy(r.seg.to); r.seg = null; }
+    }
+  });
+  actionRunners = actionRunners.filter(r => r.alpha > 0);
+}
+
+function drawActionRunners(ctx) {
+  actionRunners.forEach(r => {
+    const scr = worldToScreen(r.pos);
+    if (!scr) return;
+    if (scr.x < -60 || scr.x > window.innerWidth + 60 || scr.y < -60 || scr.y > window.innerHeight + 60) return;
+    // 跑動作路線時縮小顯示（0.55倍），視覺上區分「代跑角色」跟站崗的正常大小角色；
+    // 這個縮放參數就是未來升級成跑步序列幀動畫的掛鉤點
+    drawCharacter(ctx, scr.x, scr.y, r.role, 0, r.alpha, 0.55);
   });
 }
 
@@ -1046,7 +1155,8 @@ function animate() {
     fetchWorkflowData();
   }
 
-  // 畫 2D 角色人物
+  // 畫工具節點地點圖（背景場景，先畫）→ 再畫角色人物（疊在場景上）
+  drawNodeLocations();
   drawAllCharacters();
 
   // 即時航跡人物層（限主管，且分頁在前景才輪詢省額度）
@@ -1057,7 +1167,9 @@ function animate() {
     }
     const dt = Math.min(0.05, t - lastFrameT);
     updateLiveUsers(dt);
+    updateActionRunners(dt);
     drawLiveUsers(charCtx, t);
+    drawActionRunners(charCtx);
   }
   lastFrameT = t;
 }
