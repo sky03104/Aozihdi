@@ -505,6 +505,8 @@ const CHAR_COLORS = {
 };
 
 // 角色圖片（預載）
+// 圖片資料夾：角色圖與地點圖統一放 brain_map_img/，根目錄才不會被塞爆
+const IMG_DIR = 'brain_map_img/';
 const CHAR_IMG_MAP = {
   '路飛': 'luffy.png', '索隆': 'zoro.png',   '娜美': 'nami.png',
   '烏索普':'usopp.png','山治': 'sanji.png',   '喬巴': 'chopper.png',
@@ -514,7 +516,7 @@ const CHAR_IMG_MAP = {
 const CHAR_IMAGES = {};
 Object.entries(CHAR_IMG_MAP).forEach(([role, file]) => {
   const img = new Image();
-  img.src = file;
+  img.src = IMG_DIR + file;
   CHAR_IMAGES[role] = img;
 });
 
