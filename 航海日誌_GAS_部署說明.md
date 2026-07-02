@@ -25,7 +25,7 @@ v2.0 新增：**即時航跡**（brain_map 顯示線上使用者 + 沿線移動�
 
 | 端點 | 方法 | 用途 | 呼叫方 |
 |------|------|------|--------|
-| `?mode=getActive&minutes=10` | GET | 線上使用者+最近事件（快取10秒） | brain_map 每10秒 |
+| `?mode=getActive` | GET | 線上使用者+最近事件（快取10秒，不設閒置逾時，只認登出/強制登出，呼應「記住我」持久登入） | brain_map 每10秒 |
 | `?mode=checkKick&empId=X` | GET | 我有沒有被踢（一次性） | APP 每60秒 |
 | `action: forceLogout` | POST | 把某工號加入踢人名單 | brain_map 點人物→強制登出 |
 

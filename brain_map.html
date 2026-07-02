@@ -737,7 +737,7 @@ function queueRoundTrip(u, tool) {
 
 async function fetchActiveUsers() {
   try {
-    const res = await fetch(`${WORKFLOW_GAS_URL}?mode=getActive&minutes=10`);
+    const res = await fetch(`${WORKFLOW_GAS_URL}?mode=getActive`);
     const data = await res.json();
     if (data.status !== 'ok' || !data.data) return;
     const users = data.data.users || [], events = data.data.events || [];
@@ -769,7 +769,7 @@ async function fetchActiveUsers() {
       });
     }
 
-    // 已不在線上名單（超時/登出）→ 離場淡出
+    // 不設閒置逾時：只有明確登出/被強制登出才離場，呼應「記住我」持久登入
     Object.keys(liveUsers).forEach(id => { if (!onlineIds.has(id)) liveUsers[id].leaving = true; });
 
     // 線上人數徽章
