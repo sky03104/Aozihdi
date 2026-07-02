@@ -210,6 +210,10 @@ const NODES = [
   { id: 37, title: '物流車輛統計',        topic: 'tools',   pos: [ 0.75, 0.25, -0.35], note: 'tool_logistics.html 獨立檔（iframe src）；三分類(1.9噸/3.5噸/8噸以上)登記＋快捷一鍵送出＋單日查詢＋整月統計；可修改/刪除；全員開放(id18)，快捷管理限 admin' },
   { id: 38, title: '物流統計 GAS',        topic: 'backend', pos: [-0.55, 0.05, 0.05], note: '物流車輛統計_GAS.gs（獨立部署）；add/update/delete/getDay/getMonth/exportMonth＋getShortcuts/addShortcut/updateShortcut/deleteShortcut；時間戳伺服器端蓋、主鍵 max(ID)+1' },
   { id: 39, title: '物流試算表',          topic: 'data',    pos: [ 0.65, -1.2, -0.15], note: '新建試算表；物流車輛紀錄分頁(A~H)＋快捷設定分頁(A~C)＋YYYY-MM 月統計分頁（exportMonth 產生）；工號欄純文字保開頭0' },
+
+  // ── 航海日誌即時航跡（2026-07-02）──
+  { id: 40, title: '航海日誌 GAS',        topic: 'backend', pos: [-0.55, 0.55, 0.1], note: '航海日誌_GAS.gs v2.0；logTask/getActive/checkKick/forceLogout；CacheService 快取 10 秒 + 30 天自動清理；brain_map 每 10 秒輪詢畫即時人物' },
+  { id: 41, title: '航海日誌試算表',      topic: 'data',    pos: [-0.55, -0.75, -0.15], note: '工作日誌分頁：時間/工號/姓名/工具/節點/角色/動作/狀態/備註；只留 30 天' },
 ];
 
 const EDGES = [
@@ -239,6 +243,8 @@ const EDGES = [
   [33, 34], [33, 35], [35, 34],
   // 物流車輛統計：主控台→工具→GAS→試算表
   [0, 37], [37, 38], [38, 39],
+  // 航海日誌：APP 回報事件 → GAS → 試算表
+  [0, 40], [40, 41],
 ];
 
 // === BRAIN_MAP_DATA_END ===
@@ -643,8 +649,316 @@ function drawAllCharacters() {
   });
 }
 
+// ═══════════════════════════════════════════════════════════
+// 即時航跡人物層：線上使用者顯示 + 沿線移動 + 強制登出
+// 只有 executive/admin 登入者（同瀏覽器登入過 APP）看得到
+// ═══════════════════════════════════════════════════════════
+const SESSION_USER = (() => { try { return JSON.parse(localStorage.getItem('hsh_session_user') || 'null'); } catch (e) { return null; } })();
+const CAN_VIEW_USERS = !!(SESSION_USER && ['executive', 'admin'].includes(SESSION_USER.role));
+
+// 工具 → 巡航路線（工具節點 → 後端 GAS → 資料表）；送出資料時沿路線跑一圈回來
+const TOOL_ROUTE = {
+  app: [0], schedule: [8, 20], work: [11], aiwork: [11], signin: [11], car: [11],
+  closing: [6, 15, 18], opening: [5, 15, 19], report: [3, 13, 17], feedback: [4, 13, 17],
+  leave: [12, 14, 17], upload: [10, 18], aichat: [29, 30, 31], emergency: [9, 21],
+  post: [7], hailing: [7], logistics: [37, 38, 39],
+};
+const SUBMIT_ACTIONS = new Set(['submit', 'direct-submit', 'queue-submit', 'vehicle-reg', 'push-contacts', 'update', 'delete']);
+
+// 鄰接表 + BFS 最短路徑（人物沿現有連線走，不穿牆）
+const ADJ = {};
+EDGES.forEach(([a, b]) => { (ADJ[a] = ADJ[a] || []).push(b); (ADJ[b] = ADJ[b] || []).push(a); });
+function bfsPath(from, to) {
+  if (from === to) return [to];
+  const prev = { [from]: null }, queue = [from];
+  while (queue.length) {
+    const cur = queue.shift();
+    for (const nxt of (ADJ[cur] || [])) {
+      if (nxt in prev) continue;
+      prev[nxt] = cur;
+      if (nxt === to) {
+        const path = [to]; let p = cur;
+        while (p !== null) { path.unshift(p); p = prev[p]; }
+        return path;
+      }
+      queue.push(nxt);
+    }
+  }
+  return [from, to]; // 圖上無路 → 直線飛過去
+}
+function nodeWorldById(id) {
+  const idx = NODES.findIndex(n => n.id === id);
+  return idx < 0 ? null : worldPos[idx];
+}
+
+// 每個工號固定一個顏色（好認）
+const USER_COLORS = ['#FFD700', '#4ADE80', '#818CF8', '#FB923C', '#38BDF8', '#F87171', '#A78BFA', '#34D399'];
+function userColor(empId) {
+  let h = 0; const s = String(empId);
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return USER_COLORS[h % USER_COLORS.length];
+}
+
+let liveUsers = {};            // empId → 人物狀態
+let lastEventTs = 0;           // 已處理事件的最新時間戳
+let firstActiveLoad = true;
+let lastActiveFetch = 0;
+const ACTIVE_INTERVAL = 10000; // brain_map 每 10 秒輪詢
+const HOP_SPEED = 0.9;         // 世界座標單位/秒（沿線移動速度，看得到跑）
+
+function ensureUser(empId, name, nodeId) {
+  if (liveUsers[empId]) return liveUsers[empId];
+  const wp = nodeWorldById(nodeId) || nodeWorldById(0);
+  liveUsers[empId] = {
+    empId: empId, name: name || empId, color: userColor(empId),
+    node: nodeId, pos: wp.clone(), waypoints: [], seg: null,
+    alpha: 0, leaving: false, tool: 'app', action: 'login',
+    lastSeen: Date.now(), screen: null,
+  };
+  return liveUsers[empId];
+}
+
+function queueMoveTo(u, targetNodeId) {
+  if (nodeWorldById(targetNodeId) === null) return;
+  const path = bfsPath(u.node, targetNodeId);
+  for (let i = 1; i < path.length; i++) u.waypoints.push(path[i]);
+  u.node = targetNodeId;
+}
+
+function queueRoundTrip(u, tool) {
+  const route = TOOL_ROUTE[tool];
+  if (!route) { return; }
+  queueMoveTo(u, route[0]);
+  // 去程：工具 → GAS → 資料表；回程原路折返
+  for (let i = 1; i < route.length; i++) u.waypoints.push(route[i]);
+  for (let i = route.length - 2; i >= 0; i--) u.waypoints.push(route[i]);
+  u.node = route[0];
+}
+
+async function fetchActiveUsers() {
+  try {
+    const res = await fetch(`${WORKFLOW_GAS_URL}?mode=getActive&minutes=10`);
+    const data = await res.json();
+    if (data.status !== 'ok' || !data.data) return;
+    const users = data.data.users || [], events = data.data.events || [];
+    const onlineIds = new Set(users.map(su => String(su.empId)));
+
+    if (firstActiveLoad) {
+      // 首次載入：直接放到目前位置，不重播歷史動畫
+      users.forEach(su => {
+        const u = ensureUser(String(su.empId), su.userName, parseInt(su.nodeId));
+        u.tool = su.tool; u.action = su.actionType;
+        u.lastSeen = new Date(su.timestamp).getTime();
+      });
+      lastEventTs = events.length ? new Date(events[events.length - 1].timestamp).getTime() : Date.now();
+      firstActiveLoad = false;
+    } else {
+      // 新事件依序驅動動畫（登入現身、開工具移動、送出跑 GAS 一圈、登出離場）
+      events.forEach(ev => {
+        const ts = new Date(ev.timestamp).getTime();
+        if (ts <= lastEventTs) return;
+        lastEventTs = ts;
+        const id = String(ev.empId);
+        if (ev.actionType === 'logout') { if (liveUsers[id]) liveUsers[id].leaving = true; return; }
+        const u = ensureUser(id, ev.userName, ev.actionType === 'login' ? 0 : parseInt(ev.nodeId));
+        u.name = ev.userName || u.name; u.tool = ev.tool;
+        u.action = ev.actionType; u.lastSeen = ts; u.leaving = false;
+        if (ev.actionType === 'login') queueMoveTo(u, 0);
+        else if (SUBMIT_ACTIONS.has(ev.actionType)) queueRoundTrip(u, ev.tool);
+        else queueMoveTo(u, parseInt(ev.nodeId));
+      });
+    }
+
+    // 已不在線上名單（超時/登出）→ 離場淡出
+    Object.keys(liveUsers).forEach(id => { if (!onlineIds.has(id)) liveUsers[id].leaving = true; });
+
+    // 線上人數徽章
+    const badge = document.getElementById('online-badge');
+    if (badge) {
+      const n = Object.keys(liveUsers).filter(id => !liveUsers[id].leaving).length;
+      badge.textContent = '👥 線上 ' + n + ' 人';
+      badge.style.display = n > 0 ? 'block' : 'none';
+    }
+  } catch (e) { /* 靜默失敗，不影響地圖 */ }
+}
+
+function updateLiveUsers(dt) {
+  Object.keys(liveUsers).forEach(id => {
+    const u = liveUsers[id];
+    // 淡入淡出
+    if (u.leaving) {
+      u.alpha -= dt * 1.5;
+      if (u.alpha <= 0) { delete liveUsers[id]; return; }
+    } else {
+      u.alpha = Math.min(1, u.alpha + dt * 1.5);
+    }
+    // 沿線移動：一次走一段（節點 → 相鄰節點）
+    if (!u.seg && u.waypoints.length) {
+      const target = nodeWorldById(u.waypoints.shift());
+      if (target) {
+        const dist = u.pos.distanceTo(target);
+        u.seg = { from: u.pos.clone(), to: target.clone(), t: 0, dur: Math.max(0.4, dist / HOP_SPEED) };
+      }
+    }
+    if (u.seg) {
+      u.seg.t += dt;
+      const k = Math.min(1, u.seg.t / u.seg.dur);
+      const ease = k * k * (3 - 2 * k); // smoothstep：起步加速、到站減速
+      u.pos.lerpVectors(u.seg.from, u.seg.to, ease);
+      if (k >= 1) { u.pos.copy(u.seg.to); u.seg = null; }
+    }
+  });
+}
+
+function drawLiveUsers(ctx, t) {
+  Object.keys(liveUsers).forEach(id => {
+    const u = liveUsers[id];
+    const scr = worldToScreen(u.pos);
+    if (!scr) { u.screen = null; return; }
+    if (scr.x < -60 || scr.x > window.innerWidth + 60 || scr.y < -60 || scr.y > window.innerHeight + 60) { u.screen = null; return; }
+
+    const moving = !!u.seg;
+    const bob = moving ? 0 : Math.sin(t * 2.2 + u.pos.x * 7) * 2.5; // 待機輕輕浮動
+    const x = scr.x, y = scr.y + bob;
+    u.screen = { x: x, y: y };
+
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, u.alpha));
+
+    // 移動殘影尾巴（看得出正在跑）
+    if (moving && u.seg) {
+      const dx = u.seg.to.x - u.seg.from.x, dy = u.seg.to.y - u.seg.from.y;
+      for (let i = 1; i <= 3; i++) {
+        const back = worldToScreen(u.pos.clone().addScaledVector(new THREE.Vector3(dx, dy, u.seg.to.z - u.seg.from.z).normalize(), -0.06 * i));
+        if (back) {
+          ctx.fillStyle = u.color + ['66', '44', '22'][i - 1];
+          ctx.beginPath(); ctx.arc(back.x, back.y, 8 - i * 1.8, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+
+    // 光暈 + 本體圓點
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, 22);
+    gr.addColorStop(0, u.color + '66');
+    gr.addColorStop(1, u.color + '00');
+    ctx.fillStyle = gr;
+    ctx.beginPath(); ctx.arc(x, y, 22, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = u.color;
+    ctx.strokeStyle = '#F5F5F5'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+    // 名字標籤（深色底 + 顏色邊框）
+    ctx.font = "bold 12px 'Microsoft JhengHei', sans-serif";
+    const label = u.name;
+    const tw = ctx.measureText(label).width;
+    const lx = x - tw / 2 - 7, ly = y + 14, lw = tw + 14, lh = 20;
+    ctx.fillStyle = 'rgba(10,12,16,.88)';
+    ctx.strokeStyle = u.color + 'AA'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(lx, ly, lw, lh, 6) : ctx.rect(lx, ly, lw, lh);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#F5F5F5';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, x, ly + lh / 2 + 1);
+
+    ctx.restore();
+  });
+}
+
+// ── 點擊人物 → 彈出資訊卡（含強制登出）──────────────────────
+const TOOL_LABEL = {
+  app: '主控台', schedule: '班表查詢', work: '施工單', aiwork: '施工單', signin: '簽到',
+  car: '車輛', closing: '打烊登錄', opening: '開店登錄', report: '事故報告',
+  feedback: '表揚/反應', leave: '請假', upload: '資料上傳', aichat: 'AI 小助手',
+  emergency: '緊急聯絡', post: '明日哨表', hailing: '明日哨表', logistics: '物流統計',
+};
+
+let userMenuEl = null;
+function hideUserMenu() { if (userMenuEl) { userMenuEl.remove(); userMenuEl = null; } }
+
+function showUserMenu(u, px, py) {
+  hideUserMenu();
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;z-index:300;min-width:180px;padding:14px 16px;' +
+    'background:rgba(13,15,20,.95);border:1px solid ' + u.color + ';border-radius:12px;' +
+    'backdrop-filter:blur(12px);color:#F5F5F5;font-family:"Microsoft JhengHei",sans-serif;' +
+    'font-size:13px;line-height:1.9;box-shadow:0 8px 32px rgba(0,0,0,.6);';
+  const lastSeenStr = new Date(u.lastSeen).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+  el.innerHTML =
+    '<div style="font-size:15px;font-weight:bold;color:' + u.color + ';">● ' + u.name + '</div>' +
+    '<div style="color:#9CA3AF;">工號 ' + u.empId + '</div>' +
+    '<div>目前：' + (TOOL_LABEL[u.tool] || u.tool) + '</div>' +
+    '<div style="color:#9CA3AF;">最後動作 ' + lastSeenStr + '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:10px;">' +
+      '<button id="um-kick" style="flex:1;padding:8px;border:none;border-radius:8px;cursor:pointer;' +
+        'background:linear-gradient(135deg,#F87171,#E53E3E);color:#fff;font-weight:bold;">強制登出</button>' +
+      '<button id="um-close" style="flex:1;padding:8px;border:1px solid rgba(255,255,255,.2);border-radius:8px;' +
+        'cursor:pointer;background:rgba(255,255,255,.08);color:#F5F5F5;">關閉</button>' +
+    '</div>';
+  document.body.appendChild(el);
+  // 貼齊點擊位置，防超出畫面
+  const r = el.getBoundingClientRect();
+  el.style.left = Math.min(px, window.innerWidth - r.width - 12) + 'px';
+  el.style.top  = Math.min(py, window.innerHeight - r.height - 12) + 'px';
+  userMenuEl = el;
+
+  el.querySelector('#um-close').onclick = hideUserMenu;
+  el.querySelector('#um-kick').onclick = async () => {
+    if (!confirm('確定要強制登出「' + u.name + '」（工號 ' + u.empId + '）？\n對方 APP 最慢 1 分鐘內會被登出。')) return;
+    try {
+      const res = await fetch(WORKFLOW_GAS_URL, { method: 'POST', body: JSON.stringify({
+        action: 'forceLogout', targetEmpId: u.empId, targetName: u.name,
+        operatorEmpId: SESSION_USER.empId, operatorName: SESSION_USER.name || SESSION_USER.empId,
+      }) });
+      const d = await res.json();
+      alert(d.status === 'ok' ? '✅ ' + d.msg : '❌ ' + d.msg);
+      if (d.status === 'ok') { u.leaving = true; hideUserMenu(); }
+    } catch (e) { alert('❌ 送出失敗，請檢查網路'); }
+  };
+}
+
+// 點擊偵測：短按（非拖曳）且點在人物上 → 開資訊卡
+if (CAN_VIEW_USERS) {
+  // 線上人數徽章
+  const badge = document.createElement('div');
+  badge.id = 'online-badge';
+  badge.style.cssText = 'position:fixed;top:22px;right:26px;z-index:110;display:none;' +
+    'padding:6px 14px;background:rgba(13,15,20,.85);border:1px solid rgba(212,168,0,.4);' +
+    'border-radius:20px;color:#FFD700;font-size:13px;font-weight:bold;' +
+    'font-family:"Microsoft JhengHei",sans-serif;backdrop-filter:blur(8px);pointer-events:none;';
+  document.body.appendChild(badge);
+
+  let downPos = null;
+  const hitUser = (cx, cy) => {
+    const ids = Object.keys(liveUsers);
+    for (let i = ids.length - 1; i >= 0; i--) {
+      const u = liveUsers[ids[i]];
+      if (u.screen && Math.hypot(cx - u.screen.x, cy - u.screen.y) < 24) return u;
+    }
+    return null;
+  };
+  canvas.addEventListener('mousedown', e => { downPos = { x: e.clientX, y: e.clientY }; });
+  canvas.addEventListener('mouseup', e => {
+    if (!downPos) return;
+    const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+    downPos = null;
+    if (moved > 6) return;
+    const u = hitUser(e.clientX, e.clientY);
+    if (u) showUserMenu(u, e.clientX + 12, e.clientY + 12);
+    else hideUserMenu();
+  });
+  canvas.addEventListener('touchend', e => {
+    if (e.changedTouches.length !== 1) return;
+    const tc = e.changedTouches[0];
+    const u = hitUser(tc.clientX, tc.clientY);
+    if (u) { showUserMenu(u, tc.clientX + 12, tc.clientY + 12); }
+  });
+}
+
 // ── 動畫主迴圈 ──────────────────────────────────────────────
 const clock = new THREE.Clock();
+let lastFrameT = 0;
 function animate() {
   requestAnimationFrame(animate);
   const t = clock.getElapsedTime();
@@ -694,6 +1008,18 @@ function animate() {
 
   // 畫 2D 角色人物
   drawAllCharacters();
+
+  // 即時航跡人物層（限主管，且分頁在前景才輪詢省額度）
+  if (CAN_VIEW_USERS) {
+    if (!document.hidden && nowMs - lastActiveFetch > ACTIVE_INTERVAL) {
+      lastActiveFetch = nowMs;
+      fetchActiveUsers();
+    }
+    const dt = Math.min(0.05, t - lastFrameT);
+    updateLiveUsers(dt);
+    drawLiveUsers(charCtx, t);
+  }
+  lastFrameT = t;
 }
 animate();
 </script>
