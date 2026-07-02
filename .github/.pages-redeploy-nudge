@@ -1,1 +1,1 @@
-redeploy nudge: 2026-07-02T15:59:00Z — 前次部署 run 28602407025 卡在 GitHub Pages 佇列（deployment_queued）逾10分鐘無進展，用全新 commit 觸發乾淨的新部署，繞開舊 deployment ID 的卡住狀態。此檔僅作觸發用途，無實際功能。
+redeploy nudge #2: 2026-07-02T16:3X:00Z — 最早那次卡住的 run 28602407025 至今仍顯示 queued，GitHub API 回報 409（無法取消），確認是平台端孤立狀態。第二次全新部署（run 28604490525）已跑完失敗，現在佇列應空，再試一次。
