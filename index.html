@@ -17225,6 +17225,24 @@ function logWorkflow(tool,actionType,status){
   if(!u.empId)return;
   try{fetch(WORKFLOW_GAS_URL,{method:'POST',body:JSON.stringify({action:'logTask',tool,empId:u.empId,userName:u.name||'未知',actionType,status:status||'已完成'})});}catch(e){}
 }
+
+/* 航海日誌：每 60 秒檢查是否被管理員強制登出 */
+setInterval(function () {
+  try {
+    var u = JSON.parse(localStorage.getItem('hsh_session_user') || '{}');
+    if (!u.empId) return;
+    fetch(WORKFLOW_GAS_URL + '?mode=checkKick&empId=' + encodeURIComponent(u.empId))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.status === 'ok' && d.data && d.data.kicked) {
+          localStorage.removeItem('hsh_session_user');
+          alert('你已被管理員登出');
+          location.reload();
+        }
+      })
+      .catch(function () {});
+  } catch (e) {}
+}, 60000);
 var useState=React.useState;var useEffect=React.useEffect;var useRef=React.useRef;var useCallback=React.useCallback;var useMemo=React.useMemo;var useReducer=React.useReducer;var useContext=React.useContext;var createContext=React.createContext;
 "use strict";
 function b64decode(id) {
@@ -19020,6 +19038,8 @@ function App() {
     const [editingTool, setEditingTool] = useState(null);
     const [adminSubTab, setAdminSubTab] = useState("perms"); // perms | tools | users | approve
     const [activeToolId, setActiveToolId] = useState(null);
+        /* 航海日誌：切換工具時回報（brain_map 即時人物移動用） */
+        useEffect(() => { if (activeToolId) { try { if (typeof logWorkflow === 'function') logWorkflow(activeToolId, 'open', '使用中'); } catch (e) {} } }, [activeToolId]);
     const [externalScheduleData, setExternalScheduleData] = useState(null);
     const [showBulletin, setShowBulletin] = useState(false);
     const [bulletinSearch, setBulletinSearch] = useState('');
@@ -19198,6 +19218,7 @@ function App() {
             if (!sessionUser) return;
             setCurrentUser(sessionUser);
             localStorage.setItem('hsh_session_user', JSON.stringify(sessionUser));
+                try { if (typeof logWorkflow === 'function') logWorkflow('app', 'login', '上線'); } catch (e) {}
             setLoginForm(prev => ({ ...prev, id: sessionUser.empId }));
             const favKey = 'hsh_favs_' + sessionUser.empId;
             const savedFavs = localStorage.getItem(favKey);
@@ -19233,6 +19254,7 @@ function App() {
         setCurrentUser(sessionUser);
         /* 寫入 localStorage 讓 iframe 工具（緊急聯絡清單等）能讀到目前登入者角色 */
         localStorage.setItem('hsh_session_user', JSON.stringify(sessionUser));
+                try { if (typeof logWorkflow === 'function') logWorkflow('app', 'login', '上線'); } catch (e) {}
         /* 記住我：儲存或清除 */
         if (loginForm.remember) {
             localStorage.setItem('hsh_remember_user', JSON.stringify({ empId: loginForm.id.trim(), pw: loginForm.pw }));
@@ -20077,7 +20099,7 @@ function App() {
                     color: '#fff', cursor: 'pointer', marginBottom: 10,
                     fontFamily: "'Microsoft JhengHei',sans-serif",
                     boxShadow: '0 3px 14px rgba(6,199,85,.3)' } }, "\uD83D\uDCF1 \u7DA1\u5B9A LINE \u901A\u77E5"),
-            React.createElement("button", { className: "logout-btn", onClick: () => { setPage("login"); setCurrentUser(null); localStorage.removeItem('hsh_session_user'); showToast("已登出"); } }, "\u767B\u51FA\u5E33\u865F")));
+            React.createElement("button", { className: "logout-btn", onClick: () => { try { if (typeof logWorkflow === 'function') logWorkflow('app', 'logout', '離線'); } catch (e) {} setPage("login"); setCurrentUser(null); localStorage.removeItem('hsh_session_user'); showToast("已登出"); } }, "\u767B\u51FA\u5E33\u865F")));
     };
     const NAV = [
         { id: "home", icon: "🏠", label: "首頁" },
