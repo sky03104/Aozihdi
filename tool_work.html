@@ -594,6 +594,17 @@ function filterRows(rows, view, search, histDate){
 ══════════════════════════════════════════ */
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+// 監工姓名顯示遮蔽（陳小明→陳X明），僅用於畫面顯示，不影響搜尋/去重/帶入等原始資料
+function maskName(s){
+  s = String(s||'').trim();
+  if(!s || s==='--') return s;
+  var len = s.length;
+  if(len<=1) return s;
+  if(len===2) return s[0]+'X';
+  if(len===3) return s[0]+'X'+s[2];
+  return s[0]+'X'.repeat(len-2)+s[len-1];
+}
+
 function cardHtml(rec, view, isHot, idx){
   var today=d0(new Date());
   var cls='card '+(isHot?'c-hw':view==='tonight'?'c-tn':view==='morning'?'c-mo':'c-hi');
@@ -602,7 +613,7 @@ function cardHtml(rec, view, isHot, idx){
   var loc=rec['施工地點']||'--', work=rec['施工項目']||'--';
   var ei=fmtT(rec['進場時間輸入']), xi=fmtT(rec['退場時間輸入']);
   var timeBad = isBadTime(ei) || isBadTime(xi);  // 有爛時間就整段標紅提醒
-  var ppl=rec['人數'], sv=rec['監工']||'--';
+  var ppl=rec['人數'], sv=rec['監工']||'--', svMasked=maskName(sv);
   var sd=rec['施工日期'], xd=rec['退場日期'], note=rec['備註']||'';
 
   var dateTag='';
@@ -646,7 +657,7 @@ function cardHtml(rec, view, isHot, idx){
     +'<div class="crow">'
       +'<div class="ctime'+(timeBad?' bad':'')+'"><i class="ti '+(timeBad?'ti-alert-triangle':'ti-clock')+'"></i>'+esc(ei)+' → '+esc(xi)+(timeBad?' <span class="twarn">時間待確認</span>':'')+'</div>'
       +'<div class="cinfo"><i class="ti ti-users"></i><strong>'+esc(ppl!=null?ppl:'--')+'</strong> 人</div>'
-      +'<div class="cinfo"><i class="ti ti-user-check"></i>'+esc(sv)+'</div>'
+      +'<div class="cinfo"><i class="ti ti-user-check"></i>'+esc(svMasked)+'</div>'
     +'</div>'
     +'<div class="cwork"><i class="ti ti-tool"></i><span>'+esc(work)+'</span></div>'
     +extra

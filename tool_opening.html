@@ -1777,6 +1777,16 @@ function showToast(msg,type){
   t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2800);
 }
 function x(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+// 監工姓名顯示遮蔽（陳小明→陳X明），僅用於施工單查詢 Drawer 顯示，快速帶入/帶出仍用原始 o.supervisor
+function maskName(s){
+  s = String(s||'').trim();
+  if(!s || s==='--') return s;
+  var len = s.length;
+  if(len<=1) return s;
+  if(len===2) return s[0]+'X';
+  if(len===3) return s[0]+'X'+s[2];
+  return s[0]+'X'.repeat(len-2)+s[len-1];
+}
 
 // GENERATE SHOP CODE (client-side for DB panel)
 function genShopCode(floor){
@@ -1901,7 +1911,7 @@ function renderConBody() {
         '<div class="con-card-loc-col">' + locTxt + '</div>' +
       '</div>' +
       '<div class="con-info">' +
-        (o.supervisor ? '<span>👤' + x(o.supervisor) + '</span>' : '') +
+        (o.supervisor ? '<span>👤' + x(maskName(o.supervisor)) + '</span>' : '') +
         '<span>👥' + (o.count || 0) + ' 人</span>' +
         (timeStr ? '<span>🕐' + timeStr + '</span>' : '') +
         (o.workType ? '<span>🔧' + x(o.workType) + '</span>' : '') +
