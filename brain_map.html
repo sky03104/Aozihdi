@@ -811,15 +811,36 @@ function updateLiveUsers(dt) {
 }
 
 function drawLiveUsers(ctx, t) {
+  // 先算出每個人的基礎螢幕座標
+  const items = [];
   Object.keys(liveUsers).forEach(id => {
     const u = liveUsers[id];
     const scr = worldToScreen(u.pos);
-    if (!scr) { u.screen = null; return; }
-    if (scr.x < -60 || scr.x > window.innerWidth + 60 || scr.y < -60 || scr.y > window.innerHeight + 60) { u.screen = null; return; }
+    if (!scr || scr.x < -60 || scr.x > window.innerWidth + 60 || scr.y < -60 || scr.y > window.innerHeight + 60) {
+      u.screen = null; return;
+    }
+    items.push({ id, u, x: scr.x, y: scr.y, ox: 0, oy: 0 });
+  });
 
+  // 分組：螢幕座標相近（同一節點聚集）的人往下錯開排列，名字才不會疊在一起
+  const GROUP_DIST = 50, STACK_GAP = 52;
+  const groups = [];
+  items.forEach(it => {
+    let g = groups.find(g => Math.hypot(g.x - it.x, g.y - it.y) < GROUP_DIST);
+    if (!g) { g = { x: it.x, y: it.y, members: [] }; groups.push(g); }
+    g.members.push(it);
+  });
+  groups.forEach(g => {
+    // 依工號排序，順序穩定，才不會每次輪詢後名字互換位置閃爍
+    g.members.sort((a, b) => a.id.localeCompare(b.id));
+    g.members.forEach((m, i) => { m.oy = i * STACK_GAP; });
+  });
+
+  items.forEach(it => {
+    const u = it.u;
     const moving = !!u.seg;
     const bob = moving ? 0 : Math.sin(t * 2.2 + u.pos.x * 7) * 2.5; // 待機輕輕浮動
-    const x = scr.x, y = scr.y + bob;
+    const x = it.x + it.ox, y = it.y + it.oy + bob;
     u.screen = { x: x, y: y };
 
     ctx.save();
