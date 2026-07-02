@@ -501,6 +501,7 @@ const CHAR_COLORS = {
   '喬巴':  '#F87171',
   '弗蘭奇':'#06B6D4',
   '甚平':  '#0D9488',
+  '黃金梅利號':'#F0C040',
 };
 
 // 角色圖片（預載）
@@ -508,7 +509,7 @@ const CHAR_IMG_MAP = {
   '路飛': 'luffy.png', '索隆': 'zoro.png',   '娜美': 'nami.png',
   '烏索普':'usopp.png','山治': 'sanji.png',   '喬巴': 'chopper.png',
   '羅賓': 'robin.png', '弗蘭奇':'franky.png', '布魯克':'brook.png',
-  '甚平': 'jinbe.png',
+  '甚平': 'jinbe.png', '黃金梅利號':'godenmerry.png',
 };
 const CHAR_IMAGES = {};
 Object.entries(CHAR_IMG_MAP).forEach(([role, file]) => {
@@ -519,10 +520,11 @@ Object.entries(CHAR_IMG_MAP).forEach(([role, file]) => {
 
 // 節點 → 角色映射（地盤）
 const NODE_CHAR = {
-  0:  '路飛',   // 主控台（黃金梅利號）
+  0:  '黃金梅利號', // 主控台（草帽一夥的船，全船的家）
   1:  '烏索普', // 登入與角色系統
   3:  '羅賓',   // 事故報告工具
   4:  '喬巴',   // 匿名表揚/反應
+  6:  '路飛',   // 打烊後快速登錄（原站主控台，改站船長該顧的收工崗位）
   7:  '甚平',   // 明日哨表
   8:  '娜美',   // 班表查詢
   10: '弗蘭奇', // 資料上傳工具
@@ -580,19 +582,25 @@ function worldToScreen(vec3) {
 function drawCharacter(ctx, x, y, role, count, alpha) {
   const glowColor = CHAR_COLORS[role] || '#D4A800';
   const img = CHAR_IMAGES[role];
-  const iw = 80, ih = 80; // 顯示尺寸
+  const boxW = 80, boxH = 80; // 顯示框：光暈/名字/計數氣泡都固定用這個尺寸排版
+  let iw = boxW, ih = boxH;   // 圖片實際繪製尺寸：依原始長寬比縮放，避免船隻等非正方形圖被拉伸變形
+  if (img && img.complete && img.naturalWidth > 0) {
+    const ratio = img.naturalWidth / img.naturalHeight;
+    if (ratio >= 1) { iw = boxW; ih = boxW / ratio; }
+    else { ih = boxH; iw = boxH * ratio; }
+  }
   const ix = x - iw / 2;
-  const iy = y - ih;      // 圖片底部對齊節點上方
+  const iy = y - boxH + (boxH - ih); // 底部對齊節點上方（與其他角色齊平站在同一條基準線）
 
   ctx.save();
   ctx.globalAlpha = Math.min(1, alpha);
 
   // 光暈
-  const gr = ctx.createRadialGradient(x, y - ih * 0.5, 0, x, y - ih * 0.5, iw * 0.75);
+  const gr = ctx.createRadialGradient(x, y - boxH * 0.5, 0, x, y - boxH * 0.5, boxW * 0.75);
   gr.addColorStop(0, glowColor + '55');
   gr.addColorStop(1, glowColor + '00');
   ctx.fillStyle = gr;
-  ctx.beginPath(); ctx.arc(x, y - ih * 0.5, iw * 0.75, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y - boxH * 0.5, boxW * 0.75, 0, Math.PI * 2); ctx.fill();
 
   // 角色圖片
   if (img && img.complete && img.naturalWidth > 0) {
@@ -600,7 +608,7 @@ function drawCharacter(ctx, x, y, role, count, alpha) {
   } else {
     // 圖片未載入：顯示彩色圓圈佔位
     ctx.fillStyle = glowColor + '88';
-    ctx.beginPath(); ctx.arc(x, y - ih * 0.5, iw * 0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y - boxH * 0.5, boxW * 0.4, 0, Math.PI * 2); ctx.fill();
   }
 
   // 角色名
@@ -612,7 +620,7 @@ function drawCharacter(ctx, x, y, role, count, alpha) {
 
   // 活動計數氣泡
   if (count > 0) {
-    const bx = x + iw * 0.38, bby = y - ih * 0.88;
+    const bx = x + boxW * 0.38, bby = y - boxH * 0.88;
     ctx.fillStyle = '#D4A800'; ctx.strokeStyle = '#0A0C10'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(bx, bby, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#0A0C10'; ctx.font = 'bold 9px sans-serif';
