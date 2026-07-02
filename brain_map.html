@@ -203,9 +203,17 @@ const NODES = [
   { id: 34, title: '第二大腦 Vault',      topic: 'data',  pos: [ 0.2, -0.7,  0.75], note: 'obsidian-vault/；_CLAUDE.md 操作手冊 + index.md + Logs/ + Bases/；咖哩私人筆記，與天鷹 APP 資料分開' },
   { id: 35, title: 'SessionStart Hook',   topic: 'infra', pos: [-0.6,  0.35, -1.0], note: '.claude/settings.json：OBSIDIAN_VAULT_PATH + load_vault_context.py；只在 cwd 進入 vault 目錄才注入 _CLAUDE.md，不影響其他 session' },
 
+  // ── 車牌辨識（過夜車輛登記，2026-07-02）──
+  { id: 36, title: '車牌辨識 GAS',        topic: 'backend', pos: [-0.7, -0.15, 0.35], note: '車牌辨識_後端_GAS.gs（獨立部署）；recognizePlate Gemini Vision 辨識＋台灣車牌格式正規化、vehicleReg 寫車輛登記試算表 1K46ZEq…；Key 存指令碼屬性' },
+
+  // ── 物流車輛統計（2026-07-02）──
+  { id: 37, title: '物流車輛統計',        topic: 'tools',   pos: [ 0.75, 0.25, -0.35], note: 'tool_logistics.html 獨立檔（iframe src）；三分類(1.9噸/3.5噸/8噸以上)登記＋快捷一鍵送出＋單日查詢＋整月統計；可修改/刪除；全員開放(id18)，快捷管理限 admin' },
+  { id: 38, title: '物流統計 GAS',        topic: 'backend', pos: [-0.55, 0.05, 0.05], note: '物流車輛統計_GAS.gs（獨立部署）；add/update/delete/getDay/getMonth/exportMonth＋getShortcuts/addShortcut/updateShortcut/deleteShortcut；時間戳伺服器端蓋、主鍵 max(ID)+1' },
+  { id: 39, title: '物流試算表',          topic: 'data',    pos: [ 0.65, -1.2, -0.15], note: '新建試算表；物流車輛紀錄分頁(A~H)＋快捷設定分頁(A~C)＋YYYY-MM 月統計分頁（exportMonth 產生）；工號欄純文字保開頭0' },
+
   // ── 航海日誌即時航跡（2026-07-02）──
-  { id: 36, title: '航海日誌 GAS',        topic: 'backend', pos: [-0.55, 0.55, 0.1], note: '航海日誌_GAS.gs v2.0；logTask/getActive/checkKick/forceLogout；CacheService 快取 10 秒 + 30 天自動清理；brain_map 每 10 秒輪詢畫即時人物' },
-  { id: 37, title: '航海日誌試算表',      topic: 'data',    pos: [-0.55, -0.75, -0.15], note: '工作日誌分頁：時間/工號/姓名/工具/節點/角色/動作/狀態/備註；只留 30 天' },
+  { id: 40, title: '航海日誌 GAS',        topic: 'backend', pos: [-0.55, 0.55, 0.1], note: '航海日誌_GAS.gs v2.0；logTask/getActive/checkKick/forceLogout；CacheService 快取 10 秒 + 30 天自動清理；brain_map 每 10 秒輪詢畫即時人物' },
+  { id: 41, title: '航海日誌試算表',      topic: 'data',    pos: [-0.55, -0.75, -0.15], note: '工作日誌分頁：時間/工號/姓名/工具/節點/角色/動作/狀態/備註；只留 30 天' },
 ];
 
 const EDGES = [
@@ -227,12 +235,16 @@ const EDGES = [
   [26, 1], [27, 8], [28, 0],
   // AI 小助手：主控台→工具→GAS→Gemini；工具讀本地個人化檔；TODO-13 對應
   [0, 29], [29, 30], [30, 31], [29, 21], [28, 29],
+  // 車牌辨識：過夜車輛登記（tool_signin）→ 車牌辨識獨立 GAS → Gemini
+  [11, 36], [36, 31],
   // cec-up：與 tpl-upload 同步、部署在 GitHub Pages
   [10, 32], [23, 32],
   // obsidian-second-brain：skill 操作 vault、hook 在 session 開始注入 vault 內容
   [33, 34], [33, 35], [35, 34],
+  // 物流車輛統計：主控台→工具→GAS→試算表
+  [0, 37], [37, 38], [38, 39],
   // 航海日誌：APP 回報事件 → GAS → 試算表
-  [0, 36], [36, 37],
+  [0, 40], [40, 41],
 ];
 
 // === BRAIN_MAP_DATA_END ===
@@ -649,7 +661,7 @@ const TOOL_ROUTE = {
   app: [0], schedule: [8, 20], work: [11], aiwork: [11], signin: [11], car: [11],
   closing: [6, 15, 18], opening: [5, 15, 19], report: [3, 13, 17], feedback: [4, 13, 17],
   leave: [12, 14, 17], upload: [10, 18], aichat: [29, 30, 31], emergency: [9, 21],
-  post: [7], hailing: [7],
+  post: [7], hailing: [7], logistics: [37, 38, 39],
 };
 const SUBMIT_ACTIONS = new Set(['submit', 'direct-submit', 'queue-submit', 'vehicle-reg', 'push-contacts', 'update', 'delete']);
 
@@ -859,7 +871,7 @@ const TOOL_LABEL = {
   app: '主控台', schedule: '班表查詢', work: '施工單', aiwork: '施工單', signin: '簽到',
   car: '車輛', closing: '打烊登錄', opening: '開店登錄', report: '事故報告',
   feedback: '表揚/反應', leave: '請假', upload: '資料上傳', aichat: 'AI 小助手',
-  emergency: '緊急聯絡', post: '明日哨表', hailing: '明日哨表',
+  emergency: '緊急聯絡', post: '明日哨表', hailing: '明日哨表', logistics: '物流統計',
 };
 
 let userMenuEl = null;

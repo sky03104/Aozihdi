@@ -36,6 +36,7 @@ const WORKFLOW_MAP = {
   'emergency':  { nodeId: 9,  role: '烏索普' },    // 緊急聯絡
   'post':       { nodeId: 7,  role: '甚平' },      // 明日哨表
   'hailing':    { nodeId: 7,  role: '甚平' },      // 明日哨表（舊名相容）
+  'logistics':  { nodeId: 37, role: '索隆' },      // 物流車輛統計
 };
 
 // ── 試算表初始化 ─────────────────────────────────────────────────────
