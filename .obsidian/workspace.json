@@ -200,6 +200,10 @@
   },
   "active": "5f73ec61d1e09713",
   "lastOpenFiles": [
+    "loc_infirmary.png",
+    "loc_infirmary.png.crdownload",
+    "loc_library.png",
+    "loc_library.png.crdownload",
     "物流車輛統計_GAS_部署說明.md",
     "物流車輛統計_GAS.gs",
     "tool_logistics.html",
@@ -217,13 +221,10 @@
     "nami.png",
     "luffy.png",
     "jinbe.png",
-    "franky.png",
     "chars~origin_main",
     "chars",
     "海賊王角色圖",
-    "新增資料夾",
     "航海日誌_GAS_部署說明.md",
-    "航海日誌_GAS.gs",
     "天鷹AI助手_GAS_部署說明.md",
     "TASK_CARD.md",
     "AGENTS.md",
@@ -244,7 +245,6 @@
     "tianying-monitor/project-snapshots/2026-06-22_v1.md",
     "天鷹保全/監控系統狀態.md",
     "tpl-car.md",
-    "02-工具開發/tpl-car.md",
-    "tpl-car (1).md"
+    "02-工具開發/tpl-car.md"
   ]
 }
