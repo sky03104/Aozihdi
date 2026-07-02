@@ -522,6 +522,18 @@ Object.entries(CHAR_IMG_MAP).forEach(([role, file]) => {
   CHAR_IMAGES[role] = img;
 });
 
+// 節點地點圖（工具節點專屬場景，取代發光球體；未列在這裡的節點照舊顯示球體）
+const NODE_IMG_MAP = {
+  3:  'loc_library.png',    // 事故報告工具（羅賓／圖書室）
+  4:  'loc_infirmary.png',  // 匿名表揚/反應（喬巴／醫務室）
+};
+const NODE_IMAGES = {};
+Object.entries(NODE_IMG_MAP).forEach(([nodeId, file]) => {
+  const img = new Image();
+  img.src = IMG_DIR + file;
+  NODE_IMAGES[nodeId] = img;
+});
+
 // 節點 → 角色映射（地盤）
 const NODE_CHAR = {
   0:  '黃金梅利號', // 主控台（草帽一夥的船，全船的家）
@@ -586,10 +598,12 @@ function worldToScreen(vec3) {
 // 特定角色的顯示倍率：黃金梅利號是船不是人，該比其他角色明顯大一號
 const CHAR_SCALE = { '黃金梅利號': 1.75 };
 
-function drawCharacter(ctx, x, y, role, count, alpha) {
+// extraScale：動態縮放乘數（預設1）。跑動作路線的角色會傳較小值，看起來像在小跑；
+// 未來要升級成真正的跑步序列幀動畫時，這個參數就是掛動畫幀的入口
+function drawCharacter(ctx, x, y, role, count, alpha, extraScale) {
   const glowColor = CHAR_COLORS[role] || '#D4A800';
   const img = CHAR_IMAGES[role];
-  const scale = CHAR_SCALE[role] || 1;
+  const scale = (CHAR_SCALE[role] || 1) * (extraScale || 1);
   const boxW = 80 * scale, boxH = 80 * scale; // 顯示框：光暈/名字/計數氣泡都固定用這個尺寸排版
   let iw = boxW, ih = boxH;   // 圖片實際繪製尺寸：依原始長寬比縮放，避免船隻等非正方形圖被拉伸變形
   if (img && img.complete && img.naturalWidth > 0) {
@@ -662,6 +676,28 @@ function drawAllCharacters() {
     const alpha    = activity ? 0.95 : 0.75; // 有活動全亮，待機也清楚可見
 
     drawCharacter(charCtx, scr.x, scr.y - 28, role, count, alpha);
+  });
+}
+
+// 工具節點的地點圖（取代發光球體；圖片還沒到位的節點自動略過，照舊顯示 Three.js 球體）
+function drawNodeLocations() {
+  Object.entries(NODE_IMG_MAP).forEach(([nodeIdStr, file]) => {
+    const nodeId = parseInt(nodeIdStr);
+    const img = NODE_IMAGES[nodeId];
+    if (!img || !img.complete || img.naturalWidth === 0) return; // 未載入完成就不畫，底下球體照樣看得到
+
+    const nodeIdx = NODES.findIndex(n => n.id === nodeId);
+    if (nodeIdx < 0) return;
+    const scr = worldToScreen(worldPos[nodeIdx]);
+    if (!scr) return;
+    if (scr.x < -80 || scr.x > window.innerWidth + 80) return;
+    if (scr.y < -80 || scr.y > window.innerHeight + 80) return;
+
+    const boxW = 110, boxH = 110;
+    const ratio = img.naturalWidth / img.naturalHeight;
+    let iw = boxW, ih = boxH;
+    if (ratio >= 1) { ih = boxW / ratio; } else { iw = boxH * ratio; }
+    charCtx.drawImage(img, scr.x - iw / 2, scr.y - ih / 2, iw, ih);
   });
 }
 
@@ -741,14 +777,31 @@ function queueMoveTo(u, targetNodeId) {
   u.node = targetNodeId;
 }
 
-function queueRoundTrip(u, tool) {
+// ── 動作跑者（action runner）：送出資料時，由「地點所屬角色」代替使用者
+// 跑完 地點→GAS→資料表→地點 這段路，使用者球體留在地點原地等，跑者跑完
+// 才觸發使用者回主控台。跑者是每次事件各自獨立的實例（不共用/不重用），
+// 兩個人同時做同一動作就會同時出現兩個一樣角色的跑者。
+let actionRunners = [];
+let runnerSeq = 0;
+
+function buildRoundTripWaypoints(route) {
+  const wps = [];
+  for (let i = 1; i < route.length; i++) wps.push(route[i]);   // 去程：地點→GAS→資料表
+  for (let i = route.length - 2; i >= 0; i--) wps.push(route[i]); // 回程：原路折返
+  return wps;
+}
+
+function spawnActionRunner(tool, role, locationNodeId, onComplete) {
   const route = TOOL_ROUTE[tool];
-  if (!route) { return; }
-  queueMoveTo(u, route[0]);
-  // 去程：工具 → GAS → 資料表；回程原路折返
-  for (let i = 1; i < route.length; i++) u.waypoints.push(route[i]);
-  for (let i = route.length - 2; i >= 0; i--) u.waypoints.push(route[i]);
-  u.node = route[0];
+  const wp = nodeWorldById(locationNodeId);
+  if (!route || !wp) return null;
+  const runner = {
+    id: 'run_' + (runnerSeq++), role, color: CHAR_COLORS[role] || '#D4A800',
+    node: locationNodeId, pos: wp.clone(), waypoints: buildRoundTripWaypoints(route),
+    seg: null, alpha: 1, leaving: false, onComplete: onComplete || null,
+  };
+  actionRunners.push(runner);
+  return runner;
 }
 
 async function fetchActiveUsers() {
@@ -769,7 +822,12 @@ async function fetchActiveUsers() {
       lastEventTs = events.length ? new Date(events[events.length - 1].timestamp).getTime() : Date.now();
       firstActiveLoad = false;
     } else {
-      // 新事件依序驅動動畫（登入現身、開工具移動、送出跑 GAS 一圈、登出離場）
+      // 新事件依序驅動動畫：
+      //   登入 → 使用者現身主控台
+      //   開工具 → 使用者從目前位置走到該工具的地點
+      //   送出資料 → 使用者留在地點，該地點所屬角色代跑 GAS→資料表 一圈，
+      //             跑者跑完才觸發使用者回主控台
+      //   登出 → 使用者原地淡出
       events.forEach(ev => {
         const ts = new Date(ev.timestamp).getTime();
         if (ts <= lastEventTs) return;
@@ -779,9 +837,17 @@ async function fetchActiveUsers() {
         const u = ensureUser(id, ev.userName, ev.actionType === 'login' ? 0 : parseInt(ev.nodeId));
         u.name = ev.userName || u.name; u.tool = ev.tool;
         u.action = ev.actionType; u.lastSeen = ts; u.leaving = false;
-        if (ev.actionType === 'login') queueMoveTo(u, 0);
-        else if (SUBMIT_ACTIONS.has(ev.actionType)) queueRoundTrip(u, ev.tool);
-        else queueMoveTo(u, parseInt(ev.nodeId));
+        if (ev.actionType === 'login') {
+          queueMoveTo(u, 0);
+        } else if (SUBMIT_ACTIONS.has(ev.actionType)) {
+          const nodeId = parseInt(ev.nodeId);
+          queueMoveTo(u, nodeId); // 保險：若還沒收到對應的 open 事件，先確保使用者站在地點上
+          const role = ev.role || NODE_CHAR[nodeId] || '路飛';
+          const runner = spawnActionRunner(ev.tool, role, nodeId, () => queueMoveTo(u, 0));
+          if (!runner) queueMoveTo(u, 0); // 沒有巡航路線可跑（未知工具）就直接回主控台
+        } else {
+          queueMoveTo(u, parseInt(ev.nodeId));
+        }
       });
     }
 
@@ -823,6 +889,45 @@ function updateLiveUsers(dt) {
       u.pos.lerpVectors(u.seg.from, u.seg.to, ease);
       if (k >= 1) { u.pos.copy(u.seg.to); u.seg = null; }
     }
+  });
+}
+
+// 動作跑者移動：路線跑完（waypoints 清空且沒有移動中的 seg）就觸發
+// onComplete（讓使用者球體回主控台）並開始淡出
+function updateActionRunners(dt) {
+  actionRunners.forEach(r => {
+    if (!r.leaving && !r.seg && r.waypoints.length === 0) {
+      r.leaving = true;
+      if (r.onComplete) { r.onComplete(); r.onComplete = null; }
+    }
+    if (r.leaving) r.alpha -= dt * 1.8;
+
+    if (!r.seg && r.waypoints.length) {
+      const target = nodeWorldById(r.waypoints.shift());
+      if (target) {
+        const dist = r.pos.distanceTo(target);
+        r.seg = { from: r.pos.clone(), to: target.clone(), t: 0, dur: Math.max(0.4, dist / HOP_SPEED) };
+      }
+    }
+    if (r.seg) {
+      r.seg.t += dt;
+      const k = Math.min(1, r.seg.t / r.seg.dur);
+      const ease = k * k * (3 - 2 * k);
+      r.pos.lerpVectors(r.seg.from, r.seg.to, ease);
+      if (k >= 1) { r.pos.copy(r.seg.to); r.seg = null; }
+    }
+  });
+  actionRunners = actionRunners.filter(r => r.alpha > 0);
+}
+
+function drawActionRunners(ctx) {
+  actionRunners.forEach(r => {
+    const scr = worldToScreen(r.pos);
+    if (!scr) return;
+    if (scr.x < -60 || scr.x > window.innerWidth + 60 || scr.y < -60 || scr.y > window.innerHeight + 60) return;
+    // 跑動作路線時縮小顯示（0.55倍），視覺上區分「代跑角色」跟站崗的正常大小角色；
+    // 這個縮放參數就是未來升級成跑步序列幀動畫的掛鉤點
+    drawCharacter(ctx, scr.x, scr.y, r.role, 0, r.alpha, 0.55);
   });
 }
 
@@ -1050,7 +1155,8 @@ function animate() {
     fetchWorkflowData();
   }
 
-  // 畫 2D 角色人物
+  // 畫工具節點地點圖（背景場景，先畫）→ 再畫角色人物（疊在場景上）
+  drawNodeLocations();
   drawAllCharacters();
 
   // 即時航跡人物層（限主管，且分頁在前景才輪詢省額度）
@@ -1061,7 +1167,9 @@ function animate() {
     }
     const dt = Math.min(0.05, t - lastFrameT);
     updateLiveUsers(dt);
+    updateActionRunners(dt);
     drawLiveUsers(charCtx, t);
+    drawActionRunners(charCtx);
   }
   lastFrameT = t;
 }
