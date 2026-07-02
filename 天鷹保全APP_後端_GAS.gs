@@ -2665,7 +2665,7 @@ function buildFullPostFlex_(dateLabel, early, late) {
   var body = [];
 
   // 早班區標題
-  body.push({ type: 'box', layout: 'horizontal', backgroundColor: 'rgba(129,140,248,.15)', cornerRadius: '6px', paddingAll: '8px',
+  body.push({ type: 'box', layout: 'horizontal', backgroundColor: '#818CF826', cornerRadius: '6px', paddingAll: '8px',
     contents: [{ type: 'text', text: '🌅 早班區（' + early.length + ' 人）', color: '#818CF8', weight: 'bold', size: 'sm' }] });
   var earlyRows = buildPostSectionRows_(early);
   for (var a = 0; a < earlyRows.length; a++) body.push(earlyRows[a]);
@@ -2674,7 +2674,7 @@ function buildFullPostFlex_(dateLabel, early, late) {
   body.push({ type: 'separator', color: '#374151', margin: 'xl' });
 
   // 晚班區標題
-  body.push({ type: 'box', layout: 'horizontal', backgroundColor: 'rgba(212,168,0,.15)', cornerRadius: '6px', paddingAll: '8px', margin: 'xl',
+  body.push({ type: 'box', layout: 'horizontal', backgroundColor: '#D4A80026', cornerRadius: '6px', paddingAll: '8px', margin: 'xl',
     contents: [{ type: 'text', text: '🌙 晚班區（' + late.length + ' 人）', color: '#FFD700', weight: 'bold', size: 'sm' }] });
   var lateRows = buildPostSectionRows_(late);
   for (var b = 0; b < lateRows.length; b++) body.push(lateRows[b]);
