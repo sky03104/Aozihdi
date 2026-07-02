@@ -150,70 +150,70 @@ const TOPICS = {
 //   todo:  頂部  y∈[0.8,1.4]
 const NODES = [
   // ── 主控台核心 ──
-  { id: 0,  title: '主控台 index.html', topic: 'core',    pos: [ 0.0,  0.0,  0.6], note: '主選單/登入/公告/工具權限/首頁卡片，編譯後 React.createElement（非 JSX）' },
-  { id: 1,  title: '登入與角色系統',     topic: 'core',    pos: [-0.25, 0.25, 0.45], note: 'localStorage hsh_session_user；CAN_MANAGE_ROLES 控管理職可見' },
-  { id: 2,  title: '首頁待審卡片',       topic: 'core',    pos: [ 0.25,-0.2,  0.5], note: '待審請假/帳號/報告/表揚反應；報告、表揚兩格限 executive/admin' },
+  { id: 0,  title: '主控台 index.html', topic: 'core',    pos: [ 0.0, 0.0, 0.81], note: '主選單/登入/公告/工具權限/首頁卡片，編譯後 React.createElement（非 JSX）' },
+  { id: 1,  title: '登入與角色系統',     topic: 'core',    pos: [ -0.34, 0.34, 0.61], note: 'localStorage hsh_session_user；CAN_MANAGE_ROLES 控管理職可見' },
+  { id: 2,  title: '首頁待審卡片',       topic: 'core',    pos: [ 0.34, -0.27, 0.68], note: '待審請假/帳號/報告/表揚反應；報告、表揚兩格限 executive/admin' },
 
   // ── 前端工具 ──
-  { id: 3,  title: '事故報告工具',       topic: 'tools',   pos: [ 0.7,  0.5,  0.4], note: 'tool_report.html；?mode=admin 主管審閱（未讀/待處理/已處理）' },
-  { id: 4,  title: '匿名表揚/反應',      topic: 'tools',   pos: [ 1.0,  0.3,  0.2], note: 'tool_feedback.html；前台匿名，主管裁決寫「處置」欄' },
-  { id: 5,  title: '開店前進出登錄',     topic: 'tools',   pos: [ 1.2,  0.0, -0.1], note: 'tool_opening.html 獨立檔，雙 GAS（共用 _SharedDB）' },
-  { id: 6,  title: '打烊後快速登錄',     topic: 'tools',   pos: [ 0.9, -0.25, 0.3], note: 'index 內嵌 tpl-closing（base64）' },
-  { id: 7,  title: '明日哨表',           topic: 'tools',   pos: [ 1.3,  0.55, 0.15], note: 'post.html，iframe src 串接' },
-  { id: 8,  title: '班表查詢',           topic: 'tools',   pos: [ 1.25,-0.2,  0.45], note: 'ScheduleApp；SHIFT_TYPES 班別代號（早/晚班）' },
-  { id: 9,  title: '緊急聯絡清單',       topic: 'tools',   pos: [ 0.55, 0.65, 0.0], note: 'tpl-emergency；normalizePhone 補回開頭 0' },
-  { id: 10, title: '資料上傳工具',       topic: 'tools',   pos: [ 1.1,  0.6, -0.2], note: 'tpl-upload（base64 內嵌）；施工單/班表/哨表，SheetJS 解析 Excel；獨立版見 cec-up(id32)' },
-  { id: 11, title: '簽到/車輛/工作',     topic: 'tools',   pos: [ 0.55,-0.1, -0.2], note: 'tool_signin / tool_car / tool_work' },
-  { id: 12, title: '請假申請',           topic: 'tools',   pos: [ 0.95, 0.0,  0.55], note: 'liff_leave + 雲端請假清單' },
+  { id: 3,  title: '事故報告工具',       topic: 'tools',   pos: [ 0.94, 0.68, 0.54], note: 'tool_report.html；?mode=admin 主管審閱（未讀/待處理/已處理）' },
+  { id: 4,  title: '匿名表揚/反應',      topic: 'tools',   pos: [ 1.35, 0.41, 0.27], note: 'tool_feedback.html；前台匿名，主管裁決寫「處置」欄' },
+  { id: 5,  title: '開店前進出登錄',     topic: 'tools',   pos: [ 1.62, 0.0, -0.14], note: 'tool_opening.html 獨立檔，雙 GAS（共用 _SharedDB）' },
+  { id: 6,  title: '打烊後快速登錄',     topic: 'tools',   pos: [ 1.22, -0.34, 0.41], note: 'index 內嵌 tpl-closing（base64）' },
+  { id: 7,  title: '明日哨表',           topic: 'tools',   pos: [ 1.76, 0.74, 0.2], note: 'post.html，iframe src 串接' },
+  { id: 8,  title: '班表查詢',           topic: 'tools',   pos: [ 1.69, -0.27, 0.61], note: 'ScheduleApp；SHIFT_TYPES 班別代號（早/晚班）' },
+  { id: 9,  title: '緊急聯絡清單',       topic: 'tools',   pos: [ 0.74, 0.88, 0.0], note: 'tpl-emergency；normalizePhone 補回開頭 0' },
+  { id: 10, title: '資料上傳工具',       topic: 'tools',   pos: [ 1.49, 0.81, -0.27], note: 'tpl-upload（base64 內嵌）；施工單/班表/哨表，SheetJS 解析 Excel；獨立版見 cec-up(id32)' },
+  { id: 11, title: '簽到/車輛/工作',     topic: 'tools',   pos: [ 0.74, -0.14, -0.27], note: 'tool_signin / tool_car / tool_work' },
+  { id: 12, title: '請假申請',           topic: 'tools',   pos: [ 1.28, 0.0, 0.74], note: 'liff_leave + 雲端請假清單' },
 
   // ── 後端 GAS ──
-  { id: 13, title: '事故/表揚 GAS v3.1', topic: 'backend', pos: [-0.8,  0.2,  0.3], note: 'action 分流 report/feedback/updateStatus/deleteRow/getReports/getFeedback；狀態/處置欄' },
-  { id: 14, title: '帳號/請假 GAS',      topic: 'backend', pos: [-1.1,  0.45, 0.0], note: 'ACCOUNT_GAS_URL；登入/帳號申請/請假審核' },
-  { id: 15, title: '打烊/開店 GAS',      topic: 'backend', pos: [-1.2, -0.1,  0.2], note: '進出記錄 + _SharedDB（廠商/監工/檢查者即時同步）' },
-  { id: 16, title: '照片上傳處理',       topic: 'backend', pos: [-0.75,-0.25,-0.1], note: 'saveImages_；公告夾不可寫退回執行帳號夾；setSharing 非致命' },
+  { id: 13, title: '事故/表揚 GAS v3.1', topic: 'backend', pos: [ -1.08, 0.27, 0.41], note: 'action 分流 report/feedback/updateStatus/deleteRow/getReports/getFeedback；狀態/處置欄' },
+  { id: 14, title: '帳號/請假 GAS',      topic: 'backend', pos: [ -1.49, 0.61, 0.0], note: 'ACCOUNT_GAS_URL；登入/帳號申請/請假審核' },
+  { id: 15, title: '打烊/開店 GAS',      topic: 'backend', pos: [ -1.62, -0.14, 0.27], note: '進出記錄 + _SharedDB（廠商/監工/檢查者即時同步）' },
+  { id: 16, title: '照片上傳處理',       topic: 'backend', pos: [ -1.01, -0.34, -0.14], note: 'saveImages_；公告夾不可寫退回執行帳號夾；setSharing 非致命' },
 
   // ── 資料儲存 ──
-  { id: 17, title: '主試算表',           topic: 'data',    pos: [-0.4, -1.0,  0.2], note: '事故報告 / 匿名表揚檢舉 分頁；主鍵純數字列號' },
-  { id: 18, title: '打烊資料庫',         topic: 'data',    pos: [-0.9, -1.1,  0.0], note: '廠商/監工/檢查者/施工類型（開店打烊共用）' },
-  { id: 19, title: '開店試算表',         topic: 'data',    pos: [ 0.4, -1.1,  0.1], note: '開店前/B1F餐廳/4F餐廳 分頁' },
-  { id: 20, title: '班表資料',           topic: 'data',    pos: [ 0.9, -0.95, 0.2], note: '班別代號 SHIFT_TYPES / WORK_SHIFT / OFF_TYPES' },
-  { id: 21, title: 'localStorage 本地',  topic: 'data',    pos: [ 0.0, -0.85, 0.5], note: 'hsh_session_user / hsh_favs / hsh_shops 等' },
-  { id: 22, title: 'Drive 公告資料夾',   topic: 'data',    pos: [-1.0, -0.8, -0.3], note: '照片統一存放（1K_RR…）；共用政策可能擋公開連結' },
+  { id: 17, title: '主試算表',           topic: 'data',    pos: [ -0.54, -1.35, 0.27], note: '事故報告 / 匿名表揚檢舉 分頁；主鍵純數字列號' },
+  { id: 18, title: '打烊資料庫',         topic: 'data',    pos: [ -1.22, -1.49, 0.0], note: '廠商/監工/檢查者/施工類型（開店打烊共用）' },
+  { id: 19, title: '開店試算表',         topic: 'data',    pos: [ 0.54, -1.49, 0.14], note: '開店前/B1F餐廳/4F餐廳 分頁' },
+  { id: 20, title: '班表資料',           topic: 'data',    pos: [ 1.22, -1.28, 0.27], note: '班別代號 SHIFT_TYPES / WORK_SHIFT / OFF_TYPES' },
+  { id: 21, title: 'localStorage 本地',  topic: 'data',    pos: [ 0.0, -1.15, 0.68], note: 'hsh_session_user / hsh_favs / hsh_shops 等' },
+  { id: 22, title: 'Drive 公告資料夾',   topic: 'data',    pos: [ -1.35, -1.08, -0.41], note: '照片統一存放（1K_RR…）；共用政策可能擋公開連結' },
 
   // ── 部署/監控 ──
-  { id: 23, title: 'GitHub Pages 部署',  topic: 'infra',   pos: [ 0.0,  0.2, -1.0], note: 'sky03104.github.io/tianying-security；正式 APP 跑 main' },
-  { id: 24, title: 'Git 版本控制',       topic: 'infra',   pos: [-0.4, -0.1, -1.2], note: 'main + 功能分支；raw.githack + SHA 預覽' },
-  { id: 25, title: '監控自動化系統',     topic: 'infra',   pos: [ 0.4,  0.0, -1.2], note: 'tianying-monitor（失敗紀錄/技能迭代/回歸測試）' },
+  { id: 23, title: 'GitHub Pages 部署',  topic: 'infra',   pos: [ 0.0, 0.27, -1.35], note: 'sky03104.github.io/tianying-security；正式 APP 跑 main' },
+  { id: 24, title: 'Git 版本控制',       topic: 'infra',   pos: [ -0.54, -0.14, -1.62], note: 'main + 功能分支；raw.githack + SHA 預覽' },
+  { id: 25, title: '監控自動化系統',     topic: 'infra',   pos: [ 0.7, -0.18, -1.55], note: 'tianying-monitor（失敗紀錄/技能迭代/回歸測試）' },
 
   // ── 待辦/規劃 ──
-  { id: 26, title: 'TODO-11 角色 Agents',topic: 'todo',    pos: [-0.3,  1.1,  0.2], note: '✅ 完成（2026-06-28）：11 Agent + 工作流程檔落地成 .claude/agents/*.md' },
-  { id: 27, title: 'TODO-12 哨表自動化', topic: 'todo',    pos: [ 0.3,  1.2,  0.0], note: '排班自動產表/輪值/衝突檢查' },
-  { id: 28, title: 'TODO-13 對話助手',   topic: 'todo',    pos: [ 0.0,  1.0, -0.3], note: '✅ 已完成：天鷹 AI 小助手（小天鷹）J.A.R.V.I.S. 風格' },
+  { id: 26, title: 'TODO-11 角色 Agents',topic: 'todo',    pos: [ -0.41, 1.49, 0.27], note: '✅ 完成（2026-06-28）：11 Agent + 工作流程檔落地成 .claude/agents/*.md' },
+  { id: 27, title: 'TODO-12 哨表自動化', topic: 'todo',    pos: [ 0.41, 1.62, 0.0], note: '排班自動產表/輪值/衝突檢查' },
+  { id: 28, title: 'TODO-13 對話助手',   topic: 'todo',    pos: [ 0.0, 1.35, -0.41], note: '✅ 已完成：天鷹 AI 小助手（小天鷹）J.A.R.V.I.S. 風格' },
 
   // ── cec-up 獨立部署（2026-06-30）──
-  { id: 32, title: 'cec-up 獨立上傳工具', topic: 'infra',   pos: [ 0.35, 0.15,-1.3], note: 'sky03104/cec-up；GitHub Pages 獨立版上傳工具；早/晚班切換已與 tpl-upload 同步（2026-06-30）' },
+  { id: 32, title: 'cec-up 獨立上傳工具', topic: 'infra',   pos: [ 0.3, 0.35, -1.9], note: 'sky03104/cec-up；GitHub Pages 獨立版上傳工具；早/晚班切換已與 tpl-upload 同步（2026-06-30）' },
 
   // ── AI 小助手（小天鷹，2026-06-29）──
-  { id: 29, title: '天鷹 AI 小助手',     topic: 'tools',   pos: [ 0.7, -0.5,  0.05], note: 'tool_ai_chat.html；J.A.R.V.I.S. 風格 LOGO 光環＋語音輸入/輸出；個人化習慣記憶 hsh_ai_profile；admin 控制台調禁止規則' },
-  { id: 30, title: '小天鷹 GAS Proxy',   topic: 'backend', pos: [-1.0, -0.5,  0.05], note: '天鷹AI助手_GAS.gs；Gemini Proxy，藏 API Key；依 role/vocabLevel 組 system prompt；getConfig/saveConfig' },
-  { id: 31, title: 'Gemini 1.5 Flash',   topic: 'infra',   pos: [-1.35,-0.55,-0.45], note: '外部 AI 服務（免費額度）；API Key 存 GAS Script Properties' },
+  { id: 29, title: '天鷹 AI 小助手',     topic: 'tools',   pos: [ 0.94, -0.68, 0.07], note: 'tool_ai_chat.html；J.A.R.V.I.S. 風格 LOGO 光環＋語音輸入/輸出；個人化習慣記憶 hsh_ai_profile；admin 控制台調禁止規則' },
+  { id: 30, title: '小天鷹 GAS Proxy',   topic: 'backend', pos: [ -1.35, -0.68, 0.07], note: '天鷹AI助手_GAS.gs；Gemini Proxy，藏 API Key；依 role/vocabLevel 組 system prompt；getConfig/saveConfig' },
+  { id: 31, title: 'Gemini 1.5 Flash',   topic: 'infra',   pos: [ -1.82, -0.74, -0.61], note: '外部 AI 服務（免費額度）；API Key 存 GAS Script Properties' },
 
   // ── obsidian-second-brain（咖哩個人第二大腦，2026-07-01）── 非員工功能，Claude Code 開發工具
-  { id: 33, title: 'obsidian-second-brain skill', topic: 'infra', pos: [-0.15, 0.35, -1.15], note: '.claude/skills/obsidian-second-brain；44 個 /obsidian-* 指令，AI-first 讀寫規則；只給咖哩本人在 Claude Code 用，非 APP 員工功能' },
-  { id: 34, title: '第二大腦 Vault',      topic: 'data',  pos: [ 0.2, -0.7,  0.75], note: 'obsidian-vault/；_CLAUDE.md 操作手冊 + index.md + Logs/ + Bases/；咖哩私人筆記，與天鷹 APP 資料分開' },
-  { id: 35, title: 'SessionStart Hook',   topic: 'infra', pos: [-0.6,  0.35, -1.0], note: '.claude/settings.json：OBSIDIAN_VAULT_PATH + load_vault_context.py；只在 cwd 進入 vault 目錄才注入 _CLAUDE.md，不影響其他 session' },
+  { id: 33, title: 'obsidian-second-brain skill', topic: 'infra', pos: [ -0.42, 0.62, -1.4], note: '.claude/skills/obsidian-second-brain；44 個 /obsidian-* 指令，AI-first 讀寫規則；只給咖哩本人在 Claude Code 用，非 APP 員工功能' },
+  { id: 34, title: '第二大腦 Vault',      topic: 'data',  pos: [ 0.27, -0.94, 1.01], note: 'obsidian-vault/；_CLAUDE.md 操作手冊 + index.md + Logs/ + Bases/；咖哩私人筆記，與天鷹 APP 資料分開' },
+  { id: 35, title: 'SessionStart Hook',   topic: 'infra', pos: [ -0.81, 0.47, -1.35], note: '.claude/settings.json：OBSIDIAN_VAULT_PATH + load_vault_context.py；只在 cwd 進入 vault 目錄才注入 _CLAUDE.md，不影響其他 session' },
 
   // ── 車牌辨識（過夜車輛登記，2026-07-02）──
-  { id: 36, title: '車牌辨識 GAS',        topic: 'backend', pos: [-0.7, -0.15, 0.35], note: '車牌辨識_後端_GAS.gs（獨立部署）；recognizePlate Gemini Vision 辨識＋台灣車牌格式正規化、vehicleReg 寫車輛登記試算表 1K46ZEq…；Key 存指令碼屬性；每日 08:00 自動寄晚班登記摘要 email（SUMMARY_EMAILS）' },
+  { id: 36, title: '車牌辨識 GAS',        topic: 'backend', pos: [ -0.94, -0.2, 0.47], note: '車牌辨識_後端_GAS.gs（獨立部署）；recognizePlate Gemini Vision 辨識＋台灣車牌格式正規化、vehicleReg 寫車輛登記試算表 1K46ZEq…；Key 存指令碼屬性；每日 08:00 自動寄晚班登記摘要 email（SUMMARY_EMAILS）' },
 
   // ── 物流車輛統計（2026-07-02）──
-  { id: 37, title: '物流車輛統計',        topic: 'tools',   pos: [ 0.75, 0.25, -0.35], note: 'tool_logistics.html 獨立檔（iframe src）；三分類(1.9噸/3.5噸/8噸以上)登記＋快捷一鍵送出＋單日查詢＋整月統計；可修改/刪除；全員開放(id18)，快捷管理限 admin' },
-  { id: 38, title: '物流統計 GAS',        topic: 'backend', pos: [-0.55, 0.05, 0.05], note: '物流車輛統計_GAS.gs（獨立部署）；add/update/delete/getDay/getMonth/exportMonth＋getShortcuts/addShortcut/updateShortcut/deleteShortcut；時間戳伺服器端蓋、主鍵 max(ID)+1' },
-  { id: 39, title: '物流試算表',          topic: 'data',    pos: [ 0.65, -1.2, -0.15], note: '新建試算表；物流車輛紀錄分頁(A~H)＋快捷設定分頁(A~C)＋YYYY-MM 月統計分頁（exportMonth 產生）；工號欄純文字保開頭0' },
+  { id: 37, title: '物流車輛統計',        topic: 'tools',   pos: [ 1.01, 0.34, -0.47], note: 'tool_logistics.html 獨立檔（iframe src）；三分類(1.9噸/3.5噸/8噸以上)登記＋快捷一鍵送出＋單日查詢＋整月統計；可修改/刪除；全員開放(id18)，快捷管理限 admin' },
+  { id: 38, title: '物流統計 GAS',        topic: 'backend', pos: [ -0.74, 0.07, 0.07], note: '物流車輛統計_GAS.gs（獨立部署）；add/update/delete/getDay/getMonth/exportMonth＋getShortcuts/addShortcut/updateShortcut/deleteShortcut；時間戳伺服器端蓋、主鍵 max(ID)+1' },
+  { id: 39, title: '物流試算表',          topic: 'data',    pos: [ 0.88, -1.62, -0.2], note: '新建試算表；物流車輛紀錄分頁(A~H)＋快捷設定分頁(A~C)＋YYYY-MM 月統計分頁（exportMonth 產生）；工號欄純文字保開頭0' },
 
   // ── 航海日誌即時航跡（2026-07-02）──
-  { id: 40, title: '航海日誌 GAS',        topic: 'backend', pos: [-0.55, 0.55, 0.1], note: '航海日誌_GAS.gs v2.0；logTask/getActive/checkKick/forceLogout；CacheService 快取 10 秒 + 30 天自動清理；brain_map 每 10 秒輪詢畫即時人物' },
-  { id: 41, title: '航海日誌試算表',      topic: 'data',    pos: [-0.55, -0.75, -0.15], note: '工作日誌分頁：時間/工號/姓名/工具/節點/角色/動作/狀態/備註；只留 30 天' },
+  { id: 40, title: '航海日誌 GAS',        topic: 'backend', pos: [ -0.74, 0.74, 0.14], note: '航海日誌_GAS.gs v2.0；logTask/getActive/checkKick/forceLogout；CacheService 快取 10 秒 + 30 天自動清理；brain_map 每 10 秒輪詢畫即時人物' },
+  { id: 41, title: '航海日誌試算表',      topic: 'data',    pos: [ -0.74, -1.01, -0.2], note: '工作日誌分頁：時間/工號/姓名/工具/節點/角色/動作/狀態/備註；只留 30 天' },
 ];
 
 const EDGES = [
@@ -579,10 +579,14 @@ function worldToScreen(vec3) {
 }
 
 // 用角色圖片繪製人物（圖片預載後直接 drawImage）
+// 特定角色的顯示倍率：黃金梅利號是船不是人，該比其他角色明顯大一號
+const CHAR_SCALE = { '黃金梅利號': 1.75 };
+
 function drawCharacter(ctx, x, y, role, count, alpha) {
   const glowColor = CHAR_COLORS[role] || '#D4A800';
   const img = CHAR_IMAGES[role];
-  const boxW = 80, boxH = 80; // 顯示框：光暈/名字/計數氣泡都固定用這個尺寸排版
+  const scale = CHAR_SCALE[role] || 1;
+  const boxW = 80 * scale, boxH = 80 * scale; // 顯示框：光暈/名字/計數氣泡都固定用這個尺寸排版
   let iw = boxW, ih = boxH;   // 圖片實際繪製尺寸：依原始長寬比縮放，避免船隻等非正方形圖被拉伸變形
   if (img && img.complete && img.naturalWidth > 0) {
     const ratio = img.naturalWidth / img.naturalHeight;
@@ -830,8 +834,8 @@ function drawLiveUsers(ctx, t) {
     items.push({ id, u, x: scr.x, y: scr.y, ox: 0, oy: 0 });
   });
 
-  // 分組：螢幕座標相近（同一節點聚集）的人往下錯開排列，名字才不會疊在一起
-  const GROUP_DIST = 50, STACK_GAP = 52;
+  // 分組：螢幕座標相近（同一節點聚集）的人圍著節點排成一圈，名字才不會疊在一起
+  const GROUP_DIST = 50;
   const groups = [];
   items.forEach(it => {
     let g = groups.find(g => Math.hypot(g.x - it.x, g.y - it.y) < GROUP_DIST);
@@ -841,7 +845,14 @@ function drawLiveUsers(ctx, t) {
   groups.forEach(g => {
     // 依工號排序，順序穩定，才不會每次輪詢後名字互換位置閃爍
     g.members.sort((a, b) => a.id.localeCompare(b.id));
-    g.members.forEach((m, i) => { m.oy = i * STACK_GAP; });
+    const n = g.members.length;
+    if (n === 1) { g.members[0].ox = 0; g.members[0].oy = 0; return; }
+    const radius = 40 + Math.min(n, 6) * 7; // 人越多圈越大，設上限避免過度誇張
+    g.members.forEach((m, i) => {
+      const angle = (i / n) * Math.PI * 2 - Math.PI / 2; // 從正上方開始，順時針排列
+      m.ox = Math.cos(angle) * radius;
+      m.oy = Math.sin(angle) * radius * 0.65; // 螢幕投影稍微壓扁，看起來像圍站在節點旁而不是飄在空中
+    });
   });
 
   items.forEach(it => {
