@@ -1212,6 +1212,18 @@ python3 snapshot-generator-simple.py
 
 > 此區累積實作中踩過的坑與解法，供未來 AI 與工程師快速避雷。每次大更新後補充。
 
+### 📅 2026-07-03：GitHub Pages 部署卡死佇列 — 取消失敗的正確應對
+
+- **症狀**：GitHub Pages 部署（`pages build and deployment`）累積 **9 筆卡在 `queued`**，最舊一筆卡了超過 12 小時；網頁上的 Cancel 按鈕、API 呼叫全部失敗。
+- **根因**：GitHub 平台端問題（runner 沒被分配到這批 run），**不是 repo 或程式碼壞掉**。可先查 [githubstatus.com](https://www.githubstatus.com/) 確認有無事故公告。
+- **關鍵發現：卡住的 queued run 無法取消**。呼叫 cancel API 一律回 `409 Cannot cancel a workflow re-run that has not yet queued.`，網頁按鈕也是同一個內部錯誤，**不用再重試**。
+- **正確做法（不是取消，是蓋過去）**：
+  1. GitHub Pages 只認**最新一次成功部署**，不需要把佇列裡的殭屍逐筆清掉。
+  2. 直接推一個新 commit（哪怕是空 commit：`git commit-tree <tree> -p <parent> -m "..."`）觸發全新的部署 run。
+  3. 新 run 若卡在最後一步報錯 `##[error]Deployment failed, try again later.`（GitHub 服務端暫時性問題，日誌可用 `mcp__github__get_job_logs` 查），**用 `actions_run_trigger` 的 `rerun_failed_jobs` 重跑該次 run 即可成功**，不必再開新 commit。
+  4. 舊的殭屍 `queued` run 放著不用管，GitHub 會在逾時（最長 72 小時）後自動標記失敗並清掉，不影響網站也不影響新部署。
+- **教訓**：遇到「取消/刪除卡住的雲端資源」一直失敗時，先想「有沒有辦法繞過去（用新資源蓋過舊的）」，不要在明知會 409 的操作上重試消耗時間。
+
 ### 📅 2026-07-02：GAS `instanceof Date` 會誤判 false（物流統計除錯實錄）
 
 - **症狀**：寫入成功、getShortcuts 正常，唯獨按日期查詢永遠空的（今日累計 0、查紀錄「這一天沒有登記紀錄」），試算表裡資料明明都在。
@@ -1405,9 +1417,10 @@ python3 snapshot-generator-simple.py
 | 1.8 | 2026-06-30 | TODO-05/06/15 完成；cec-up 早班切換同步；brain_map 新增 cec-up 節點(id32)；補 2026-06-30 技術筆記 |
 | 1.9 | 2026-07-02 | TODO-16 完成：物流車輛統計工具（`tool_logistics.html` + 獨立 GAS + 部署說明，三分類登記/日查/月統計/月分頁匯出，全員開放 id18）；brain_map 同步節點 37~39 |
 | 1.7 | 2026-06-29 | TODO-13 完成：天鷹 AI 小助手（小天鷹）上線（`tool_ai_chat.html` + `天鷹AI助手_GAS.gs`，Gemini Proxy、語音、個人化、管理員控制台、資料問題自動彈真實畫面）；brain_map 同步 AI 節點；新增 2026-06-29 技術經驗筆記（Gemini 模型/額度坑、麥克風授權、LLM 導航不當資料庫、git checkout 覆蓋教訓）；7 PR 迭代上線 main |
+| 2.0 | 2026-07-03 | 新增 2026-07-03 技術經驗筆記：GitHub Pages 部署卡死佇列處理（cancel API 一律 409、正確做法是推新 commit 蓋過去 + rerun_failed_jobs，殭屍 queued run 免管會自動過期） |
 
 ---
 
-**Last Updated**: 2026-06-29  
+**Last Updated**: 2026-07-03  
 **For Questions**: Refer to project documentation or contact the project owner  
 **Branch**: `claude/claude-md-docs-4bz58p`
