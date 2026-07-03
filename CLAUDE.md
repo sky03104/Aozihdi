@@ -1181,6 +1181,25 @@ python3 snapshot-generator-simple.py
 
 **部署狀態（2026-07-02）**：試算表已建、GAS 已部署（`BUILT_IN_GAS_URL` 已回填，全員自動連線）、登記/查詢/快捷實測通過。之後改 GAS 記得「管理部署→編輯→新版本」。
 
+#### [TODO-17] 明日哨表 → 今/明日哨表雙分頁切換
+- **需求**：原本只有「明日哨表」單一畫面，改成今日／明日雙分頁切換；每天 08:00 自動把當時的明日哨表內容搬到今日哨表；明日哨表若還沒更新要顯示「尚未更新」而非舊資料；同步處理試算表與 LINE 機器人
+- **狀態**：✅ 完成（2026-07-03）
+
+**實作結果（2026-07-03）**：
+
+| 項目 | 值 |
+|------|-----|
+| 資料來源 | `POST_SHEET_ID` 試算表既有的 `今日哨表` 分頁（gid=466253701，原為預留空白）；不新建/不刪分頁，gid 永久不變 |
+| 快照機制 | 新增 `snapshotTodayPostScheduled_`：每日 08:00（Asia/Taipei）`dst.clear()` + `Range.copyTo()` 原地覆寫 `今日哨表`（含格式/合併儲存格），`明日哨表` 分頁不受影響；完全靜默無推播無通知 |
+| 觸發器 | `setupTodaySnapshotTrigger_`（08:00 daily），部署後需手動執行一次 `runSetupTodaySnapshotTrigger` + `runSnapshotTodayPostNow`（後者立即產生首份今日哨表，否則要等隔天才有資料） |
+| 後端 API | `parsePostSheet_`/`parsePostFullList_` 改吃 `sheetName` 參數（預設明日哨表）；新增 `getTodayPost`；`getTomorrowPost`/`getTodayPost` 皆用新增的 `checkDateMatch_` 比對日期，不符回傳 `status:'notyet'`（不是 err），前端顯示「尚未更新/尚未產生」而非舊資料或紅色錯誤 |
+| 前端 | `post.html` 新增今日/明日切換鈕（金色=今日、靛色=明日，沿用天鷹色系）；預設顯示今日；新增 `#state-empty` 中性提示狀態（🕒 圖示，非驚嘆號錯誤語氣）；切換時忽略舊分頁的過期回應（防競態） |
+| LINE 機器人 | 新增「今日哨點」文字指令 → `handleMyTodayPost_`（複用 `parsePostSheet_(POST_TODAY_SHEET_NAME)`）；`今日哨點` 判斷順序放在既有 `哨點` 判斷之前，避免字串包含誤判；既有 21:00 群組推播與「哨點」單人查詢完全不動 |
+| App 殼層 | `index.html` 工具名稱「明日哨表」→「今/明日哨表」（`toolId` 維持 `post` 不變，不影響權限與 AI 助手路由）；`tool_ai_chat.html` TOOL_MAP 名稱同步 |
+| brain_map | 節點 7 改名「今/明日哨表」+ 更新說明；新增節點 42「哨表試算表」（data 主題）；新增關聯 `[7,14]`（工具→帳號/請假GAS，原本漏連）、`[14,42]`（GAS→哨表試算表） |
+
+**待咖哩手動操作**：GAS 編輯器「管理部署→編輯→新版本」發布（沿用既有 `/exec` 網址）→ 執行一次 `runSetupTodaySnapshotTrigger` 建立觸發器 → 執行一次 `runSnapshotTodayPostNow` 立即產生今日哨表測試資料。
+
 ### 🟢 本次（2026-06-27）額外完成
 
 #### [TODO-07] 開店/打烊工具「設定」分頁限管理員
@@ -1417,7 +1436,8 @@ python3 snapshot-generator-simple.py
 | 1.8 | 2026-06-30 | TODO-05/06/15 完成；cec-up 早班切換同步；brain_map 新增 cec-up 節點(id32)；補 2026-06-30 技術筆記 |
 | 1.9 | 2026-07-02 | TODO-16 完成：物流車輛統計工具（`tool_logistics.html` + 獨立 GAS + 部署說明，三分類登記/日查/月統計/月分頁匯出，全員開放 id18）；brain_map 同步節點 37~39 |
 | 1.7 | 2026-06-29 | TODO-13 完成：天鷹 AI 小助手（小天鷹）上線（`tool_ai_chat.html` + `天鷹AI助手_GAS.gs`，Gemini Proxy、語音、個人化、管理員控制台、資料問題自動彈真實畫面）；brain_map 同步 AI 節點；新增 2026-06-29 技術經驗筆記（Gemini 模型/額度坑、麥克風授權、LLM 導航不當資料庫、git checkout 覆蓋教訓）；7 PR 迭代上線 main |
-| 2.0 | 2026-07-03 | 新增 2026-07-03 技術經驗筆記：GitHub Pages 部署卡死佇列處理（cancel API 一律 409、正確做法是推新 commit 蓋過去 + rerun_failed_jobs，殭屍 queued run 免管會自動過期） |
+| 2.0 | 2026-07-03 | TODO-17 完成：明日哨表 → 今/明日哨表雙分頁（`post.html` 今日/明日切換＋尚未更新提示、`天鷹保全APP_後端_GAS.gs` 每日08:00原地快照今日哨表＋`getTodayPost`＋LINE「今日哨點」指令）；brain_map 新增節點42「哨表試算表」+ 補連結 `[7,14]`/`[14,42]` |
+| 2.1 | 2026-07-03 | 新增 2026-07-03 技術經驗筆記：GitHub Pages 部署卡死佇列處理（cancel API 一律 409、正確做法是推新 commit 蓋過去 + rerun_failed_jobs，殭屍 queued run 免管會自動過期） |
 
 ---
 

@@ -161,7 +161,7 @@ const NODES = [
   { id: 4,  title: '匿名表揚/反應',      topic: 'tools',   pos: [ 2.62, 0.7, 0.47], note: 'tool_feedback.html；前台匿名，主管裁決寫「處置」欄' },
   { id: 5,  title: '開店前進出登錄',     topic: 'tools',   pos: [ 3.01, 0.11, -0.13], note: 'tool_opening.html 獨立檔，雙 GAS（共用 _SharedDB）' },
   { id: 6,  title: '打烊後快速登錄',     topic: 'tools',   pos: [ 2.43, -0.38, 0.67], note: 'index 內嵌 tpl-closing（base64）' },
-  { id: 7,  title: '明日哨表',           topic: 'tools',   pos: [ 3.22, 1.18, 0.37], note: 'post.html，iframe src 串接' },
+  { id: 7,  title: '今/明日哨表',        topic: 'tools',   pos: [ 3.22, 1.18, 0.37], note: 'post.html，iframe src 串接；今日/明日切換鈕，未更新顯示「尚未更新」；每日08:00自動快照明日哨表→今日哨表（gid不變、完全靜默）' },
   { id: 8,  title: '班表查詢',           topic: 'tools',   pos: [ 3.12, -0.28, 0.96], note: 'ScheduleApp；SHIFT_TYPES 班別代號（早/晚班）' },
   { id: 9,  title: '緊急聯絡清單',       topic: 'tools',   pos: [ 1.74, 1.39, 0.08], note: 'tpl-emergency；normalizePhone 補回開頭 0' },
   { id: 10, title: '資料上傳工具',       topic: 'tools',   pos: [ 2.83, 1.28, -0.32], note: 'tpl-upload（base64 內嵌）；施工單/班表/哨表，SheetJS 解析 Excel；獨立版見 cec-up(id32)' },
@@ -216,6 +216,9 @@ const NODES = [
   // ── 航海日誌即時航跡（2026-07-02）──
   { id: 40, title: '航海日誌 GAS',        topic: 'backend', pos: [ -1.98, 1.0, 0.33], note: '航海日誌_GAS.gs v2.0；logTask/getActive/checkKick/forceLogout；CacheService 快取 10 秒 + 30 天自動清理；brain_map 每 10 秒輪詢畫即時人物' },
   { id: 41, title: '航海日誌試算表',      topic: 'data',    pos: [ -1.03, -2.13, -0.15], note: '工作日誌分頁：時間/工號/姓名/工具/節點/角色/動作/狀態/備註；只留 30 天' },
+
+  // ── 今/明日哨表雙分頁（2026-07-03）──
+  { id: 42, title: '哨表試算表',          topic: 'data',    pos: [ 0.15, -2.7, 0.62], note: '獨立於主試算表；分頁：明日哨表(員工手動更新)/今日哨表(每日08:00原地快照，gid固定)/歷史哨表(補位用)' },
 ];
 
 const EDGES = [
@@ -226,7 +229,7 @@ const EDGES = [
   // 登入讀本地、首頁卡片讀 GAS
   [1, 21], [2, 13], [2, 14],
   // 工具 → 後端 GAS
-  [3, 13], [4, 13], [5, 15], [6, 15], [12, 14],
+  [3, 13], [4, 13], [5, 15], [6, 15], [12, 14], [7, 14],
   // 後端內部與照片流
   [13, 16], [16, 22],
   // 後端 → 資料
@@ -247,6 +250,8 @@ const EDGES = [
   [0, 37], [37, 38], [38, 39],
   // 航海日誌：APP 回報事件 → GAS → 試算表
   [0, 40], [40, 41],
+  // 今/明日哨表：帳號/請假 GAS 讀寫獨立的哨表試算表（明日→今日每日快照）
+  [14, 42],
 ];
 
 // === BRAIN_MAP_DATA_END ===
@@ -1020,7 +1025,7 @@ const TOOL_LABEL = {
   app: '主控台', schedule: '班表查詢', work: '施工單', aiwork: '施工單', signin: '簽到',
   car: '車輛', closing: '打烊登錄', opening: '開店登錄', report: '事故報告',
   feedback: '表揚/反應', leave: '請假', upload: '資料上傳', aichat: 'AI 小助手',
-  emergency: '緊急聯絡', post: '明日哨表', hailing: '明日哨表', logistics: '物流統計',
+  emergency: '緊急聯絡', post: '今/明日哨表', hailing: '今/明日哨表', logistics: '物流統計',
 };
 
 let userMenuEl = null;
