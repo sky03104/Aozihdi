@@ -143,9 +143,11 @@ const TOPICS = {
 
 // 海賊王世界地圖式佈局（2026-07-03 改版）：
 //   core:  正中心三角形，半徑 0.45（CORE_R），三點 90°/210°/330°，y=0
-//   tools: 環繞核心的直立雙圈（紅土大陸意象），半徑 1.15（RING_R），
-//          A排 y=+0.18 角度0/60/120/180/240/300，B排 y=-0.18 角度30/90/150/210/270/330
-//          （軸心＝Y軸，兩排錯開30°才不會疊在一起）
+//   tools: 環繞核心的直立雙圈（紅土大陸意象），半徑 2.3（RING_R，2026-07-03再調整：
+//          原0.45→加大到2.3，核心到工具環間距拉開一倍），
+//          A排 y=+0.4 角度0/60/120/180/240/300，B排 y=-0.4 角度30/90/150/210/270/330
+//          （軸心＝Y軸，兩排錯開30°＋上下更明顯分開才不會擠成一團；
+//          注意此半徑已逼近海域最內圈真實節點(~2.13)，兩者刻意留一點點交界感）
 //   四海域（backend/data/infra/todo）：半徑帶 2.0~3.0，φ/θ球座標象限，
 //          北海=data(左上,X<0,Y>0) 東海=backend(右上,X>0,Y>0)
 //          西海=todo(左下,X<0,Y<0) 南海=infra(右下,X>0,Y<0)
@@ -164,16 +166,16 @@ const NODES = [
   { id: 2, title: '首頁待審卡片', topic: 'core', pos: [0.3897, 0.0, -0.225], note: '待審請假/帳號/報告/表揚反應；報告、表揚兩格限 executive/admin' },
 
   // ── 前端工具（直立雙圈環繞核心） ──
-  { id: 3, title: '事故報告工具', topic: 'tools', pos: [1.15, 0.18, 0.0], note: 'tool_report.html；?mode=admin 主管審閱（未讀/待處理/已處理）' },
-  { id: 4, title: '匿名表揚/反應', topic: 'tools', pos: [0.575, 0.18, 0.9959], note: 'tool_feedback.html；前台匿名，主管裁決寫「處置」欄' },
-  { id: 5, title: '開店前進出登錄', topic: 'tools', pos: [-0.575, 0.18, 0.9959], note: 'tool_opening.html 獨立檔，雙 GAS（共用 _SharedDB）' },
-  { id: 6, title: '打烊後快速登錄', topic: 'tools', pos: [-1.15, 0.18, 0.0], note: 'index 內嵌 tpl-closing（base64）' },
-  { id: 7, title: '今/明日哨表', topic: 'tools', pos: [-0.575, 0.18, -0.9959], note: 'post.html，iframe src 串接；今日/明日切換鈕，未更新顯示「尚未更新」；每日08:00自動快照明日哨表→今日哨表（gid不變、完全靜默）' },
-  { id: 8, title: '班表查詢', topic: 'tools', pos: [0.575, 0.18, -0.9959], note: 'ScheduleApp；SHIFT_TYPES 班別代號（早/晚班）' },
-  { id: 9, title: '緊急聯絡清單', topic: 'tools', pos: [0.9959, -0.18, 0.575], note: 'tpl-emergency；normalizePhone 補回開頭 0' },
-  { id: 10, title: '資料上傳工具', topic: 'tools', pos: [0.0, -0.18, 1.15], note: 'tpl-upload（base64 內嵌）；施工單/班表/哨表，SheetJS 解析 Excel；獨立版見 cec-up(id32)' },
-  { id: 11, title: '簽到/車輛/工作', topic: 'tools', pos: [-0.9959, -0.18, 0.575], note: 'tool_signin / tool_car / tool_work' },
-  { id: 12, title: '請假申請', topic: 'tools', pos: [-0.9959, -0.18, -0.575], note: 'liff_leave + 雲端請假清單' },
+  { id: 3, title: '事故報告工具', topic: 'tools', pos: [2.3, 0.4, 0.0], note: 'tool_report.html；?mode=admin 主管審閱（未讀/待處理/已處理）' },
+  { id: 4, title: '匿名表揚/反應', topic: 'tools', pos: [1.15, 0.4, 1.9919], note: 'tool_feedback.html；前台匿名，主管裁決寫「處置」欄' },
+  { id: 5, title: '開店前進出登錄', topic: 'tools', pos: [-1.15, 0.4, 1.9919], note: 'tool_opening.html 獨立檔，雙 GAS（共用 _SharedDB）' },
+  { id: 6, title: '打烊後快速登錄', topic: 'tools', pos: [-2.3, 0.4, 0.0], note: 'index 內嵌 tpl-closing（base64）' },
+  { id: 7, title: '今/明日哨表', topic: 'tools', pos: [-1.15, 0.4, -1.9919], note: 'post.html，iframe src 串接；今日/明日切換鈕，未更新顯示「尚未更新」；每日08:00自動快照明日哨表→今日哨表（gid不變、完全靜默）' },
+  { id: 8, title: '班表查詢', topic: 'tools', pos: [1.15, 0.4, -1.9919], note: 'ScheduleApp；SHIFT_TYPES 班別代號（早/晚班）' },
+  { id: 9, title: '緊急聯絡清單', topic: 'tools', pos: [1.9919, -0.4, 1.15], note: 'tpl-emergency；normalizePhone 補回開頭 0' },
+  { id: 10, title: '資料上傳工具', topic: 'tools', pos: [0.0, -0.4, 2.3], note: 'tpl-upload（base64 內嵌）；施工單/班表/哨表，SheetJS 解析 Excel；獨立版見 cec-up(id32)' },
+  { id: 11, title: '簽到/車輛/工作', topic: 'tools', pos: [-1.9919, -0.4, 1.15], note: 'tool_signin / tool_car / tool_work' },
+  { id: 12, title: '請假申請', topic: 'tools', pos: [-1.9919, -0.4, -1.15], note: 'liff_leave + 雲端請假清單' },
 
   // ── 東海／後端 GAS ──
   { id: 13, title: '事故/表揚 GAS v3.1', topic: 'backend', pos: [1.6891, 1.2961, 0.0], note: 'action 分流 report/feedback/updateStatus/deleteRow/getReports/getFeedback；狀態/處置欄' },
@@ -200,7 +202,7 @@ const NODES = [
   { id: 28, title: 'TODO-13 對話助手', topic: 'todo', pos: [-0.4572, -1.6235, -1.547], note: '✅ 已完成：天鷹 AI 小助手（小天鷹）J.A.R.V.I.S. 風格' },
 
   // ── 前端工具（直立雙圈環繞核心） ──
-  { id: 29, title: '天鷹 AI 小助手', topic: 'tools', pos: [-0.0, -0.18, -1.15], note: 'tool_ai_chat.html；J.A.R.V.I.S. 風格 LOGO 光環＋語音輸入/輸出；個人化習慣記憶 hsh_ai_profile；admin 控制台調禁止規則' },
+  { id: 29, title: '天鷹 AI 小助手', topic: 'tools', pos: [-0.0, -0.4, -2.3], note: 'tool_ai_chat.html；J.A.R.V.I.S. 風格 LOGO 光環＋語音輸入/輸出；個人化習慣記憶 hsh_ai_profile；admin 控制台調禁止規則' },
 
   // ── 東海／後端 GAS ──
   { id: 30, title: '小天鷹 GAS Proxy', topic: 'backend', pos: [2.2085, 0.8995, -0.1129], note: '天鷹AI助手_GAS.gs；Gemini Proxy，藏 API Key；依 role/vocabLevel 組 system prompt；getConfig/saveConfig' },
@@ -220,7 +222,7 @@ const NODES = [
   { id: 36, title: '車牌辨識 GAS', topic: 'backend', pos: [1.4062, 1.7406, 0.9428], note: '車牌辨識_後端_GAS.gs（獨立部署）；recognizePlate Gemini Vision 辨識＋台灣車牌格式正規化、vehicleReg 寫車輛登記試算表 1K46ZEq…；Key 存指令碼屬性；每日 08:00 自動寄晚班登記摘要 email（SUMMARY_EMAILS）' },
 
   // ── 前端工具（直立雙圈環繞核心） ──
-  { id: 37, title: '物流車輛統計', topic: 'tools', pos: [0.9959, -0.18, -0.575], note: 'tool_logistics.html 獨立檔（iframe src）；三分類(1.9噸/3.5噸/8噸以上)登記＋快捷一鍵送出＋單日查詢＋整月統計；可修改/刪除；全員開放(id18)，快捷管理限 admin' },
+  { id: 37, title: '物流車輛統計', topic: 'tools', pos: [1.9919, -0.4, -1.15], note: 'tool_logistics.html 獨立檔（iframe src）；三分類(1.9噸/3.5噸/8噸以上)登記＋快捷一鍵送出＋單日查詢＋整月統計；可修改/刪除；全員開放(id18)，快捷管理限 admin' },
 
   // ── 東海／後端 GAS ──
   { id: 38, title: '物流統計 GAS', topic: 'backend', pos: [0.7926, 0.6153, 2.252], note: '物流車輛統計_GAS.gs（獨立部署）；add/update/delete/getDay/getMonth/exportMonth＋getShortcuts/addShortcut/updateShortcut/deleteShortcut；時間戳伺服器端蓋、主鍵 max(ID)+1' },
@@ -466,32 +468,65 @@ Object.keys(TOPICS).forEach(k => { glowTex[k] = buildGlowTex(TOPICS[k].color); }
 })();
 
 // ── 無風帶星雲（偉大的航道，銀河雲海視覺）────────────────────────
+// 2026-07-03 美化：改用柔光貼圖（借 buildGlowTex）取代硬邊方塊點，
+// 並分「主霧層＋亮點層」兩層、粒子聚集成雲團而非均勻亂數散佈，
+// 避免看起來像規則點陣
 (function buildNebula() {
-  const N = 7000, innerR = 3.4, outerR = 7.5, thicknessMax = 0.8, spiralTwist = 0.5;
+  const innerR = 3.4, outerR = 7.5, thicknessMax = 0.8, spiralTwist = 0.5;
   const warm = { r: 1.00, g: 0.85, b: 0.92 }; // 粉白：近赤道/內圈
   const cool = { r: 0.42, g: 0.32, b: 0.88 }; // 藍紫：外圈/遠離赤道
-  const pos = new Float32Array(N * 3), cols = new Float32Array(N * 3);
-  for (let i = 0; i < N; i++) {
+  const nebulaTex = buildGlowTex('#FFFFFF', 128); // 柔和放射狀白光，vertexColors 再上色
+
+  // 雲團中心：粒子優先聚在這些點附近，做出「一坨一坨」的雲霧感而非噪點
+  const CLUMP_N = 14;
+  const clumps = [];
+  for (let c = 0; c < CLUMP_N; c++) {
     const rad   = innerR + Math.random() * (outerR - innerR);
-    const angle = Math.random() * Math.PI * 2 + rad * spiralTwist; // 半徑越大轉越多，做出旋臂感
-    const y     = ((Math.random() + Math.random() + Math.random() - 1.5) / 1.5) * thicknessMax; // 近似鐘形分布
-    pos[i*3]   = rad * Math.cos(angle);
-    pos[i*3+1] = y;
-    pos[i*3+2] = rad * Math.sin(angle);
+    const angle = Math.random() * Math.PI * 2 + rad * spiralTwist;
+    const y     = ((Math.random() + Math.random() + Math.random() - 1.5) / 1.5) * thicknessMax * 0.6;
+    clumps.push({ x: rad * Math.cos(angle), y, z: rad * Math.sin(angle) });
+  }
+
+  function colorFor(rad, y) {
     const t = Math.min(1, Math.max(0,
       (rad - innerR) / (outerR - innerR) * 0.6 + Math.abs(y) / thicknessMax * 0.4
     ));
-    cols[i*3]   = warm.r + (cool.r - warm.r) * t;
-    cols[i*3+1] = warm.g + (cool.g - warm.g) * t;
-    cols[i*3+2] = warm.b + (cool.b - warm.b) * t;
+    return { r: warm.r + (cool.r - warm.r) * t, g: warm.g + (cool.g - warm.g) * t, b: warm.b + (cool.b - warm.b) * t };
   }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  geo.setAttribute('color',    new THREE.BufferAttribute(cols, 3));
-  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
-    size: 0.10, vertexColors: true, transparent: true, opacity: 0.75,
-    sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false,
-  })));
+
+  // clumpRatio：粒子落在雲團附近的機率（其餘完全隨機散開，避免雲團間太空）
+  function buildLayer(N, spread, sizeVal, opacityVal, clumpRatio, brightBias) {
+    const pos = new Float32Array(N * 3), cols = new Float32Array(N * 3);
+    const jitter = () => (Math.random() + Math.random() - 1) * spread; // 三角分布，中心密邊緣疏
+    for (let i = 0; i < N; i++) {
+      let x, y, z, rad;
+      if (Math.random() < clumpRatio) {
+        const c = clumps[(Math.random() * CLUMP_N) | 0];
+        x = c.x + jitter(); y = c.y + jitter() * 0.6; z = c.z + jitter();
+        rad = Math.hypot(x, z);
+      } else {
+        rad = innerR + Math.random() * (outerR - innerR);
+        const angle = Math.random() * Math.PI * 2 + rad * spiralTwist;
+        x = rad * Math.cos(angle);
+        z = rad * Math.sin(angle);
+        y = ((Math.random() + Math.random() + Math.random() - 1.5) / 1.5) * thicknessMax;
+      }
+      pos[i*3] = x; pos[i*3+1] = y; pos[i*3+2] = z;
+      let col = colorFor(rad, y);
+      if (brightBias) col = { r: col.r * 0.5 + 0.5, g: col.g * 0.5 + 0.45, b: col.b * 0.5 + 0.5 }; // 亮點層偏暖白
+      cols[i*3] = col.r; cols[i*3+1] = col.g; cols[i*3+2] = col.b;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color',    new THREE.BufferAttribute(cols, 3));
+    scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
+      map: nebulaTex, size: sizeVal, vertexColors: true, transparent: true, opacity: opacityVal,
+      sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false,
+    })));
+  }
+
+  buildLayer(6000, 1.0,  0.22, 0.35, 0.8, false); // 主霧層：大顆、淡、大範圍聚集+部分隨機補空
+  buildLayer(2500, 0.35, 0.06, 0.9,  1.0, true);  // 亮點層：小顆、亮、緊貼雲團中心
 })();
 
 // ── 節點建立 ─────────────────────────────────────────────────
