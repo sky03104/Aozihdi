@@ -659,7 +659,6 @@ function drawCharacter(ctx, x, y, role, count, alpha, extraScale) {
 }
 // 每格畫面更新人物
 function drawAllCharacters() {
-  charCtx.clearRect(0, 0, charCanvas.width, charCanvas.height);
   const now = Date.now();
 
   // 無論有無日誌，在各節點固定地盤顯示淡淡待機人物
@@ -1165,7 +1164,10 @@ function animate() {
     fetchWorkflowData();
   }
 
-  // 畫工具節點地點圖（背景場景，先畫）→ 再畫角色人物（疊在場景上）
+  // 整張 2D 疊層畫布每幀只清一次，畫工具節點地點圖（背景場景，先畫）→
+  // 再畫角色人物（疊在場景上）；順序不能顛倒，也不能各自清畫布，
+  // 不然後畫的會把先畫的清掉（地點圖曾因此完全被蓋掉，見此處修復）
+  charCtx.clearRect(0, 0, charCanvas.width, charCanvas.height);
   drawNodeLocations();
   drawAllCharacters();
 
