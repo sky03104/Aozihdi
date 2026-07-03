@@ -239,7 +239,7 @@ const NODES = [
 
   // ── 東海／後端 GAS ──
   // ↳ 空節點（預留，外圍）
-  { id: 43, title: '空節點 #43', topic: 'backend', pos: [1.1915, 2.2311, -0.1222], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
+  { id: 43, title: '交接事項 GAS', topic: 'backend', pos: [1.1915, 2.2311, -0.1222], note: '帶班交接_GAS.gs（獨立部署）；add/update/delete/getAll；建立人+建立時間、最後修改人+時間伺服器端蓋章，主鍵 max(ID)+1' },
   { id: 44, title: '空節點 #44', topic: 'backend', pos: [1.8958, 1.2979, 1.1353], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 45, title: '空節點 #45', topic: 'backend', pos: [0.5772, 2.099, 1.4062], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 46, title: '空節點 #46', topic: 'backend', pos: [1.6916, 1.0127, -1.7242], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
@@ -264,7 +264,7 @@ const NODES = [
 
   // ── 北海／資料儲存 ──
   // ↳ 空節點（預留，外圍）
-  { id: 65, title: '空節點 #65', topic: 'data', pos: [-0.5772, 2.099, -1.4062], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
+  { id: 65, title: '交接事項試算表', topic: 'data', pos: [-0.5772, 2.099, -1.4062], note: '新建試算表；交接事項分頁(A~I)：事項ID/內容/狀態/建立人工號/姓名/時間/最後修改人工號/姓名/時間' },
   { id: 66, title: '空節點 #66', topic: 'data', pos: [-1.6916, 1.0127, 1.7242], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 67, title: '空節點 #67', topic: 'data', pos: [-1.8028, 1.916, 0.2784], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 68, title: '空節點 #68', topic: 'data', pos: [-2.2774, 0.6941, -1.2103], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
@@ -340,6 +340,9 @@ const NODES = [
   { id: 132, title: '空節點 #132', topic: 'todo', pos: [-0.8308, -2.5273, 1.2918], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 133, title: '空節點 #133', topic: 'todo', pos: [-2.2811, -1.7085, 0.8522], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 134, title: '空節點 #134', topic: 'todo', pos: [-2.815, -0.5911, -0.8222], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
+
+  // ── 帶班交接事項（2026-07-03）── tools 雙圈 12 格已滿，外加第三圈（半徑2.6，y=0赤道面）
+  { id: 135, title: '帶班交接事項', topic: 'tools', pos: [1.839, 0.0, 1.839], note: 'tool_handover.html 獨立檔（iframe src）；新增/編輯/刪除交接事項，狀態未完成/進行中/已完成；組長以上可見(id19)，工具內 checkRole() 二次把關' },
 ];
 
 const EDGES = [
@@ -373,6 +376,8 @@ const EDGES = [
   [0, 40], [40, 41],
   // 今/明日哨表：帳號/請假 GAS 讀寫獨立的哨表試算表（明日→今日每日快照）
   [14, 42],
+  // 帶班交接事項：主控台→工具→GAS→試算表
+  [0, 135], [135, 43], [43, 65],
 ];
 
 // === BRAIN_MAP_DATA_END ===
