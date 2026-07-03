@@ -708,10 +708,15 @@ function drawNodeLocations() {
 
 // ═══════════════════════════════════════════════════════════
 // 即時航跡人物層：線上使用者顯示 + 沿線移動 + 強制登出
-// 只有 executive/admin 登入者（同瀏覽器登入過 APP）看得到
+// 預設只有 executive/admin 登入者（同瀏覽器登入過 APP）看得到；
+// EXTRA_VIEWER_EMPIDS 是額外個別開放的工號白名單，不受角色限制
 // ═══════════════════════════════════════════════════════════
 const SESSION_USER = (() => { try { return JSON.parse(localStorage.getItem('hsh_session_user') || 'null'); } catch (e) { return null; } })();
-const CAN_VIEW_USERS = !!(SESSION_USER && ['executive', 'admin'].includes(SESSION_USER.role));
+const EXTRA_VIEWER_EMPIDS = ['015732']; // 謝志遠
+const CAN_VIEW_USERS = !!(SESSION_USER && (
+  ['executive', 'admin'].includes(SESSION_USER.role) ||
+  EXTRA_VIEWER_EMPIDS.includes(String(SESSION_USER.empId))
+));
 
 // 工具 → 巡航路線（工具節點 → 後端 GAS → 資料表）；送出資料時沿路線跑一圈回來
 const TOOL_ROUTE = {
