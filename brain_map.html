@@ -853,6 +853,7 @@ function drawAllCharacters() {
   // 無論有無日誌，在各節點固定地盤顯示淡淡待機人物
   Object.entries(NODE_CHAR).forEach(([nodeIdStr, role]) => {
     const nodeId = parseInt(nodeIdStr);
+    if (NODE_IMG_MAP[nodeId]) return; // 有地點圖的節點改由 drawNodeLocations 統一畫（圖+名字+計數），不重複疊角色浮空圖
     const nodeIdx = NODES.findIndex(n => n.id === nodeId);
     if (nodeIdx < 0) return;
 
@@ -872,7 +873,8 @@ function drawAllCharacters() {
   });
 }
 
-// 工具節點的地點圖（取代發光球體；圖片還沒到位的節點自動略過，照舊顯示 Three.js 球體）
+// 工具節點的地點圖（取代發光球體＋取代角色浮空圖，兩者合一變成節點唯一的圖；
+// 圖片還沒到位的節點自動略過，照舊顯示 Three.js 球體／角色浮空圖）
 function drawNodeLocations() {
   Object.entries(NODE_IMG_MAP).forEach(([nodeIdStr, file]) => {
     const nodeId = parseInt(nodeIdStr);
@@ -890,7 +892,33 @@ function drawNodeLocations() {
     const ratio = img.naturalWidth / img.naturalHeight;
     let iw = boxW, ih = boxH;
     if (ratio >= 1) { ih = boxW / ratio; } else { iw = boxH * ratio; }
-    charCtx.drawImage(img, scr.x - iw / 2, scr.y - ih / 2, iw, ih);
+    const ix = scr.x - iw / 2, iy = scr.y - ih / 2;
+    charCtx.drawImage(img, ix, iy, iw, ih);
+
+    // 補回角色名字＋活動計數氣泡（原本畫在角色浮空圖上，現在地點圖取代了角色圖，
+    // 這兩樣資訊還是要留著，不然節點失去角色識別跟活動度資訊）
+    const role = NODE_CHAR[nodeId];
+    if (role) {
+      const labelY = iy + ih + 4;
+      charCtx.save();
+      charCtx.fillStyle = '#F5F5F5'; charCtx.strokeStyle = '#00000099'; charCtx.lineWidth = 3;
+      charCtx.font = "bold 12px 'Microsoft JhengHei', sans-serif";
+      charCtx.textAlign = 'center'; charCtx.textBaseline = 'top';
+      charCtx.strokeText(role, scr.x, labelY);
+      charCtx.fillText(role, scr.x, labelY);
+
+      const activity = activeChars[nodeId];
+      const count = activity ? activity.count : 0;
+      if (count > 0) {
+        const bx = ix + iw * 0.92, bby = iy + 2;
+        charCtx.fillStyle = '#D4A800'; charCtx.strokeStyle = '#0A0C10'; charCtx.lineWidth = 1.5;
+        charCtx.beginPath(); charCtx.arc(bx, bby, 10, 0, Math.PI * 2); charCtx.fill(); charCtx.stroke();
+        charCtx.fillStyle = '#0A0C10'; charCtx.font = 'bold 9px sans-serif';
+        charCtx.textAlign = 'center'; charCtx.textBaseline = 'middle';
+        charCtx.fillText(count > 99 ? '99+' : String(count), bx, bby);
+      }
+      charCtx.restore();
+    }
   });
 }
 
