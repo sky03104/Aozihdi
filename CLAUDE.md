@@ -1231,6 +1231,20 @@ python3 snapshot-generator-simple.py
 
 > 此區累積實作中踩過的坑與解法，供未來 AI 與工程師快速避雷。每次大更新後補充。
 
+### 📅 2026-07-03：brain_map 地點圖被每幀清畫布蓋掉 + 新增地點圖的標準流程
+
+- **症狀**：`brain_map.html` 幫工具節點（事故報告=圖書室、表揚反應=醫務室）接上場景圖後，咖哩回報「還是舊的發光球體，看不到場景圖」。換兩台不同瀏覽器、強制重新整理（含 `?v=` cache-buster）都一樣 → **先排除快取，鎖定是程式碼問題**。
+- **根因**：`drawNodeLocations()`（畫地點圖）跟 `drawAllCharacters()`（畫角色）依序在 animate loop 呼叫，但 `drawAllCharacters()` 開頭就 `charCtx.clearRect(...)` 清整張畫布——把剛畫好的地點圖立刻清掉，只留角色跟底下 Three.js 發光球體。地點圖**從未真正顯示過**，不是部署或快取延遲。
+- **修法**：`clearRect` 只能在 animate loop 每幀呼叫「一次」，放在所有 2D 疊層繪製函數（`drawNodeLocations`、`drawAllCharacters`、之後任何新的 draw 函數）**之前**，不要讓個別繪製函數各自清畫布。
+- **除錯技巧**：使用者回報「圖沒更新」時，若「不同瀏覽器 + 強制重新整理都重現同樣結果」，可直接排除快取／部署延遲，轉向查程式邏輯（尤其是共用畫布/共用狀態的清除時機）。
+
+**給未來 AI／自己的提醒（咖哩接下來幾天會陸續上傳其他工具的地點圖）**：新增一張地點圖的標準流程——
+1. 咖哩傳圖 → 用 Python Pillow 壓縮：`resize` 寬 400~500px（`Image.LANCZOS`）+ `quantize(colors=~200, method=Image.FASTOCTREE)` 降色，壓到 60~100KB 上下（跟角色圖檔案大小一致）
+2. 存進 `brain_map_img/`，檔名延續 `loc_*.png` 慣例（如 `loc_kitchen.png`）
+3. 在 `brain_map.html` 的 `NODE_IMG_MAP` 加一行 `節點id: '檔名.png'`（該常數在 `IMG_DIR`/`CHAR_IMG_MAP` 附近，不在 `BRAIN_MAP_DATA_START/END` 資料區內，是渲染層設定，可直接改）
+4. **不要動 `drawNodeLocations`/`drawAllCharacters`/`clearRect` 的呼叫順序**（本篇教訓的根因），新增地點圖只需要改 `NODE_IMG_MAP` 一行
+5. `node --check` 驗證 → commit → PR → 咖哩確認再合併
+
 ### 📅 2026-07-03：GitHub Pages 部署卡死佇列 — 取消失敗的正確應對
 
 - **症狀**：GitHub Pages 部署（`pages build and deployment`）累積 **9 筆卡在 `queued`**，最舊一筆卡了超過 12 小時；網頁上的 Cancel 按鈕、API 呼叫全部失敗。
@@ -1438,6 +1452,7 @@ python3 snapshot-generator-simple.py
 | 1.7 | 2026-06-29 | TODO-13 完成：天鷹 AI 小助手（小天鷹）上線（`tool_ai_chat.html` + `天鷹AI助手_GAS.gs`，Gemini Proxy、語音、個人化、管理員控制台、資料問題自動彈真實畫面）；brain_map 同步 AI 節點；新增 2026-06-29 技術經驗筆記（Gemini 模型/額度坑、麥克風授權、LLM 導航不當資料庫、git checkout 覆蓋教訓）；7 PR 迭代上線 main |
 | 2.0 | 2026-07-03 | TODO-17 完成：明日哨表 → 今/明日哨表雙分頁（`post.html` 今日/明日切換＋尚未更新提示、`天鷹保全APP_後端_GAS.gs` 每日08:00原地快照今日哨表＋`getTodayPost`＋LINE「今日哨點」指令）；brain_map 新增節點42「哨表試算表」+ 補連結 `[7,14]`/`[14,42]` |
 | 2.1 | 2026-07-03 | 新增 2026-07-03 技術經驗筆記：GitHub Pages 部署卡死佇列處理（cancel API 一律 409、正確做法是推新 commit 蓋過去 + rerun_failed_jobs，殭屍 queued run 免管會自動過期） |
+| 2.2 | 2026-07-03 | brain_map 即時航跡系統：動作跑者（送出資料由地點角色代跑）、黃金梅利號主控台、海域式節點分散、工具節點地點圖機制（圖書室/醫務室已生效，後續陸續補其他工具）；修正地點圖被每幀清畫布蓋掉的 bug（clearRect 呼叫時機）；新增技術經驗筆記記錄新增地點圖的標準流程 |
 
 ---
 
