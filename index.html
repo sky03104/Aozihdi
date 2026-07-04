@@ -19023,6 +19023,7 @@ function App() {
     const [perms, setPerms] = useState(DEFAULT_PERMS);
     const [permsSaved, setPermsSaved] = useState(false); // flash indicator
     const [permRole, setPermRole] = useState("fulltime");
+    const [workAllowedIds, setWorkAllowedIds] = useState(null); // 施工單查詢(id 9) 正職/兼職個別白名單；null=不限制(全員可用，現狀)
     const [selectedUser, setSelectedUser] = useState(null);
     const [loginForm, setLoginForm] = useState({ id: "", pw: "", remember: false });
     const [regForm, setRegForm] = useState({ name: "", id: "", dept: "", role: "fulltime", pw: "", pw2: "" });
@@ -19234,6 +19235,13 @@ function App() {
         }
         catch (e) { /* 解析失敗 → 沿用預設值 */ }
     }, []);
+    // 施工單查詢(id 9) 正職/兼職個別白名單：載入已儲存值（不存在＝null＝不限制）
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem('tianying_work_allowed_ids');
+            if (raw) setWorkAllowedIds(JSON.parse(raw));
+        } catch (e) { }
+    }, []);
     // 記住我：頁面載入時自動登入
     useEffect(() => {
         try {
@@ -19400,6 +19408,10 @@ function App() {
                             localStorage.setItem('tianying_perms_ver', PERMS_VER);
                         }
                     } catch (e) { }
+                }
+                if (Array.isArray(d.workAllowedIds)) {
+                    setWorkAllowedIds(d.workAllowedIds);
+                    try { localStorage.setItem('tianying_work_allowed_ids', JSON.stringify(d.workAllowedIds)); } catch (e) { }
                 }
             }
         } catch (e) { /* 失敗用預設 早5晚3 */ }
@@ -19655,6 +19667,17 @@ function App() {
             return merged;
         });
     };
+    const toggleWorkAllowed = (empId) => {
+        setWorkAllowedIds(prev => {
+            // 尚未設定過(null=不限制)：首次操作時以目前所有正職/兼職工號為基底，再從中移除這個人
+            const base = prev === null
+                ? Object.entries(userDb).filter(([, rec]) => rec.role === 'fulltime' || rec.role === 'parttime').map(([id]) => id)
+                : [...prev];
+            const next = base.includes(empId) ? base.filter(x => x !== empId) : [...base, empId];
+            try { localStorage.setItem('tianying_work_allowed_ids', JSON.stringify(next)); } catch (e) { }
+            return next;
+        });
+    };
     const toggleFav = (e, toolId) => {
         e.stopPropagation();
         setFavorites(prev => {
@@ -19665,7 +19688,13 @@ function App() {
             return next;
         });
     };
-    const userTools = currentUser ? (perms[currentUser.role] || []) : [];
+    const userTools = currentUser ? (perms[currentUser.role] || []).filter(id => {
+        // 施工單查詢(id 9) 對正職/兼職多一層個人白名單；其他工具、其他角色不受影響
+        if (id === 9 && (currentUser.role === 'fulltime' || currentUser.role === 'parttime')) {
+            return workAllowedIds === null || workAllowedIds.includes(currentUser.empId);
+        }
+        return true;
+    }) : [];
     const CAN_MANAGE_ROLES = ['leader', 'vicecaptain', 'captain', 'executive', 'admin'];
     // Image upload helper for bulletin board
     const readImgAsBase64 = (file) => new Promise((res, rej) => {
@@ -19986,17 +20015,38 @@ function App() {
                             React.createElement("button", { className: `toggle ${isOn ? 'on' : 'off'}`, onClick: () => togglePerm(permRole, tool.id) },
                                 React.createElement("div", { className: "toggle-thumb" }))));
                     })))),
+                React.createElement("div", { style: { marginTop: 22, marginBottom: 14, borderTop: '1px solid var(--border)', paddingTop: 16 } },
+                    React.createElement("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 4 } }, "📋 施工單查詢 — 正職/兼職個別授權"),
+                    React.createElement("div", { style: { fontSize: 11, color: 'var(--muted)', marginBottom: 10 } },
+                        workAllowedIds === null
+                            ? "尚未設定，正職/兼職目前全員可用"
+                            : `已限制，僅 ${workAllowedIds.length} 人可用`),
+                    React.createElement("div", { style: { maxHeight: '40vh', overflowY: 'auto', paddingRight: 2 } },
+                        Object.entries(userDb)
+                            .filter(([, rec]) => rec.role === 'fulltime' || rec.role === 'parttime')
+                            .map(([id, rec]) => (Object.assign({ empId: id }, rec)))
+                            .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-Hant'))
+                            .map(u => {
+                                const checked = workAllowedIds === null ? true : workAllowedIds.includes(u.empId);
+                                return (React.createElement("div", { className: "perm-item", key: u.empId },
+                                    React.createElement("div", { className: "perm-item-left" },
+                                        React.createElement("span", null, u.role === 'fulltime' ? "🔷" : "🔹"),
+                                        React.createElement("span", null, `${u.name}（${u.empId}）`)),
+                                    React.createElement("button", { className: `toggle ${checked ? 'on' : 'off'}`, onClick: () => toggleWorkAllowed(u.empId) },
+                                        React.createElement("div", { className: "toggle-thumb" }))));
+                            }))),
                 React.createElement("button", { className: "save-btn", onClick: async () => {
                         try {
                             localStorage.setItem('tianying_perms', JSON.stringify(perms));
                             localStorage.setItem('tianying_perms_known', JSON.stringify(TOOLS.map(t => t.id)));
                             localStorage.setItem('tianying_perms_ver', PERMS_VER);
+                            localStorage.setItem('tianying_work_allowed_ids', JSON.stringify(workAllowedIds));
                             setPermsSaved(true);
                             setTimeout(() => setPermsSaved(false), 2500);
                             try {
                                 const body = new FormData();
                                 body.append('action', 'setSettings');
-                                body.append('data', JSON.stringify({ toolPerms: JSON.stringify(perms) }));
+                                body.append('data', JSON.stringify({ toolPerms: JSON.stringify(perms), workAllowedIds: workAllowedIds }));
                                 const r = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
                                 const d = await r.json();
                                 showToast(d.status === 'ok' ? "✅ 權限已同步到雲端，所有裝置將自動更新！" : "✅ 本機已儲存（雲端同步失敗）");
@@ -20011,10 +20061,12 @@ function App() {
                 React.createElement("div", { style: { fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 6 } }, "\u5132\u5B58\u5F8C\u5373\u4F7F\u91CD\u65B0\u6574\u7406\u6216\u91CD\u958B\u4E5F\u6703\u4FDD\u7559"),
                 React.createElement("button", { onClick: async () => {
                         setPerms(DEFAULT_PERMS);
+                        setWorkAllowedIds(null);
                         try {
                             localStorage.removeItem('tianying_perms');
                             localStorage.removeItem('tianying_perms_known');
                             localStorage.removeItem('tianying_perms_ver');
+                            localStorage.removeItem('tianying_work_allowed_ids');
                         }
                         catch (e) { }
                         showToast("🔄 已還原為原廠預設權限");
