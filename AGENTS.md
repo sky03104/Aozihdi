@@ -206,4 +206,20 @@ tianying-security/
 
 ---
 
+## 🤖 姊妹專案：Xinyu-jarvis（小鈺）
+
+咖哩另外在做一個**完全獨立**的桌面 AI 助手專案，跟天鷹保全 APP 分開，不共用資料夾、不共用 repo。
+
+- **專案名稱**：`Xinyu-jarvis`，助手中文稱呼「**小鈺**」
+- **本機位置**：`C:\Users\USER\Xinyu-jarvis\`
+- **GitHub**：`https://github.com/sky03104/Xinyu-jarvis`（Private repo）
+- **是什麼**：背景常駐、語音喚醒詞叫出來的桌面助手，功能為①日常聊天/查資料 ②電腦操作（開程式/開網頁/查檔案讀內容，刪改需咖哩授權）
+- **視覺**：中間一顆圓球，之後會結合天鷹 `brain_map.html` 的「咖哩海域」3D 場景風格
+- **技術複用**：對話後端複用小天鷹 `tool_ai_chat.html` 的 Gemini Proxy 架構；語音採 `faster-whisper`(STT) + `Kokoro`(TTS) 本地方案
+- **目前進度**：規劃/brainstorming 階段，尚未動工。詳細規劃見該專案自己的 `AGENTS.md`
+
+**跨專案協作原則**：若咖哩要求把天鷹的某段程式碼（例如小天鷹的語音/對話架構）複製到 Xinyu-jarvis，直接用完整路徑跨資料夾讀取即可，不需要把兩個專案的檔案混放在一起。
+
+---
+
 **最後：有問題就直接問我，我會按你的「直接、高效、誠實」風格回答。加油！** 🚀
