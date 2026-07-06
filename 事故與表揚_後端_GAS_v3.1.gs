@@ -327,21 +327,28 @@ function json_(obj) {
 
 // ====== GET：連線測試 + 主管讀清單 ======
 function doGet(e) {
-  var action = (e && e.parameter && e.parameter.action) || '';
+  try {
+    var action = (e && e.parameter && e.parameter.action) || '';
 
-  if (action === 'getReports') {
-    var rList = readSheetRows_(SHEET_REPORT, HEADERS_REPORT,
-      ['提交時間', '工號', '姓名', '日期', '時間', '地點', '類別', '描述', '處理經過', '相關人員', '照片連結', '狀態']);
-    return json_({ status: 'ok', list: rList });
+    if (action === 'getReports') {
+      var rList = readSheetRows_(SHEET_REPORT, HEADERS_REPORT,
+        ['提交時間', '工號', '姓名', '日期', '時間', '地點', '類別', '描述', '處理經過', '相關人員', '照片連結', '狀態']);
+      return json_({ status: 'ok', list: rList });
+    }
+
+    if (action === 'getFeedback') {
+      var fList = readSheetRows_(SHEET_FEEDBACK, HEADERS_FEEDBACK,
+        ['時間戳記', '類型', '對象', '分類', '描述', '發生日期', '附件', '工號', '姓名', '狀態', '處置']);
+      return json_({ status: 'ok', list: fList });
+    }
+
+    return json_({ status: 'ok', msg: '天鷹保全 事故報告/匿名表揚舉報 API 運作正常', time: new Date().toString() });
+  } catch (error) {
+    // 原本 doGet 沒有 try/catch：getSheet_/openById 一旦拋錯（權限漂移、Sheets API 暫時性錯誤），
+    // GAS 會回傳原始錯誤頁而非 JSON，前端 .json() 解析失敗，只能顯示無資訊的「連線錯誤」。
+    // 補上後至少能回真正的錯誤訊息，方便下次直接對症。
+    return json_({ status: 'error', msg: '伺服器錯誤：' + (error && error.message ? error.message : error) });
   }
-
-  if (action === 'getFeedback') {
-    var fList = readSheetRows_(SHEET_FEEDBACK, HEADERS_FEEDBACK,
-      ['時間戳記', '類型', '對象', '分類', '描述', '發生日期', '附件', '工號', '姓名', '狀態', '處置']);
-    return json_({ status: 'ok', list: fList });
-  }
-
-  return json_({ status: 'ok', msg: '天鷹保全 事故報告/匿名表揚舉報 API 運作正常', time: new Date().toString() });
 }
 
 // ====== 首次部署用：手動執行一次以觸發授權 ======
