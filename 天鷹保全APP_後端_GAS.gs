@@ -58,7 +58,7 @@ var POST_SHEET_ID   = "1sIcdAhw0mz5iM3F5fulDNPOda2pv-t7xUhT6XXf9X7Q"; // 每日�
 var POST_SHEET_NAME = "明日哨表";
 var POST_PAGE_URL   = "https://sky03104.github.io/tianying-security/post.html"; // 整張明日哨表瀏覽頁
 var POST_HISTORY_SHEET_NAME = "歷史哨表"; // 結構化哨表，用於補回視覺表解析不到的哨位
-var POST_TODAY_SHEET_NAME = "今日哨表"; // 每日08:00由 明日哨表 原地快照而來（gid固定不變）
+var POST_TODAY_SHEET_NAME = "今日哨表"; // 每日06:00由 明日哨表 原地快照而來（gid固定不變）
 
 var SHIFT_INFO_ = {
   'B':    { label: 'B班',    time: '20:00-08:00', color: '#60A5FA' },
@@ -3002,7 +3002,7 @@ function setupTomorrowPostTrigger_() {
   Logger.log('已建立明日哨點每日21:00推播觸發器');
 }
 
-// 每日08:00：把當時的 明日哨表 內容原地覆寫進 今日哨表（保留分頁gid不變，完全靜默無推播）
+// 每日06:00：把當時的 明日哨表 內容原地覆寫進 今日哨表（保留分頁gid不變，完全靜默無推播）
 function snapshotTodayPostScheduled_() {
   try {
     var ss = SpreadsheetApp.openById(POST_SHEET_ID);
@@ -3024,8 +3024,8 @@ function setupTodaySnapshotTrigger_() {
     if (triggers[i].getHandlerFunction() === 'snapshotTodayPostScheduled_') ScriptApp.deleteTrigger(triggers[i]);
   }
   ScriptApp.newTrigger('snapshotTodayPostScheduled_')
-    .timeBased().everyDays(1).atHour(8).inTimezone('Asia/Taipei').create();
-  Logger.log('已建立今日哨表每日08:00快照觸發器');
+    .timeBased().everyDays(1).atHour(6).inTimezone('Asia/Taipei').create();
+  Logger.log('已建立今日哨表每日06:00快照觸發器');
 }
 
 function handleMyTomorrowPost_(lineUserId, replyToken) {
@@ -3090,7 +3090,7 @@ function runSnapshotTodayPostNow() {
 
 // ════════════════════════════════════════════════════════════
 // 【一鍵重建哨表觸發器】── 清掉殘留的舊觸發器（含舊版21:00個人逐人推播），
-//   只重建正確的兩個：21:00 群組版哨表推播、08:00 今日哨表快照。
+//   只重建正確的兩個：21:00 群組版哨表推播、06:00 今日哨表快照。
 //   ★ 重要觀念：時間觸發器執行的是「編輯器目前儲存的程式碼」，不是部署版本。
 //     所以修掉個人版推播後，必須把新程式碼貼進 GAS 編輯器儲存，觸發器才會跑新版。
 //   在編輯器選此函式執行一次，看 Log 確認清理結果。
@@ -3099,7 +3099,7 @@ function 一鍵重建哨表觸發器() {
   // 這個專案唯二需要的排程觸發器（其餘同名或舊版殘留一律刪除重建）
   var KILL_LIST = {
     'pushTomorrowPostScheduled_': 1,   // 21:00 哨表推播（舊版此函式是個人逐人push，同名觸發器一併清掉重建）
-    'snapshotTodayPostScheduled_': 1,  // 08:00 今日哨表快照
+    'snapshotTodayPostScheduled_': 1,  // 06:00 今日哨表快照
     'onScheduleEdit_': 1,              // 已廢棄的班表偵測（改即時推播後不再需要）
     'processScheduleChangeQueue_': 1   // 已廢棄的5分鐘彙整推播
   };
@@ -3117,9 +3117,9 @@ function 一鍵重建哨表觸發器() {
   ScriptApp.newTrigger('pushTomorrowPostScheduled_')
     .timeBased().everyDays(1).atHour(21).inTimezone('Asia/Taipei').create();
   ScriptApp.newTrigger('snapshotTodayPostScheduled_')
-    .timeBased().everyDays(1).atHour(8).inTimezone('Asia/Taipei').create();
+    .timeBased().everyDays(1).atHour(6).inTimezone('Asia/Taipei').create();
   log.push('✅ 已重建：pushTomorrowPostScheduled_（每日21:00 群組版完整哨表，只吃1則額度）');
-  log.push('✅ 已重建：snapshotTodayPostScheduled_（每日08:00 今日哨表快照，無推播）');
+  log.push('✅ 已重建：snapshotTodayPostScheduled_（每日06:00 今日哨表快照，無推播）');
   log.push('提醒：個人「哨點」查詢是 reply 回覆訊息，不佔每月200則推播額度，可放心使用。');
   Logger.log(log.join('\n'));
 }
