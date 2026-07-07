@@ -206,6 +206,12 @@ function migrateOldVehicleData_() {
   Logger.log(log.join('\n'));
 }
 
+// 包裝函數（無底線）：GAS 編輯器「執行」下拉選單會濾掉結尾底線的私有函數，
+// 底線版 migrateOldVehicleData_ 不會出現在選單裡，故補一個沒底線的入口讓咖哩手動執行。
+function runMigrateOldVehicleData() {
+  migrateOldVehicleData_();
+}
+
 // 輔助函式：回傳 JSON 格式
 function jsonOut(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
