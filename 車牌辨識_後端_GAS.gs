@@ -99,10 +99,9 @@ function doPost(e) {
       return jsonOut({ success: false, error: "辨識失敗：請確保照片清晰且包含車牌" });
     }
 
-    // --- 功能 B: 資料登記到試算表 ---
+    // --- 功能 B: 資料登記到試算表（依類型分頁：館內機車／館內汽車／新莊停車場各一分頁）---
     if (payload.action === 'vehicleReg') {
-      var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-      var sheet = ss.getSheets()[0];
+      var sheet = getVehicleSheet_(payload.typeLabel);
       var timestamp = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss');
       sheet.appendRow([
         timestamp,
@@ -152,6 +151,21 @@ function extractPlate_(text) {
     }
   }
   return '';
+}
+
+// ── 依車輛類型取得對應分頁（館內機車／館內汽車／新莊停車場各一分頁，無則自動建立表頭）──
+var VEHICLE_HEADERS_ = ['時間', '類型', '車牌', '登記人'];
+function getVehicleSheet_(typeLabel) {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var name = typeLabel || '未分類';
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, VEHICLE_HEADERS_.length).setValues([VEHICLE_HEADERS_]);
+    sheet.getRange(1, 1, 1, VEHICLE_HEADERS_.length).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
 }
 
 // 輔助函式：回傳 JSON 格式
@@ -211,22 +225,24 @@ function sendDailySummary() {
   var endKey   = todayStr     + ' 08:00:00';
 
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  var sheet = ss.getSheets()[0];
-  var rows = sheet.getDataRange().getValues();
+  var sheets = ss.getSheets(); // 分頁已依類型拆開（館內機車／館內汽車／新莊停車場…），逐頁彙整
 
   var hits = [];        // [時間, 類型, 車牌, 登記人]
   var byType = {};      // 類型 → 台數
-  for (var i = 0; i < rows.length; i++) {
-    var ts = rows[i][0];
-    // 儲存格可能是字串或已被試算表轉成 Date，統一格式化後比對
-    var key = (ts instanceof Date)
-      ? Utilities.formatDate(ts, tz, 'yyyy-MM-dd HH:mm:ss')
-      : String(ts || '');
-    if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(key)) continue; // 跳過表頭/空列/爛值
-    if (key < startKey || key >= endKey) continue;
-    var type = String(rows[i][1] || '未分類');
-    hits.push([key, type, String(rows[i][2] || ''), String(rows[i][3] || '')]);
-    byType[type] = (byType[type] || 0) + 1;
+  for (var s = 0; s < sheets.length; s++) {
+    var rows = sheets[s].getDataRange().getValues();
+    for (var i = 0; i < rows.length; i++) {
+      var ts = rows[i][0];
+      // 儲存格可能是字串或已被試算表轉成 Date，統一格式化後比對
+      var key = (ts instanceof Date)
+        ? Utilities.formatDate(ts, tz, 'yyyy-MM-dd HH:mm:ss')
+        : String(ts || '');
+      if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(key)) continue; // 跳過表頭/空列/爛值
+      if (key < startKey || key >= endKey) continue;
+      var type = String(rows[i][1] || '未分類');
+      hits.push([key, type, String(rows[i][2] || ''), String(rows[i][3] || '')]);
+      byType[type] = (byType[type] || 0) + 1;
+    }
   }
   hits.sort(); // 依時間排序
 
