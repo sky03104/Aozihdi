@@ -168,6 +168,44 @@ function getVehicleSheet_(typeLabel) {
   return sheet;
 }
 
+/* ═════════════════════════════════════════════
+ * 【一次性搬遷】把舊版混合分頁的歷史資料，依「類型」欄位拆進新的
+ *   館內機車／館內汽車／新莊停車場…分頁。
+ * 用法：GAS 編輯器函數選 migrateOldVehicleData_ → 執行一次即可
+ *   （執行前第一個分頁必須還是舊版混合資料那頁，且尚未被改名/搬動）。
+ *   搬完會清空舊分頁的資料列（表頭保留）並改名為「舊資料(已搬遷備份)」，
+ *   避免之後每日摘要信重複計算同一筆資料。可重複執行，第二次起是空跑。
+ * ═════════════════════════════════════════════ */
+function migrateOldVehicleData_() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var oldSheet = ss.getSheets()[0];
+  var data = oldSheet.getDataRange().getValues();
+  if (data.length === 0) { Logger.log('舊分頁沒有資料，無需搬遷'); return; }
+
+  var headerLike = String(data[0][0] || '').indexOf('時間') >= 0;
+  var startIdx = headerLike ? 1 : 0;
+  var counts = {};
+  for (var i = startIdx; i < data.length; i++) {
+    var row = data[i];
+    if (!row[0]) continue; // 空列跳過
+    var type = String(row[1] || '未分類');
+    var sheet = getVehicleSheet_(type);
+    sheet.appendRow([row[0], row[1], row[2], row[3]]);
+    counts[type] = (counts[type] || 0) + 1;
+  }
+
+  var lastRow = oldSheet.getLastRow();
+  if (lastRow > startIdx) {
+    oldSheet.getRange(startIdx + 1, 1, lastRow - startIdx, Math.max(oldSheet.getLastColumn(), 4)).clearContent();
+  }
+  oldSheet.setName('舊資料(已搬遷備份)');
+
+  var log = ['搬遷完成：'];
+  for (var t in counts) log.push('・' + t + '：' + counts[t] + ' 筆');
+  if (!Object.keys(counts).length) log.push('（沒有符合的資料列）');
+  Logger.log(log.join('\n'));
+}
+
 // 輔助函式：回傳 JSON 格式
 function jsonOut(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
