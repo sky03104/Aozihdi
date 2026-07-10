@@ -19217,7 +19217,7 @@ function App() {
     useEffect(() => {
         if (tab === 'home') loadDirectivesCloud();
     }, [tab]);
-    const openDirectives = () => { setShowDirectives(true); loadDirectivesCloud(); };
+    const openDirectives = () => { setShowDirectives(true); loadDirectivesCloud(); try { if (typeof logWorkflow === 'function') logWorkflow('directive', 'open', '使用中'); } catch (e) {} };
     // 公告雲端讀取：自「公告欄」分頁拉最新（含圖片 Drive 連結），成功則更新並快取本機
     const loadAnnouncementsCloud = async () => {
         if (!ACCOUNT_GAS_URL) return;
@@ -21033,6 +21033,7 @@ function App() {
                                         ? { ...d, ...editingDirective, id: d.id, date: now } : d);
                                     setDirectives(next);
                                     pushDirectivesCloud(next);
+                                    try { if (typeof logWorkflow === 'function') logWorkflow('directive', 'update', '\u5DF2\u5B8C\u6210'); } catch (e) {}
                                     showToast('\u2705 \u5BA3\u5C0E\u4E8B\u9805\u5DF2\u66F4\u65B0\uFF08\u540C\u6B65\u96F2\u7AEF\uFF09');
                                 }
                                 else {
@@ -21043,6 +21044,7 @@ function App() {
                                     ];
                                     setDirectives(next);
                                     pushDirectivesCloud(next);
+                                    try { if (typeof logWorkflow === 'function') logWorkflow('directive', 'submit', '\u5DF2\u5B8C\u6210'); } catch (e) {}
                                     showToast('\u2705 \u5BA3\u5C0E\u4E8B\u9805\u5DF2\u65B0\u589E\uFF08\u540C\u6B65\u96F2\u7AEF\uFF09');
                                 }
                                 setEditingDirective(null);
@@ -21076,6 +21078,7 @@ function App() {
                                         const next = directives.filter(d => d.id !== dir.id);
                                         setDirectives(next);
                                         pushDirectivesCloud(next);
+                                        try { if (typeof logWorkflow === 'function') logWorkflow('directive', 'delete', '\u5DF2\u5B8C\u6210'); } catch (e) {}
                                         showToast('\uD83D\uDDD1\uFE0F \u5BA3\u5C0E\u4E8B\u9805\u5DF2\u522A\u9664\uFF08\u540C\u6B65\u96F2\u7AEF\uFF09');
                                     }
                                 }, style: { background: 'rgba(248,113,113,.12)', border: '1px solid rgba(248,113,113,.25)',
