@@ -19854,7 +19854,7 @@ function App() {
     });
     const canManageAnn = CAN_MANAGE_ROLES.includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role);
     const canManageDirective = CAN_MANAGE_ROLES.includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role);
-    const categories = [...new Set(tools.map(t => t.category))];
+    const categories = [...new Set(tools.map(t => t.category))].sort((a, b) => (a === "待開發" ? 1 : 0) - (b === "待開發" ? 1 : 0));
     if (page === "login")
         return (React.createElement("div", { className: "app" },
             React.createElement("style", null, css),
