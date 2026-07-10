@@ -54,7 +54,7 @@ aliases: [專案狀態, 快照]
 | 3 | 資料上傳工具 | `upload` | `tpl-upload`（index內嵌）| — | ✅ |
 | 4 | 事故報告填寫 | externalUrl | `事故回報工具/tool_report.html` + `事故回報工具/Code.gs` | 232行+74行GAS | ✅（GAS v2.0 支援照片上傳）|
 | 5 | 訪客登記系統 | — | ❌ 無 | — | 📋 待開發 |
-| 6 | 過夜車輛登記 | `signin` | `tpl-signin`（index內嵌）+ `tool_signin.html` | 561行 | ✅ |
+| 6 | 過夜車輛登記 | `signin` | `tool_signin.html`（獨立檔，iframe src；2026-07-11 起不再內嵌 base64） | 572行 | ✅ |
 | 7 | 停車場車位計算 | `car` | `tpl-car`（index內嵌）+ `tool_car.html` | 758行 | ✅ |
 | 9 | 施工單查詢 | externalUrl | `tool_work.html` | 766行 | ✅ |
 | 10 | 影像調閱申請 | — | ❌ 無 | — | 📋 待開發 |
@@ -86,7 +86,6 @@ aliases: [專案狀態, 快照]
 | `tpl-car` | 停車場車位計算 | ✅ |
 | `tpl-closing` | 打烊後進出快速登錄 | ✅ |
 | `tpl-emergency` | 緊急聯絡清單 | ✅ |
-| `tpl-signin` | 過夜車輛登記 | ✅ |
 | `tpl-upload` | 資料上傳工具 | ✅ |
 
 > ⚠️ `tpl-post`、`tpl-leave`、`tpl-schedule` 不存在於 index.html，相關工具為獨立頁或 LIFF

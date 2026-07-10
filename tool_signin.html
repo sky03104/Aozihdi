@@ -1,564 +1,463 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
   <title>過夜車輛登記 · 天鷹保全</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script>
+const WORKFLOW_GAS_URL='https://script.google.com/macros/s/AKfycbzxjedGAbxj3G85zkybqoFoB-P7uQ9ycqdJZ7mzQ2Ax-vaxKgOTG60120PlGPbcNJpR/exec';
+function logWorkflow(tool,actionType,status){
+  var u=JSON.parse(localStorage.getItem('hsh_session_user')||'{}');
+  if(!u.empId)return;
+  try{fetch(WORKFLOW_GAS_URL,{method:'POST',body:JSON.stringify({action:'logTask',tool,empId:u.empId,userName:u.name||'未知',actionType,status:status||'已完成'})});}catch(e){}
+}</script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0A0C10; font-family: 'Microsoft JhengHei','PingFang TC',sans-serif; color: #F5F5F5; min-height: 100vh; overflow-x: hidden; }
-    /* ─── Splash ─── */
-    #splash { position:fixed; inset:0; background:#0A0C10; z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; transition:opacity .6s; }
-    #splash.hide { opacity:0; pointer-events:none; }
-    .splash-rings { position:relative; width:72px; height:72px; }
-    .splash-ring { position:absolute; inset:0; border-radius:50%; border:2px solid transparent; animation: spinRing 2.2s linear infinite; }
-    .splash-ring:nth-child(1){ border-top-color:#D4A800; animation-duration:2.2s; }
-    .splash-ring:nth-child(2){ inset:8px; border-right-color:#FFD700; animation-duration:1.7s; animation-direction:reverse; }
-    .splash-ring:nth-child(3){ inset:16px; border-bottom-color:#C9A227; animation-duration:1.3s; }
-    .splash-logo-img { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
-    .splash-logo-img img { width:38px; height:38px; object-fit:contain; }
-    @keyframes spinRing { to { transform:rotate(360deg); } }
-    .splash-brand { font-size:18px; font-weight:900; color:#D4A800; letter-spacing:2px; }
-    .splash-sub { font-size:9px; color:#8A95A8; letter-spacing:3px; }
-    /* ─── Header ─── */
-    .app-header { display:flex; align-items:center; gap:12px; padding:12px 16px; background:rgba(10,12,16,.95); border-bottom:1px solid rgba(212,168,0,.2); position:sticky; top:0; z-index:100; }
-    .header-logo { width:34px; height:34px; object-fit:contain; filter:drop-shadow(0 0 8px rgba(212,168,0,.5)); flex-shrink:0; }
-    .header-title { flex:1; }
-    .header-cn { font-size:14px; font-weight:900; color:#D4A800; letter-spacing:1px; }
-    .header-en { font-size:8px; color:#8A95A8; letter-spacing:2px; margin-top:1px; }
-    /* ─── Screens ─── */
-    .screen { display:none; min-height:calc(100vh - 56px); padding:16px 16px 80px; }
-    .screen.active { display:block; }
-    /* ─── Type selection ─── */
-    .section-label { font-size:11px; color:#8A95A8; letter-spacing:2px; text-transform:uppercase; margin-bottom:12px; }
-    .reg-card { display:flex; align-items:center; gap:14px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:16px; margin-bottom:12px; cursor:pointer; transition:all .2s; -webkit-tap-highlight-color:transparent; text-decoration:none; color:inherit; }
-    .reg-card:active { transform:scale(.98); }
-    .reg-card.moto { border-color:rgba(212,168,0,.25); }
-    .reg-card.moto:hover { background:rgba(212,168,0,.06); }
-    .reg-card.car { border-color:rgba(129,140,248,.25); }
-    .reg-card.car:hover { background:rgba(129,140,248,.06); }
-    .reg-card.park { border-color:rgba(74,222,128,.25); }
-    .reg-card.park:hover { background:rgba(74,222,128,.06); }
-    .card-icon-wrap { width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
-    .moto .card-icon-wrap { background:rgba(212,168,0,.15); color:#FFD700; }
-    .car .card-icon-wrap { background:rgba(129,140,248,.15); color:#818CF8; }
-    .park .card-icon-wrap { background:rgba(74,222,128,.15); color:#4ADE80; }
-    .card-body { flex:1; min-width:0; }
-    .card-name { font-size:16px; font-weight:700; margin-bottom:3px; }
-    .card-desc { font-size:12px; color:#8A95A8; }
-    .card-arrow { color:#4B5563; font-size:18px; }
-    /* ─── OCR Screen ─── */
-    .screen-title { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
-    .screen-title .back-btn { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); border-radius:8px; color:#F5F5F5; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:16px; flex-shrink:0; }
-    .screen-title-text { font-size:17px; font-weight:800; }
-    .type-badge { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:20px; font-size:13px; font-weight:700; margin-bottom:16px; }
-    .type-badge.moto { background:rgba(212,168,0,.15); color:#FFD700; border:1px solid rgba(212,168,0,.3); }
-    .type-badge.car { background:rgba(129,140,248,.15); color:#818CF8; border:1px solid rgba(129,140,248,.3); }
-    .type-badge.park { background:rgba(74,222,128,.15); color:#4ADE80; border:1px solid rgba(74,222,128,.3); }
-    /* ─── Camera Area ─── */
-    .camera-zone { background:rgba(255,255,255,.04); border:2px dashed rgba(255,255,255,.12); border-radius:14px; padding:24px; text-align:center; margin-bottom:16px; cursor:pointer; transition:all .2s; }
-    .camera-zone.has-photo { border-style:solid; border-color:rgba(212,168,0,.3); padding:0; overflow:hidden; }
-    .camera-zone:active { opacity:.8; }
-    .camera-zone img { width:100%; max-height:200px; object-fit:cover; border-radius:12px; display:block; }
-    .camera-icon { font-size:44px; color:#8A95A8; margin-bottom:10px; }
-    .camera-hint { font-size:14px; color:#8A95A8; font-weight:500; }
-    .camera-sub { font-size:11px; color:#4B5563; margin-top:4px; }
-    /* ─── OCR Progress ─── */
-    .ocr-progress { background:rgba(212,168,0,.08); border:1px solid rgba(212,168,0,.2); border-radius:10px; padding:12px 16px; margin-bottom:16px; display:none; }
-    .ocr-progress.show { display:block; }
-    .ocr-prog-label { font-size:13px; color:#FFD700; font-weight:600; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
-    .ocr-bar-wrap { background:rgba(255,255,255,.06); border-radius:4px; height:4px; overflow:hidden; }
-    .ocr-bar { height:100%; background:linear-gradient(90deg,#C9A227,#FFD700); border-radius:4px; transition:width .3s; width:0%; }
-    /* ─── Form Fields ─── */
-    .field-group { margin-bottom:14px; }
-    .field-label { font-size:12px; color:#8A95A8; font-weight:600; margin-bottom:6px; letter-spacing:.5px; }
-    .field-input { width:100%; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:12px 14px; color:#F5F5F5; font-size:16px; font-family:inherit; outline:none; transition:border-color .2s; }
-    .field-input:focus { border-color:rgba(212,168,0,.5); }
-    .field-input::placeholder { color:#4B5563; }
-    .plate-input { font-size:22px; font-weight:800; letter-spacing:3px; text-align:center; color:#FFD700; text-transform:uppercase; }
-    .plate-input::placeholder { font-size:16px; font-weight:400; letter-spacing:0; color:#4B5563; }
-    .field-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    /* ─── OCR Result ─── */
-    .ocr-result-badge { display:flex; align-items:center; gap:8px; background:rgba(74,222,128,.08); border:1px solid rgba(74,222,128,.2); border-radius:8px; padding:8px 12px; margin-bottom:8px; font-size:12px; color:#4ADE80; }
-    .ocr-fail-badge { background:rgba(248,113,113,.08); border-color:rgba(248,113,113,.2); color:#F87171; }
-    /* ─── Buttons ─── */
-    .btn-primary { width:100%; background:linear-gradient(135deg,#C9A227,#D4A800); color:#0A0C10; border:none; border-radius:12px; padding:15px; font-size:16px; font-weight:900; cursor:pointer; font-family:inherit; letter-spacing:.5px; transition:all .2s; display:flex; align-items:center; justify-content:center; gap:8px; }
-    .btn-primary:active { transform:scale(.98); }
-    .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
-    .btn-secondary { width:100%; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); color:#F5F5F5; border-radius:12px; padding:13px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; transition:all .2s; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:10px; }
-    .btn-secondary:active { transform:scale(.98); }
-    .btn-ms-forms { background:rgba(0,120,212,.1); border-color:rgba(0,120,212,.3); color:#60a5fa; }
-    /* ─── Retake ─── */
-    .retake-btn { font-size:12px; color:#8A95A8; background:none; border:none; cursor:pointer; font-family:inherit; padding:8px 0 0; display:flex; align-items:center; gap:5px; }
-    /* ─── Success ─── */
-    .success-card { background:rgba(74,222,128,.08); border:1px solid rgba(74,222,128,.25); border-radius:16px; padding:28px 20px; text-align:center; margin-top:20px; }
-    .success-icon { font-size:56px; margin-bottom:12px; }
-    .success-title { font-size:20px; font-weight:900; color:#4ADE80; margin-bottom:6px; }
-    .success-plate { font-size:26px; font-weight:800; color:#FFD700; letter-spacing:3px; margin:12px 0; }
-    .success-info { font-size:13px; color:#8A95A8; line-height:1.8; }
-    /* ─── Divider ─── */
-    .or-divider { display:flex; align-items:center; gap:10px; margin:14px 0 4px; color:#4B5563; font-size:11px; }
-    .or-divider::before, .or-divider::after { content:''; flex:1; height:1px; background:rgba(255,255,255,.08); }
-    /* ─── Nav ─── */
-    .nav-bar { position:fixed; bottom:0; left:0; right:0; padding:12px 16px calc(12px + env(safe-area-inset-bottom)); background:rgba(10,12,16,.95); border-top:1px solid rgba(255,255,255,.08); }
-    .nav-btn { width:100%; padding:13px; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; transition:all .2s; border:none; display:flex; align-items:center; justify-content:center; gap:8px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); color:#8A95A8; }
-    /* ─── Toast ─── */
-    .toast { position:fixed; top:70px; left:50%; transform:translateX(-50%); background:rgba(30,34,42,.95); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:12px 20px; font-size:14px; font-weight:600; z-index:9000; white-space:nowrap; box-shadow:0 8px 32px rgba(0,0,0,.5); animation:toastIn .25s ease; }
-    @keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(-8px); } }
-    /* ─── Footer ─── */
-    .page-footer { font-size:10px; color:#4B5563; letter-spacing:1px; text-align:center; padding:0 0 16px; }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0A0C10;font-family:'Microsoft JhengHei','PingFang TC',sans-serif;color:#F5F5F5;min-height:100vh;overflow-x:hidden}
+    #splash{position:fixed;inset:0;background:#0A0C10;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity .6s}
+    #splash.hide{opacity:0;pointer-events:none}
+    .sp-rings{position:relative;width:72px;height:72px}
+    .sp-ring{position:absolute;inset:0;border-radius:50%;border:2px solid transparent;animation:spin 2.2s linear infinite}
+    .sp-ring:nth-child(1){border-top-color:#D4A800}
+    .sp-ring:nth-child(2){inset:8px;border-right-color:#FFD700;animation-duration:1.7s;animation-direction:reverse}
+    .sp-ring:nth-child(3){inset:16px;border-bottom-color:#C9A227;animation-duration:1.3s}
+    .sp-logo{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+    .sp-logo img{width:38px;height:38px;object-fit:contain}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .sp-brand{font-size:18px;font-weight:900;color:#D4A800;letter-spacing:2px}
+    .sp-sub{font-size:9px;color:#8A95A8;letter-spacing:3px}
+    .app-hdr{display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(10,12,16,.95);border-bottom:1px solid rgba(212,168,0,.2);position:sticky;top:0;z-index:100}
+    .hdr-logo{width:34px;height:34px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(212,168,0,.5));flex-shrink:0}
+    .hdr-cn{font-size:14px;font-weight:900;color:#D4A800;letter-spacing:1px}
+    .hdr-en{font-size:8px;color:#8A95A8;letter-spacing:2px;margin-top:1px}
+    .screen{display:none;min-height:calc(100vh - 56px);padding:16px 16px 90px}
+    .screen.active{display:block}
+    .sec-lbl{font-size:11px;color:#8A95A8;letter-spacing:2px;margin-bottom:12px}
+    .reg-card{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;margin-bottom:12px;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
+    .reg-card:active{transform:scale(.98)}
+    .reg-card.moto{border-color:rgba(212,168,0,.3)}
+    .reg-card.car{border-color:rgba(129,140,248,.3)}
+    .reg-card.park{border-color:rgba(74,222,128,.3)}
+    .ci{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+    .moto .ci{background:rgba(212,168,0,.15);color:#FFD700}
+    .car .ci{background:rgba(129,140,248,.15);color:#818CF8}
+    .park .ci{background:rgba(74,222,128,.15);color:#4ADE80}
+    .cb{flex:1}.cn{font-size:16px;font-weight:700;margin-bottom:3px}.cd{font-size:12px;color:#8A95A8}
+    .ca{color:#4B5563;font-size:18px}
+    .scr-ttl{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+    .back-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#F5F5F5;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;flex-shrink:0}
+    .scr-ttl-txt{font-size:17px;font-weight:800}
+    .type-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:20px;font-size:13px;font-weight:700}
+    .type-badge.moto{background:rgba(212,168,0,.15);color:#FFD700;border:1px solid rgba(212,168,0,.3)}
+    .type-badge.car{background:rgba(129,140,248,.15);color:#818CF8;border:1px solid rgba(129,140,248,.3)}
+    .type-badge.park{background:rgba(74,222,128,.15);color:#4ADE80;border:1px solid rgba(74,222,128,.3)}
+    /* ── 連拍統計列 ── */
+    .stat-bar{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 16px;margin:12px 0}
+    .stat-num{font-size:22px;font-weight:900;color:#4ADE80}
+    .stat-lbl{font-size:11px;color:#8A95A8}
+    /* ── 大型拍照按鈕 ── */
+    .big-cam{width:100%;background:linear-gradient(135deg,#C9A227,#D4A800);border:none;border-radius:18px;padding:26px;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px;transition:all .15s;-webkit-tap-highlight-color:transparent;box-shadow:0 6px 24px rgba(212,168,0,.25)}
+    .big-cam:active{transform:scale(.97)}
+    .big-cam:disabled{opacity:.5}
+    .big-cam .ic{font-size:44px;color:#0A0C10}
+    .big-cam .tx{font-size:18px;font-weight:900;color:#0A0C10;letter-spacing:1px}
+    .big-cam .sb{font-size:11px;color:rgba(10,12,16,.65)}
+    /* ── 處理中遮罩卡 ── */
+    .proc-card{background:rgba(129,140,248,.07);border:1px solid rgba(129,140,248,.25);border-radius:14px;padding:18px;margin-top:14px;display:none}
+    .proc-card.show{display:block}
+    .proc-row{display:flex;align-items:center;gap:12px}
+    .proc-thumb{width:64px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;border:1px solid rgba(255,255,255,.15)}
+    .proc-info{flex:1}
+    .proc-lbl{font-size:13px;color:#818CF8;font-weight:700;display:flex;align-items:center;gap:7px;margin-bottom:6px}
+    .spin{display:inline-block;width:13px;height:13px;border-radius:50%;border:2px solid transparent;border-top-color:#818CF8;animation:spin .8s linear infinite}
+    .proc-bar-w{background:rgba(255,255,255,.06);border-radius:4px;height:4px;overflow:hidden}
+    .proc-bar{height:100%;background:linear-gradient(90deg,#6366F1,#818CF8);transition:width .4s;width:0%}
+    /* ── 確認卡（辨識結果）── */
+    .cfm-card{background:rgba(74,222,128,.06);border:2px solid rgba(74,222,128,.35);border-radius:16px;padding:18px;margin-top:14px;display:none;animation:popIn .25s ease}
+    .cfm-card.show{display:block}
+    @keyframes popIn{from{opacity:0;transform:scale(.95)}}
+    .cfm-top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+    .cfm-thumb{width:72px;height:54px;border-radius:8px;object-fit:cover;flex-shrink:0;border:1px solid rgba(255,255,255,.15)}
+    .cfm-plate-wrap{flex:1}
+    .cfm-plate{width:100%;background:rgba(0,0,0,.3);border:1px solid rgba(255,215,0,.3);border-radius:10px;padding:8px 10px;font-size:26px;font-weight:900;letter-spacing:3px;text-align:center;color:#FFD700;font-family:inherit;outline:none;text-transform:uppercase;-webkit-appearance:none}
+    .cfm-plate:focus{border-color:#FFD700}
+    .cfm-count{font-size:11px;color:#4ADE80;text-align:center;margin-bottom:10px;font-weight:600}
+    .cfm-btns{display:grid;grid-template-columns:1fr 2fr;gap:10px}
+    .cfm-cancel{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#F87171;border-radius:11px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+    .cfm-ok{background:linear-gradient(135deg,#16A34A,#22C55E);border:none;color:#fff;border-radius:11px;padding:13px;font-size:15px;font-weight:900;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;position:relative;overflow:hidden}
+    .cfm-ok .auto-fill{position:absolute;inset:0;background:rgba(255,255,255,.22);transform-origin:left;transform:scaleX(0)}
+    .cfm-ok .ok-txt{position:relative;z-index:1;display:flex;align-items:center;gap:6px}
+    /* ── 錯誤卡 ── */
+    .err-card{background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.3);border-radius:14px;padding:16px;margin-top:14px;display:none}
+    .err-card.show{display:block}
+    .err-lbl{font-size:13px;color:#F87171;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+    .err-input-row{display:flex;gap:8px}
+    .err-plate{flex:1;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px;font-size:20px;font-weight:800;letter-spacing:2px;text-align:center;color:#FFD700;font-family:inherit;outline:none;text-transform:uppercase;-webkit-appearance:none}
+    .err-send{background:linear-gradient(135deg,#16A34A,#22C55E);border:none;color:#fff;border-radius:10px;padding:10px 18px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;flex-shrink:0}
+    /* ── 最近登記列表 ── */
+    .recent-list{margin-top:18px}
+    .recent-item{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:10px 14px;margin-bottom:8px;animation:slideIn .3s ease}
+    @keyframes slideIn{from{opacity:0;transform:translateY(-6px)}}
+    .recent-plate{font-size:16px;font-weight:800;letter-spacing:2px;color:#F5F5F5;flex:1}
+    .recent-time{font-size:11px;color:#6B7280}
+    .recent-ok{color:#4ADE80;font-size:15px}
+    .recent-fail{color:#FB923C;font-size:15px}
+    /* divider/ms */
+    .divider{display:flex;align-items:center;gap:10px;margin:14px 0 8px;color:#4B5563;font-size:11px}
+    .divider::before,.divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.08)}
+    .btn-ms{width:100%;background:rgba(0,120,212,.08);border:1px solid rgba(0,120,212,.25);color:#60a5fa;border-radius:12px;padding:12px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
+    .nav-bar{position:fixed;bottom:0;left:0;right:0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:rgba(10,12,16,.96);border-top:1px solid rgba(255,255,255,.07);z-index:200}
+    .nav-btn{width:100%;padding:13px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#8A95A8;display:flex;align-items:center;justify-content:center;gap:8px}
+    .toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(30,34,42,.96);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px 20px;font-size:14px;font-weight:600;z-index:9000;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,.5);animation:toastIn .25s ease}
+    @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-8px)}}
+    .page-footer{font-size:10px;color:#4B5563;letter-spacing:1px;text-align:center;padding:8px 0 16px}
   </style>
 </head>
 <body>
 
-<!-- ===== Splash ===== -->
 <div id="splash">
-  <div class="splash-rings">
-    <div class="splash-ring"></div>
-    <div class="splash-ring"></div>
-    <div class="splash-ring"></div>
-    <div class="splash-logo-img">
-      <img id="splashLogoImg" src="" alt="Logo" />
-    </div>
+  <div class="sp-rings">
+    <div class="sp-ring"></div><div class="sp-ring"></div><div class="sp-ring"></div>
+    <div class="sp-logo"><img id="spLogo" src="" alt=""/></div>
   </div>
-  <div class="splash-brand">天鷹保全</div>
-  <div class="splash-sub">TIANYING SECURITY · DATA SYSTEM</div>
+  <div class="sp-brand">天鷹保全</div>
+  <div class="sp-sub">TIANYING SECURITY · DATA SYSTEM</div>
 </div>
 
-<!-- ===== Header ===== -->
-<header class="app-header">
-  <img id="headerLogo" class="header-logo" src="" alt="Logo" />
-  <div class="header-title">
-    <div class="header-cn"><span style="color:#FFD700">天鷹</span>保全</div>
-    <div class="header-en">OVERNIGHT VEHICLE REGISTRATION</div>
-  </div>
+<header class="app-hdr">
+  <img id="hdrLogo" class="hdr-logo" src="" alt=""/>
+  <div><div class="hdr-cn"><span style="color:#FFD700">天鷹</span>保全</div><div class="hdr-en">OVERNIGHT VEHICLE REGISTRATION</div></div>
 </header>
 
-<!-- ===== Screen 0: 選擇車輛類型 ===== -->
-<div id="screen-select" class="screen active" style="padding-top:20px;">
-  <div class="section-label">選擇登記項目</div>
-  <p style="font-size:12px;color:#8A95A8;margin-bottom:16px;line-height:1.6;">
-    點擊類型後可📸拍照辨識車牌，自動填入登記表單，無需手動輸入。
-  </p>
-
-  <div class="reg-card moto" onclick="openOCR('moto')">
-    <div class="card-icon-wrap"><i class="ti ti-motorbike"></i></div>
-    <div class="card-body">
-      <div class="card-name">館內機車</div>
-      <div class="card-desc">漢神巨蛋館內機車過夜登記</div>
-    </div>
-    <div class="card-arrow"><i class="ti ti-chevron-right"></i></div>
+<!-- S0: 類型選擇 -->
+<div id="s0" class="screen active" style="padding-top:20px">
+  <div class="sec-lbl">選擇登記項目</div>
+  <div class="reg-card moto" onclick="openCam('moto')">
+    <div class="ci"><i class="ti ti-motorbike"></i></div>
+    <div class="cb"><div class="cn">館內機車</div><div class="cd">連續拍照快速登記</div></div>
+    <div class="ca"><i class="ti ti-chevron-right"></i></div>
   </div>
-
-  <div class="reg-card car" onclick="openOCR('car')">
-    <div class="card-icon-wrap"><i class="ti ti-car"></i></div>
-    <div class="card-body">
-      <div class="card-name">館內汽車</div>
-      <div class="card-desc">漢神巨蛋館內汽車過夜登記</div>
-    </div>
-    <div class="card-arrow"><i class="ti ti-chevron-right"></i></div>
+  <div class="reg-card car" onclick="openCam('car')">
+    <div class="ci"><i class="ti ti-car"></i></div>
+    <div class="cb"><div class="cn">館內汽車</div><div class="cd">連續拍照快速登記</div></div>
+    <div class="ca"><i class="ti ti-chevron-right"></i></div>
   </div>
-
-  <div class="reg-card park" onclick="openOCR('park')">
-    <div class="card-icon-wrap"><i class="ti ti-parking"></i></div>
-    <div class="card-body">
-      <div class="card-name">新莊停車場</div>
-      <div class="card-desc">新莊停車場車輛過夜登記</div>
-    </div>
-    <div class="card-arrow"><i class="ti ti-chevron-right"></i></div>
+  <div class="reg-card park" onclick="openCam('park')">
+    <div class="ci"><i class="ti ti-parking"></i></div>
+    <div class="cb"><div class="cn">新莊停車場</div><div class="cd">連續拍照快速登記</div></div>
+    <div class="ca"><i class="ti ti-chevron-right"></i></div>
   </div>
-
-  <div class="or-divider">備用 · Microsoft 表單</div>
-  <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
-    <a class="btn-secondary btn-ms-forms" href="https://forms.cloud.microsoft/r/QGHn5SQ0en?origin=lprLink" target="_blank" rel="noopener">
-      <i class="ti ti-external-link"></i>機車 · Microsoft 表單
-    </a>
-    <a class="btn-secondary btn-ms-forms" href="https://forms.cloud.microsoft/r/Mcf0VUYBX7?origin=lprLink" target="_blank" rel="noopener">
-      <i class="ti ti-external-link"></i>汽車 · Microsoft 表單
-    </a>
-    <a class="btn-secondary btn-ms-forms" href="https://forms.cloud.microsoft/r/WHzPK2maLC" target="_blank" rel="noopener">
-      <i class="ti ti-external-link"></i>停車場 · Microsoft 表單
-    </a>
+  <div class="divider">備用 · Microsoft 表單</div>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+    <a class="btn-ms" href="https://forms.cloud.microsoft/r/QGHn5SQ0en?origin=lprLink" target="_blank" rel="noopener"><i class="ti ti-external-link"></i>機車 · Microsoft 表單</a>
+    <a class="btn-ms" href="https://forms.cloud.microsoft/r/Mcf0VUYBX7?origin=lprLink" target="_blank" rel="noopener"><i class="ti ti-external-link"></i>汽車 · Microsoft 表單</a>
+    <a class="btn-ms" href="https://forms.cloud.microsoft/r/WHzPK2maLC" target="_blank" rel="noopener"><i class="ti ti-external-link"></i>停車場 · Microsoft 表單</a>
   </div>
 </div>
 
-<!-- ===== Screen 1: 車牌辨識 ===== -->
-<div id="screen-ocr" class="screen">
-  <div class="screen-title">
-    <button class="back-btn" onclick="goToSelect()"><i class="ti ti-arrow-left"></i></button>
-    <span class="screen-title-text">車牌辨識登記</span>
+<!-- S1: 連拍登記 -->
+<div id="s1" class="screen">
+  <div class="scr-ttl">
+    <button class="back-btn" onclick="showS(0)"><i class="ti ti-arrow-left"></i></button>
+    <span class="scr-ttl-txt">快速連拍登記</span>
+    <span id="typeBadge" class="type-badge moto" style="margin-left:auto"></span>
   </div>
 
-  <div id="typeBadge" class="type-badge moto"></div>
-
-  <!-- Camera zone -->
-  <div id="cameraZone" class="camera-zone" onclick="triggerCamera()">
-    <div class="camera-icon"><i class="ti ti-camera"></i></div>
-    <div class="camera-hint">點擊拍攝車牌照片</div>
-    <div class="camera-sub">建議讓車牌佔畫面 2/3 以上，效果更好</div>
+  <!-- 統計 -->
+  <div class="stat-bar">
+    <div><div class="stat-num" id="statCount">0</div><div class="stat-lbl">本次已登記</div></div>
+    <div style="text-align:right"><div style="font-size:13px;color:#8A95A8" id="statLast">—</div><div class="stat-lbl">最後車牌</div></div>
   </div>
-  <button class="retake-btn" id="retakeBtn" style="display:none;" onclick="triggerCamera()">
-    <i class="ti ti-refresh"></i> 重新拍攝
+
+  <!-- 大拍照按鈕 -->
+  <button class="big-cam" id="bigCam" onclick="triggerCam()">
+    <span class="ic"><i class="ti ti-camera"></i></span>
+    <span class="tx">拍攝車牌</span>
+    <span class="sb">拍照後 AI 自動辨識並登記</span>
   </button>
 
-  <!-- OCR Progress -->
-  <div class="ocr-progress" id="ocrProgress">
-    <div class="ocr-prog-label"><span id="ocrSpinner" style="animation:spinRing .8s linear infinite;display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid transparent;border-top-color:#FFD700;"></span><span id="ocrLabel">正在辨識車牌中…</span></div>
-    <div class="ocr-bar-wrap"><div class="ocr-bar" id="ocrBar"></div></div>
-  </div>
-  <div id="ocrResultBadge" style="display:none;"></div>
-
-  <!-- Form -->
-  <div id="regForm" style="margin-top:16px;">
-    <div class="field-group">
-      <div class="field-label">🚗 車牌號碼（辨識結果，可手動修改）</div>
-      <input type="text" class="field-input plate-input" id="plateInput" placeholder="例：ABC-1234" autocomplete="off" autocorrect="off" spellcheck="false" />
+  <!-- 處理中 -->
+  <div class="proc-card" id="procCard">
+    <div class="proc-row">
+      <img class="proc-thumb" id="procThumb" src="" alt=""/>
+      <div class="proc-info">
+        <div class="proc-lbl"><span class="spin"></span><span id="procLbl">AI 辨識中…</span></div>
+        <div class="proc-bar-w"><div class="proc-bar" id="procBar"></div></div>
+      </div>
     </div>
-    <button class="btn-primary" id="submitBtn" onclick="submitReg()">
-      <i class="ti ti-device-floppy"></i> 確認登記
-    </button>
   </div>
+
+  <!-- 確認卡：3秒自動送出 -->
+  <div class="cfm-card" id="cfmCard">
+    <div class="cfm-top">
+      <img class="cfm-thumb" id="cfmThumb" src="" alt=""/>
+      <div class="cfm-plate-wrap">
+        <input type="text" class="cfm-plate" id="cfmPlate" autocomplete="off" autocorrect="off" spellcheck="false" oninput="onPlateEdit()"/>
+      </div>
+    </div>
+    <div class="cfm-count" id="cfmCount">3 秒後自動登記，點車牌可修改</div>
+    <div class="cfm-btns">
+      <button class="cfm-cancel" onclick="cancelCfm()">取消</button>
+      <button class="cfm-ok" onclick="confirmNow()">
+        <span class="auto-fill" id="autoFill"></span>
+        <span class="ok-txt"><i class="ti ti-check"></i> 立即登記</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 辨識失敗：手動輸入 -->
+  <div class="err-card" id="errCard">
+    <div class="err-lbl"><i class="ti ti-alert-circle"></i> 辨識失敗，請手動輸入車牌</div>
+    <div class="err-input-row">
+      <input type="text" class="err-plate" id="errPlate" placeholder="BNZ-5205" autocomplete="off" oninput="this.value=this.value.toUpperCase()"/>
+      <button class="err-send" onclick="sendManual()">登記</button>
+    </div>
+    <div id="errDebug" style="margin-top:8px;font-size:11px;line-height:1.5;color:#FB923C;word-break:break-all;font-family:monospace;"></div>
+  </div>
+
+  <!-- 最近登記 -->
+  <div class="recent-list" id="recentList"></div>
 </div>
 
-<!-- ===== Screen 2: 成功 ===== -->
-<div id="screen-success" class="screen">
-  <div class="success-card">
-    <div class="success-icon">✅</div>
-    <div class="success-title">登記完成！</div>
-    <div class="success-plate" id="successPlate"></div>
-    <div class="success-info" id="successInfo"></div>
-  </div>
-  <button class="btn-primary" style="margin-top:20px;" onclick="continueSame()">
-    <i class="ti ti-camera"></i> 繼續拍下一台（同項目）
-  </button>
-  <button class="btn-secondary" style="margin-top:10px;" onclick="goToSelect()">
-    <i class="ti ti-list"></i> 換登記項目
-  </button>
-</div>
-
-<!-- ===== 隱藏 file input ===== -->
-<input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" />
-
-<!-- ===== Nav ===== -->
-<nav class="nav-bar">
-  <button class="nav-btn" onclick="goBack()"><i class="ti ti-arrow-left"></i> 返回工具頁</button>
-</nav>
-
-<footer class="page-footer" style="padding:16px;">© TIANYING SECURITY · INTERNAL SYSTEM</footer>
-
-<!-- ===== Toast ===== -->
-<div id="toast" class="toast" style="display:none;"></div>
+<input type="file" id="camInp" accept="image/*" capture="environment" style="display:none"/>
+<nav class="nav-bar"><button class="nav-btn" onclick="goBack()"><i class="ti ti-arrow-left"></i> 返回工具頁</button></nav>
+<div id="toast" class="toast" style="display:none"></div>
+<footer class="page-footer">© TIANYING SECURITY · INTERNAL SYSTEM</footer>
 
 <script>
-// ===== 設定 =====
-// 車牌辨識獨立 GAS（recognizePlate 辨識 + vehicleReg 登記寫入，綁車輛登記試算表）
-const GAS_URL = 'https://script.google.com/macros/s/AKfycby8wWysK9AeiXzVlfB2MSyyxgrBLp7T6W0i-cKl-7RFHi2TL2P0gTw2btCpwJo_m6Mq/exec';
-const MS_FORMS = {
-  moto: 'https://forms.cloud.microsoft/r/QGHn5SQ0en?origin=lprLink',
-  car:  'https://forms.cloud.microsoft/r/Mcf0VUYBX7?origin=lprLink',
-  park: 'https://forms.cloud.microsoft/r/WHzPK2maLC'
+// ═══════ 設定 ═══════
+var GAS_URL='https://script.google.com/macros/s/AKfycbwZ5f7h_Lv_MOCxPrqPpBPKA917-JKmEz5DDekYixLDsGf1QAKCTOuVxwo18OYKX7a4ng/exec';
+// 車牌辨識獨立 GAS（recognizePlate 辨識 + vehicleReg 登記寫入，綁車輛登記試算表）；
+// 上面 GAS_URL 只剩 getLineBindings（LINE 綁定反查工號）在用
+var PLATE_GAS_URL='https://script.google.com/macros/s/AKfycby8wWysK9AeiXzVlfB2MSyyxgrBLp7T6W0i-cKl-7RFHi2TL2P0gTw2btCpwJo_m6Mq/exec';
+var LOGO_SRC='data:image/png;base64,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';
+var AUTO_SUBMIT_SEC = 3;   // 自動送出秒數
+var TYPE_INFO={
+  moto:{label:'館內機車',icon:'ti-motorbike',ms:'https://forms.cloud.microsoft/r/QGHn5SQ0en?origin=lprLink'},
+  car:{label:'館內汽車',icon:'ti-car',ms:'https://forms.cloud.microsoft/r/Mcf0VUYBX7?origin=lprLink'},
+  park:{label:'新莊停車場',icon:'ti-parking',ms:'https://forms.cloud.microsoft/r/WHzPK2maLC'}
 };
-const TYPE_LABEL = { moto:'館內機車 🏍️', car:'館內汽車 🚗', park:'新莊停車場 🅿️' };
+var empId=new URLSearchParams(window.location.search).get('empId')||'';
+var empName=new URLSearchParams(window.location.search).get('empName')||'';
+// srcDoc 內嵌時 iframe 網址無 ?empId= 參數 → 退回主程式登入態（同源 iframe 共用 localStorage）
+if(!empId||!empName){try{var _u=JSON.parse(localStorage.getItem('hsh_session_user')||'{}');if(!empId)empId=_u.empId||'';if(!empName)empName=_u.name||'';}catch(e){}}
 
-// ===== 狀態 =====
-const params = new URLSearchParams(window.location.search);
-let empId = params.get('empId') || '';
-// 網址沒帶工號時退回主程式登入態（同網域共用 localStorage）
-if (!empId) { try { empId = (JSON.parse(localStorage.getItem('hsh_session_user') || '{}').empId) || ''; } catch (e) {} }
-let currentType = 'moto';
+// ═══════ LIFF 整合（綁定 LINE 通知用，可選功能） ═══════
+// LIFF_ID：於 LINE Developers Console → LIFF → 新增 App 後取得
+// 格式如 '1234567890-abcdefgh'，若尚未設定請保持空字串（不影響原有功能）
+var LIFF_ID = '2010392723-Pl8dPArQ';
 
-// ===== LOGO 注入 =====
-const LOGO_B64 = 'data:image/png;base64,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';
-['splashLogoImg','headerLogo'].forEach(id => {
-  var el = document.getElementById(id);
-  if (el) el.src = LOGO_B64;
-});
+// 優先序：URL ?empId= 參數 > LIFF 自動帶入（依 LINE綁定 反查工號） > 無
+// LIFF 初始化失敗、SDK 未載入或非 LINE 環境時靜默跳過，不影響一般瀏覽器開啟
+if (LIFF_ID && !empId && typeof liff !== 'undefined') {
+  liff.init({ liffId: LIFF_ID }).then(function () {
+    if (!liff.isLoggedIn()) {
+      // 未登入時不強制導向登入，避免一般瀏覽器誤觸發；僅在 LIFF 內嵌瀏覽器才會自動登入
+      return;
+    }
+    return liff.getProfile();
+  }).then(function (profile) {
+    if (!profile || !profile.userId) return;
+    // 依 LINE userId 反查綁定工號（GAS getLineBindings：批次查詢）
+    return fetch(GAS_URL + '?action=getLineBindings')
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data.status !== 'ok' || !Array.isArray(data.list)) return;
+        var matched = data.list.find(function (b) {
+          return b.lineUserId === profile.userId && b.status === 'bound';
+        });
+        if (matched) {
+          empId = matched.empId;
+          // 將自動帶入的工號同步寫回 URL，供返回主頁時帶回工號狀態
+          var url = new URL(window.location.href);
+          url.searchParams.set('empId', empId);
+          window.history.replaceState({}, '', url.toString());
+        }
+      });
+  }).catch(function (err) {
+    console.error('LIFF 初始化或綁定查詢失敗：' + err.toString());
+  });
+}
+var curType='moto';
+var sessCount=0;
+var cfmTimer=null, cfmDeadline=0;
+var curThumbUrl='';
 
-// ===== Splash =====
-window.addEventListener('load', function() {
-  setTimeout(function() {
-    var sp = document.getElementById('splash');
-    if (sp) { sp.classList.add('hide'); setTimeout(function(){ sp.style.display='none'; }, 650); }
-  }, 900);
-});
+['spLogo','hdrLogo'].forEach(function(id){var el=document.getElementById(id);if(el)el.src=LOGO_SRC;});
+window.addEventListener('load',function(){setTimeout(function(){var sp=document.getElementById('splash');if(sp){sp.classList.add('hide');setTimeout(function(){sp.style.display='none';},650);}},900);});
 
-// ===== 切換畫面 =====
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+function showS(n){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});document.getElementById('s'+n).classList.add('active');}
+
+function openCam(type){
+  curType=type;
+  var info=TYPE_INFO[type];
+  var b=document.getElementById('typeBadge');
+  b.className='type-badge '+type;
+  b.innerHTML='<i class="ti '+info.icon+'"></i> '+info.label;
+  sessCount=0;
+  document.getElementById('statCount').textContent='0';
+  document.getElementById('statLast').textContent='—';
+  document.getElementById('recentList').innerHTML='';
+  hideAllCards();
+  showS(1);
 }
 
-// ===== 選擇車型 → OCR 畫面 =====
-function openOCR(type) {
-  currentType = type;
-  var badge = document.getElementById('typeBadge');
-  badge.className = 'type-badge ' + type;
-  badge.innerHTML = '<i class="ti ti-' + (type==='moto'?'motorbike':type==='car'?'car':'parking') + '"></i> ' + TYPE_LABEL[type];
-
-  // 重置畫面（日期時間於登記當下自動帶入，無需手動填）
-  resetOCRScreen();
-
-  showScreen('screen-ocr');
+function hideAllCards(){
+  document.getElementById('procCard').classList.remove('show');
+  document.getElementById('cfmCard').classList.remove('show');
+  document.getElementById('errCard').classList.remove('show');
+  clearCfmTimer();
 }
 
-// 連續登記：成功後回到「同一項目」的拍照畫面，可接著拍下一台
-function continueSame() {
-  openOCR(currentType);
-}
+function triggerCam(){document.getElementById('camInp').value='';document.getElementById('camInp').click();}
+document.getElementById('camInp').addEventListener('change',function(e){var f=e.target.files[0];if(f)startOCR(f);});
 
-function goToSelect() {
-  showScreen('screen-select');
-}
-
-function resetOCRScreen() {
-  var zone = document.getElementById('cameraZone');
-  zone.className = 'camera-zone';
-  zone.innerHTML = '<div class="camera-icon"><i class="ti ti-camera"></i></div><div class="camera-hint">點擊拍攝車牌照片</div><div class="camera-sub">建議讓車牌佔畫面 2/3 以上，效果更好</div>';
-  document.getElementById('retakeBtn').style.display = 'none';
-  document.getElementById('ocrProgress').classList.remove('show');
-  document.getElementById('ocrResultBadge').style.display = 'none';
-  document.getElementById('plateInput').value = '';
-  document.getElementById('submitBtn').disabled = false;
-}
-
-// ===== 相機觸發 =====
-function triggerCamera() {
-  document.getElementById('cameraInput').value = '';
-  document.getElementById('cameraInput').click();
-}
-
-document.getElementById('cameraInput').addEventListener('change', function(e) {
-  var file = e.target.files[0];
-  if (!file) return;
-  startOCR(file);
-});
-
-// ===== 照片壓縮（縮到長邊 1280、JPEG 0.82）=====
-// 手機原圖可達數 MB，壓縮後再轉 base64 才不會撐爆 GAS 傳輸上限
-function compressImage(file) {
-  return new Promise(function(resolve, reject) {
-    var img = new Image();
-    var url = URL.createObjectURL(file);
-    img.onload = function() {
-      var maxSide = 1280;
-      var w = img.width, h = img.height;
-      if (Math.max(w, h) > maxSide) {
-        var scale = maxSide / Math.max(w, h);
-        w = Math.round(w * scale);
-        h = Math.round(h * scale);
-      }
-      var canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      var ctx = canvas.getContext('2d');
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, 0, 0, w, h);
-      URL.revokeObjectURL(url);
-      // 回傳純 base64（去掉 data:image/jpeg;base64, 前綴）
-      // 長邊 1280 + 品質 0.85：車牌佔 2/3 畫面時已足夠清晰，
-      // 上傳量約減半 → 辨識明顯更快（base64 傳輸是主要瓶頸）
-      var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      resolve({ base64: dataUrl.split(',')[1], previewUrl: dataUrl });
+// ═══════ 圖片壓縮 ═══════
+function compressImg(file){
+  return new Promise(function(resolve){
+    var url=URL.createObjectURL(file);
+    var img=new Image();
+    img.onload=function(){
+      var MAX=1280;
+      var sc=Math.min(1,MAX/Math.max(img.width,img.height));
+      var cvs=document.createElement('canvas');
+      cvs.width=Math.round(img.width*sc);cvs.height=Math.round(img.height*sc);
+      cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);
+      resolve({dataUrl:cvs.toDataURL('image/jpeg',0.85),previewUrl:url});
     };
-    img.onerror = function() { reject(new Error('讀取照片失敗')); };
-    img.src = url;
+    img.src=url;
   });
 }
 
-// ===== 進度條動畫（Gemini 無進度回呼，改用模擬遞增）=====
-var _ocrTimer = null;
-function startFakeProgress() {
-  var bar = document.getElementById('ocrBar');
-  var label = document.getElementById('ocrLabel');
-  var pct = 0;
-  bar.style.width = '0%';
-  label.textContent = 'AI 辨識中…';
-  clearInterval(_ocrTimer);
-  _ocrTimer = setInterval(function() {
-    // 緩慢逼近 90%，等真正回應再補滿
-    pct += pct < 60 ? 8 : (pct < 85 ? 3 : 1);
-    if (pct > 90) pct = 90;
-    bar.style.width = pct + '%';
-    label.textContent = 'AI 辨識中… ' + pct + '%';
-  }, 180);
-}
-function stopFakeProgress() {
-  clearInterval(_ocrTimer);
-  document.getElementById('ocrBar').style.width = '100%';
-}
+// ═══════ AI 辨識（Gemini via GAS）═══════
+async function startOCR(file){
+  hideAllCards();
+  var proc=document.getElementById('procCard');
+  proc.classList.add('show');
+  setBar(10);setLbl('壓縮圖片中…');
 
-// ===== OCR 主流程（Gemini Vision，透過 GAS 中介）=====
-async function startOCR(file) {
-  var zone = document.getElementById('cameraZone');
+  try{
+    var c=await compressImg(file);
+    curThumbUrl=c.previewUrl;
+    document.getElementById('procThumb').src=c.previewUrl;
+    setBar(35);setLbl('AI 辨識中…');
 
-  // 1. 壓縮 + 顯示預覽
-  var img;
-  try {
-    img = await compressImage(file);
-  } catch (e) {
-    showToast('⚠️ 照片讀取失敗，請重拍');
-    return;
+    var res=await fetch(PLATE_GAS_URL,{method:'POST',body:JSON.stringify({action:'recognizePlate',imageBase64:c.dataUrl.split(',')[1],mimeType:'image/jpeg'})});
+    setBar(90);
+    var json=await res.json();
+    setBar(100);
+    proc.classList.remove('show');
+
+    var plate=(json.plate||'').trim().toUpperCase();
+    if(json.success && plate && plate!=='無法辨識' && plate.length>=3){
+      showCfm(plate);
+    }else{
+      showErr(json.success ? ('AI 回應：'+(json.plate||'(空)')+(json.raw?' ｜原始：'+String(json.raw).slice(0,200):'')) : ('HTTP '+res.status+' · '+(json.error||'未知錯誤')));
+    }
+  }catch(e){
+    proc.classList.remove('show');
+    showErr('連線失敗（fetch 例外）：'+(e&&e.message?e.message:e));
   }
-  zone.className = 'camera-zone has-photo';
-  zone.onclick = null;
-  zone.innerHTML = '<img src="' + img.previewUrl + '" alt="車牌" />';
-  document.getElementById('retakeBtn').style.display = 'flex';
+}
+function setBar(v){document.getElementById('procBar').style.width=v+'%';}
+function setLbl(t){document.getElementById('procLbl').textContent=t;}
 
-  // 2. 啟動進度動畫
-  document.getElementById('ocrProgress').classList.add('show');
-  startFakeProgress();
+// ═══════ 確認卡：3秒自動送出 ═══════
+function showCfm(plate){
+  document.getElementById('cfmThumb').src=curThumbUrl;
+  document.getElementById('cfmPlate').value=plate;
+  document.getElementById('cfmCard').classList.add('show');
+  startCfmTimer();
+}
+function startCfmTimer(){
+  clearCfmTimer();
+  cfmDeadline=Date.now()+AUTO_SUBMIT_SEC*1000;
+  var fill=document.getElementById('autoFill');
+  fill.style.transition='transform '+AUTO_SUBMIT_SEC+'s linear';
+  requestAnimationFrame(function(){fill.style.transform='scaleX(1)';});
+  cfmTimer=setInterval(function(){
+    var remain=Math.ceil((cfmDeadline-Date.now())/1000);
+    if(remain<=0){confirmNow();return;}
+    document.getElementById('cfmCount').textContent=remain+' 秒後自動登記，點車牌可修改';
+  },200);
+}
+function clearCfmTimer(){
+  if(cfmTimer){clearInterval(cfmTimer);cfmTimer=null;}
+  var fill=document.getElementById('autoFill');
+  fill.style.transition='none';fill.style.transform='scaleX(0)';
+}
+function onPlateEdit(){
+  // 修改時暫停自動送出
+  clearCfmTimer();
+  var inp=document.getElementById('cfmPlate');
+  inp.value=inp.value.toUpperCase();
+  document.getElementById('cfmCount').textContent='已暫停自動登記，請按「立即登記」';
+}
+function cancelCfm(){
+  hideAllCards();
+  showToast('已取消本筆');
+}
+function confirmNow(){
+  clearCfmTimer();
+  var plate=document.getElementById('cfmPlate').value.trim().toUpperCase();
+  if(!plate){showToast('⚠️ 車牌為空');return;}
+  document.getElementById('cfmCard').classList.remove('show');
+  doSubmit(plate);
+}
 
-  // 3. 呼叫車牌辨識 GAS（Gemini Vision）
-  try {
-    var res = await fetch(GAS_URL, {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'recognizePlate',
-        imageBase64: img.base64,
-        mimeType: 'image/jpeg'
-      })
+// ═══════ 失敗手動 ═══════
+function showErr(debug){
+  document.getElementById('errPlate').value='';
+  document.getElementById('errCard').classList.add('show');
+  var dbgEl=document.getElementById('errDebug');
+  dbgEl.textContent=debug?('🔧 '+debug):'';
+  showToast('❌ 辨識失敗，請手動輸入');
+}
+function sendManual(){
+  var plate=document.getElementById('errPlate').value.trim().toUpperCase();
+  if(!plate){showToast('⚠️ 請輸入車牌');return;}
+  document.getElementById('errCard').classList.remove('show');
+  doSubmit(plate);
+}
+
+// ═══════ 送出（背景進行，不擋下一張拍攝）═══════
+function doSubmit(plate){
+  // 樂觀 UI：先進列表，後台送出
+  sessCount++;
+  document.getElementById('statCount').textContent=sessCount;
+  document.getElementById('statLast').textContent=plate;
+  var itemId='r'+Date.now();
+  var list=document.getElementById('recentList');
+  var div=document.createElement('div');
+  div.className='recent-item';div.id=itemId;
+  div.innerHTML='<span class="recent-plate">'+plate+'</span><span class="recent-time">'+new Date().toLocaleTimeString('zh-TW',{hour12:false,hour:'2-digit',minute:'2-digit'})+'</span><span class="recent-ok" id="'+itemId+'-st"><span class="spin" style="width:12px;height:12px;border-top-color:#4ADE80"></span></span>';
+  list.insertBefore(div,list.firstChild);
+
+  // 背景送出（日期時間 = 送出當下，GAS端自動填）
+  fetch(PLATE_GAS_URL,{method:'POST',body:JSON.stringify({action:'vehicleReg',type:curType,typeLabel:TYPE_INFO[curType].label,plate:plate,operator:empName||empId||'未登入'})})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      var st=document.getElementById(itemId+'-st');
+      if(st) st.innerHTML=j.success?'<i class="ti ti-check"></i>':'<i class="ti ti-alert-triangle" style="color:#FB923C"></i>';
+      if(!j.success) showToast('⚠️ '+plate+' 寫入失敗');
+      if(j.success) logWorkflow('signin','vehicle-reg','已完成');
+    })
+    .catch(function(){
+      var st=document.getElementById(itemId+'-st');
+      if(st) st.innerHTML='<i class="ti ti-wifi-off" style="color:#F87171"></i>';
+      showToast('⚠️ '+plate+' 網路錯誤');
     });
-    var raw = await res.text();          // 先取原始字串，方便除錯
-    var json = {};
-    try { json = JSON.parse(raw); } catch (_) {}
-    stopFakeProgress();
-    setTimeout(function() {
-      document.getElementById('ocrProgress').classList.remove('show');
-    }, 300);
 
-    // 改良：GAS 已做完格式驗證與混淆字元修正，前端只做最小清洗
-    var rawPlate = (json && typeof json.plate === 'string') ? json.plate : '';
-    var plate = rawPlate.trim().toUpperCase().replace(/[^A-Z0-9\-]/g, '');
-    // 取得 AI 原始回應（用於除錯顯示）
-    var aiRaw = (json && json.raw) ? String(json.raw).slice(0, 200) : rawPlate;
-    var dbg = plate
-      ? ('AI 辨識結果：' + plate + (aiRaw !== plate ? ' ｜原始回應：' + aiRaw : ''))
-      : ('HTTP ' + res.status + ' · GAS回應：' + (raw || '(空)').slice(0, 300));
-    showOCRResult(plate, dbg);
-  } catch (e) {
-    stopFakeProgress();
-    document.getElementById('ocrProgress').classList.remove('show');
-    showOCRResult('', '連線失敗（fetch 例外）：' + (e && e.message ? e.message : e));
-    showToast('⚠️ 辨識服務連線失敗');
-  }
+  showToast('✅ '+plate+' 已登記');
 }
 
-// ===== 車牌提取（台灣格式）=====
-function extractPlate(text) {
-  var clean = text.replace(/[^A-Za-z0-9\-]/g, '').toUpperCase();
-  // 台灣常見格式：AB-1234、ABC-123、AB-12、1234-AB 等
-  var patterns = [
-    /[A-Z]{1,3}-?[0-9]{3,4}/,  // 一般汽機車
-    /[A-Z]{2,3}[0-9]{3,4}/,
-    /[0-9]{2,4}-?[A-Z]{1,3}/,
-    /[A-Z][0-9]{2}-[0-9]{3}/   // 電動車
-  ];
-  for (var i = 0; i < patterns.length; i++) {
-    var m = clean.match(patterns[i]);
-    if (m && m[0].length >= 4) {
-      var p = m[0];
-      if (p.length >= 5 && p.indexOf('-') < 0) {
-        p = p.slice(0, p.length - Math.min(4, p.length-2)) + '-' + p.slice(p.length - Math.min(4, p.length-2));
-      }
-      return p;
-    }
-  }
-  return '';
-}
-
-// ===== 顯示辨識結果 =====
-function showOCRResult(plate, debug) {
-  var badge = document.getElementById('ocrResultBadge');
-  badge.style.display = 'flex';
-  if (plate) {
-    badge.className = 'ocr-result-badge';
-    badge.style.flexDirection = 'column';
-    badge.style.alignItems = 'flex-start';
-    badge.innerHTML = '<span><i class="ti ti-scan"></i> 辨識成功：<strong style="letter-spacing:2px;">' + plate + '</strong>（可在下方修改）</span>' +
-      (debug ? '<div style="margin-top:6px;font-size:11px;line-height:1.5;color:#8A95A8;word-break:break-all;font-family:monospace;">🔧 ' + String(debug).replace(/</g,'&lt;') + '</div>' : '');
-    document.getElementById('plateInput').value = plate;
-  } else {
-    badge.className = 'ocr-result-badge ocr-fail-badge';
-    badge.style.flexDirection = 'column';
-    badge.style.alignItems = 'flex-start';
-    badge.innerHTML = '<span><i class="ti ti-alert-circle"></i> 辨識失敗，請手動輸入車牌號碼</span>' +
-      (debug ? '<div style="margin-top:8px;font-size:11px;line-height:1.5;color:#FB923C;word-break:break-all;font-family:monospace;">🔧 ' + String(debug).replace(/</g,'&lt;') + '</div>' : '');
-  }
-}
-
-// ===== 提交登記 =====
-async function submitReg() {
-  var plate = document.getElementById('plateInput').value.trim().toUpperCase();
-  if (!plate) { showToast('⚠️ 請輸入車牌號碼'); return; }
-
-  document.getElementById('submitBtn').disabled = true;
-  document.getElementById('submitBtn').innerHTML = '<i class="ti ti-loader" style="animation:spinRing .8s linear infinite"></i> 登記中…';
-
-  // 登記時間 = 送出當下（GAS 端亦以台北時間自動寫入，此處用於畫面顯示）
-  var now  = new Date();
-  var dStr = now.toLocaleDateString('sv-SE');           // yyyy-MM-dd
-  var tStr = now.toLocaleTimeString('sv-SE').slice(0,5); // HH:mm
-
-  var payload = {
-    action: 'vehicleReg',
-    type: currentType,
-    typeLabel: TYPE_LABEL[currentType].replace(/ [^\s]+$/, '').trim(),
-    plate: plate,
-    operator: empId || '未登入'
-  };
-
-  // 嘗試寫入 GAS
-  var gasOk = false;
-  if (GAS_URL && GAS_URL !== 'REPLACE_GAS_URL') {
-    try {
-      var res = await fetch(GAS_URL, { method:'POST', body: JSON.stringify(payload) });
-      var json = await res.json();
-      gasOk = json.success === true;
-    } catch(e) {}
-  }
-
-  // 顯示成功畫面
-  document.getElementById('successPlate').textContent = plate;
-  document.getElementById('successInfo').innerHTML =
-    TYPE_LABEL[currentType] + '<br>' + dStr + ' ' + tStr +
-    (gasOk ? '<br><span style="color:#4ADE80">✓ 已寫入 Google Sheets</span>' : '<br><span style="color:#FB923C">⚠️ 寫入失敗，請改用 Microsoft 表單補登</span>');
-  showScreen('screen-success');
-}
-
-// ===== 開啟 Microsoft 表單（並複製車牌）=====
-function openMSForms() {
-  var plate = document.getElementById('plateInput').value.trim().toUpperCase();
-  if (plate) {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(plate).then(function(){
-        showToast('✅ 車牌「' + plate + '」已複製，請貼入表單');
-      }).catch(function(){ showToast('請手動複製車牌：' + plate); });
-    } else {
-      showToast('請手動複製車牌：' + plate);
-    }
-  }
-  setTimeout(function(){ window.open(MS_FORMS[currentType], '_blank'); }, 600);
-}
-
-// ===== Toast =====
-var _toastTimer;
-function showToast(msg) {
-  var el = document.getElementById('toast');
-  el.textContent = msg; el.style.display = 'block';
-  clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(function(){ el.style.display='none'; }, 2500);
-}
-
-// ===== 導航 =====
-function goBack() {
-  if (window.self !== window.top) {
-    try {
-      var btn = window.top.document.getElementById('hsh-tool-back-btn');
-      if (btn) { btn.click(); return; }
-    } catch(e) {}
-  }
-  if (window.history.length > 1) window.history.back();
+var _tt;
+function showToast(msg){var el=document.getElementById('toast');el.textContent=msg;el.style.display='block';clearTimeout(_tt);_tt=setTimeout(function(){el.style.display='none';},2200);}
+function goBack(){
+  if(window.self!==window.top){try{var b=window.top.document.getElementById('hsh-tool-back-btn');if(b){b.click();return;}}catch(e){}}
+  if(window.history.length>1)window.history.back();
 }
 </script>
 </body>
