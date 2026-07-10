@@ -58,7 +58,7 @@ var ANN_MAX_IMAGES = 3;
 // 試算表：宣導事項＆教育訓練 https://docs.google.com/spreadsheets/d/1AXhSEsR8ubdVdu8qgIJmQv7QnBJyYKBpkWQJQzoHD1I
 var DIRECTIVE_SHEET_ID   = "1AXhSEsR8ubdVdu8qgIJmQv7QnBJyYKBpkWQJQzoHD1I";
 var DIRECTIVE_SHEET_NAME = "宣導事項";
-var DIRECTIVE_MAX_IMAGES = 6;
+var DIRECTIVE_MAX_IMAGES = 10;
 var DIRECTIVE_FOLDER_ID  = ANN_FOLDER_ID; // 宣導圖片沿用公告的 Drive 資料夾，如需分開存放可換成獨立資料夾 ID
 
 // ── 明日哨點推播用常數 ──
