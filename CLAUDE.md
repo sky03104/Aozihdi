@@ -1332,9 +1332,16 @@ python3 snapshot-generator-simple.py
 > 附註：咖哩要求「待開發項目移到最下面」— 之後每次整理 backlog，已完成項目（✅）留在上方各分類原位，未開發／規劃中項目統一往此區塊或更下方擺放，方便一眼看到還沒做的事。
 
 #### [TODO-20] 首頁「可用工具」卡片 → 改成「宣導事項」按鈕
-- 首頁目前用「可用工具」小卡片呈現，改成宣導事項按鈕形式（顯示公司/主管想讓員工看到的宣導內容）
-- 需先確認：宣導事項的資料來源（沿用公告欄 or 新開一張表）、按鈕點開後的呈現方式
-- **狀態**：🟡 待開發
+- **狀態**：✅ 完成（2026-07-10）
+
+**實作結果（2026-07-10）**：
+
+| 項目 | 值 |
+|------|-----|
+| 資料來源 | 獨立試算表「宣導事項＆教育訓練」（`1AXhSEsR8ubdVdu8qgIJmQv7QnBJyYKBpkWQJQzoHD1I`），透過既有 `ACCOUNT_GAS_URL`（`天鷹保全APP_後端_GAS.gs`）以 `SpreadsheetApp.openById(DIRECTIVE_SHEET_ID)` 跨表讀寫，不需另外部署新 GAS |
+| 後端 | 新增 `getDirectives`/`saveDirectives`（doGet/doPost 路由）+ `getDirectiveSheet_()` 自動建「宣導事項」分頁（欄位：ID/標題/內容/發布者/日期/置頂/圖片/更新時間），`DIRECTIVE_SHEET_ID` 已回填；圖片沿用公告的 `annUploadImage_` 上傳到 `DIRECTIVE_FOLDER_ID`（預設同公告 Drive 資料夾） |
+| 前端 | 首頁原「可用工具」小卡（`stat-card`，🛠️＋`userTools.length`）改為「宣導事項」按鈕（📣＋`directives.length`，靛色），點擊開啟 `showDirectives` 全螢幕清單（比照公告欄 UI：置頂優先排序、admin/組長以上可新增/編輯/刪除，雲端＋本機 localStorage 雙寫）；表單支援附圖上傳（拖曳/點擊選擇，最多 6 張，每張 5MB 內），比照公告欄圖片元件；已用沙盒瀏覽器實測新增/上傳/顯示/清除整條流程 |
+| **待咖哩手動操作** | GAS「管理部署→編輯→新版本」重新部署（`/exec` 網址不變），部署後首頁「宣導事項」按鈕即可正常讀寫雲端資料 |
 
 #### [TODO-21] 車牌辨識工具修復優化
 - 車牌辨識目前功能待咖哩具體回報問題點（辨識失敗率／介面／速度等）
@@ -1345,14 +1352,21 @@ python3 snapshot-generator-simple.py
 - **狀態**：🟡 待開發
 
 #### [TODO-23] 首頁公告跑馬燈 → 支援置頂輪流播放
-- 目前公告跑馬燈只會顯示一條，改成：置頂公告優先、多條公告輪流播放（跑馬燈或定時切換）
-- **位置**：`index.html` 首頁公告區塊
-- **狀態**：🟡 待開發
+- **狀態**：✅ 完成（2026-07-10）
+
+**根因**：原本邏輯把全部公告 `sort()`（置頂優先＋id新到舊）後只取 `[0]`，導致無論有幾則公告，畫面永遠只顯示排序後的第一則，其他公告完全輪不到。
+**修法**：新增 `annMarqueeList`（同樣排序：置頂優先、其餘新到舊）＋ `annMarqueeIdx` 狀態，每 7 秒 `setInterval` 遞增索引並取模輪播；公告數 ≤1 則時不啟動輪播計時器（避免無意義刷新）。點擊行為不變（仍開啟公告欄全部清單）。
+**位置**：`index.html` 首頁公告跑馬燈區塊
 
 #### [TODO-24] 找 5 個同類型 APP 模板參考優化方向
-- 針對天鷹保全 APP（保全/駐衛/物業管理類工具系統）找 5 個同類型 APP／模板，整理各自優點，給咖哩做優化方向參考
-- 屬於研究型任務，非程式異動
-- **狀態**：🟡 待開發
+- **狀態**：✅ 完成（2026-07-10，研究型任務，無程式異動）
+
+**找到 5 個同類型系統，整理如下（詳細比較見對話紀錄）**：
+1. **Novagems** — 全方位保全管理（排班/GPS定位/巡邏打卡點/事故報告），跟天鷹功能骨架最接近的對標
+2. **TARGPatrol** — 巡邏+任務清單+事故+營運報表，適合參考「巡邏打卡+交接」流程設計
+3. **Connecteam** — 排班/打卡/內部溝通的通用工作團隊管理 App，適合參考排班與公告/請假的 UX
+4. **OctopusPro** — 現場勘查+巡邏清單+班別報告+事故報告的多工具組合，架構理念跟天鷹「一個殼、多個獨立工具」很像
+5. **SwipedOn / Sign In App**（訪客管理類）— 適合參考「開店前/打烊後進出登錄」的訪客/廠商簽到體驗
 
 #### [TODO-25] 無線電管理／庫存工具（新工具）
 - 需求待細化：無線電領用/歸還登記、數量庫存、故障報修、借用人員追蹤等
@@ -1360,8 +1374,10 @@ python3 snapshot-generator-simple.py
 - **狀態**：🟡 待開發（待補規格）
 
 #### [TODO-26] 請假申請工具 → 檢查早/晚班限制天數是否對應正確工號
-- 檢查 `liff_leave.html`／請假相關 GAS 邏輯：早班員工與晚班員工的請假限制天數規則，是否有依工號正確對應各自班別的規則，而非誤用另一班別的限制
-- **狀態**：🟡 待開發（待排查）
+- **狀態**：✅ 完成（2026-07-10，查核完畢，**未發現 bug**）
+
+**查核結果**：`liff_leave.html`、`index.html`、`天鷹保全APP_後端_GAS.gs` 三層邏輯一致，早班固定對應 cap 5、晚班固定對應 cap 3，字串比對只認 `'早班'`（非此字串一律當晚班），empId→班別的查找邏輯（`resolveEmp`/`getShiftByEmpId_`）在三處呼叫點都一致，未發現對調或誤用的情況。
+**潛在風險（非 bug，提醒用）**：①「帳號管理」分頁的 `班別` 欄位是用**欄位名稱**比對，若哪天欄位標題被改名/刪掉，會靜默全部視為晚班（cap 3），不會跳錯誤 ②empId 比對用的是**欄位A固定位置**而非欄位名稱，若帳號表欄位順序被調整，比對會錯位。目前沒有觸發跡象，純屬結構性風險提醒，不建議在沒有實際問題前貿然重構。
 
 ---
 
@@ -1627,9 +1643,10 @@ python3 snapshot-generator-simple.py
 | 2.7 | 2026-07-05 | 操作手冊更新至 v1.1（`操作手冊/` 三份 PDF 重產）：員工版補「今/明日哨表」「物流車輛統計」；主管版新增「帶班交接事項」「新案件 LINE 即時通知」「天鷹 AI 小助手（管理員限定）」三章；LINE 機器人手冊補「查詢班表與哨點」章節（本月/本週/今日/明日班表、今日哨點、哨點指令，先前未文件化）；新增 4 張實機截圖（logistics_form/handover_list/post_today/ai_chat，皆假資料） |
 | 2.8 | 2026-07-05 | brain_map.html：咖哩海域使用者圓點縮小一倍（光暈22→11、本體9→4.5、邊框2→1，PR #83）；補上艾斯角色圖檔 `brain_map_img/ace.png`（node 1「登入與角色系統」既有配置但缺圖，PR #86，等待補地點圖後轉圓形徽章顯示）；新增 2026-07-05 技術經驗筆記（firecrawl-cli 在 agent proxy 環境下的 405/403 排查） |
 | 2.9 | 2026-07-06 | 新增 `.claude/settings.json` PostToolUse hook（`scripts/hooks/check-tool-html.js`）：Edit/Write 命中 `index.html`/`tool_*.html` 時強制檢查 React 版本(禁19.x)＋`<script>`內容 node --check 語法，任一失敗 exit 2 擋下，把既有 QA 規範從「軟性提醒」變「硬性阻擋」；同步加 `fewer-permission-prompts` 白名單（preview_eval/preview_screenshot）；AGENTS.md 新增「姊妹專案 Xinyu-jarvis（小鈺）」段落，記錄咖哩另立的獨立桌面 AI 助手專案（PR #92 已合併）；新增 2026-07-06 技術經驗筆記 |
+| 3.0 | 2026-07-10 | TODO-20/23/24/26 完成：①首頁「可用工具」小卡改為「宣導事項」按鈕（獨立試算表＋GAS `getDirectives`/`saveDirectives`，待咖哩填 `DIRECTIVE_SHEET_ID` 並重新部署）②公告跑馬燈修正只顯示一則的 bug，改置頂優先＋每7秒輪播 ③研究 5 個同類型保全/巡邏管理 App 供優化參考（Novagems/TARGPatrol/Connecteam/OctopusPro/SwipedOn）④查核請假早/晚班限制天數對應邏輯，三層程式碼一致無 bug；brain_map 新增節點66「宣導事項試算表」+ 更新節點0/14說明 + 新增關聯 `[0,14]`/`[14,66]`；AGENTS.md 新增「☁️ 雲端開工協議」（雲端 session 開場先讀 git log + CLAUDE.md 進度） |
 
 ---
 
-**Last Updated**: 2026-07-06  
+**Last Updated**: 2026-07-10  
 **For Questions**: Refer to project documentation or contact the project owner  
-**Branch**: `claude/dazzling-chandrasekhar-dccf5e`
+**Branch**: `claude/app-todo-features-06dc47`
