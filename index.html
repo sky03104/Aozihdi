@@ -20952,7 +20952,7 @@ function App() {
                         borderRadius: 8, color: '#F5F5F5', padding: '6px 12px', cursor: 'pointer',
                         fontSize: 13, fontFamily: "'Microsoft JhengHei',sans-serif" } }, "\u2190 \u8FD4\u56DE"),
                 React.createElement("div", { style: { flex: 1, fontSize: 15, fontWeight: 900, color: 'var(--indigo2)' } }, "\uD83D\uDCE3 \u5BA3\u5C0E\u4E8B\u9805"),
-                canManageDirective && !editingDirective && (React.createElement("button", { onClick: () => setEditingDirective({ id: null, title: '', content: '', pinned: false }), style: { background: 'linear-gradient(135deg,#818CF8,#6366F1)', border: 'none',
+                canManageDirective && !editingDirective && (React.createElement("button", { onClick: () => setEditingDirective({ id: null, title: '', content: '', pinned: false, images: [] }), style: { background: 'linear-gradient(135deg,#818CF8,#6366F1)', border: 'none',
                         borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700,
                         color: '#fff', cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif" } }, "\uFF0B \u65B0\u589E\u5BA3\u5C0E"))),
             React.createElement("div", { style: { flex: 1, overflowY: 'auto', padding: 14 } },
@@ -20971,6 +20971,51 @@ function App() {
                                 padding: '10px 12px', fontSize: 14, color: 'var(--text)', resize: 'vertical',
                                 fontFamily: "'Microsoft JhengHei',sans-serif", outline: 'none',
                                 transition: 'border-color .2s', boxSizing: 'border-box' }, onFocus: e => e.target.style.borderColor = 'var(--indigo2)', onBlur: e => e.target.style.borderColor = 'rgba(255,255,255,.10)' })),
+                    React.createElement("div", { className: "input-group" },
+                        React.createElement("label", { className: "input-label" }, "\u9644\u5716\uFF08\u9078\u586B\uFF0C\u6700\u591A 6 \u5F35\uFF09"),
+                        React.createElement("div", { onDragOver: e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--indigo2)'; e.currentTarget.style.background = 'rgba(99,102,241,.08)'; }, onDragLeave: e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,.10)'; e.currentTarget.style.background = 'rgba(255,255,255,.03)'; }, onDrop: async (e) => {
+                                e.preventDefault();
+                                e.currentTarget.style.borderColor = 'rgba(255,255,255,.10)';
+                                e.currentTarget.style.background = 'rgba(255,255,255,.03)';
+                                const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/')).slice(0, 6 - (editingDirective.images || []).length);
+                                if (!files.length)
+                                    return;
+                                try {
+                                    const b64s = await Promise.all(files.map(readImgAsBase64));
+                                    setEditingDirective(p => ({ ...p, images: [...(p.images || []), ...b64s].slice(0, 6) }));
+                                }
+                                catch (err) {
+                                    showToast('\u26A0\uFE0F ' + err);
+                                }
+                            }, style: { border: '1.5px dashed rgba(255,255,255,.10)', borderRadius: 10,
+                                padding: '14px 10px', textAlign: 'center', background: 'rgba(255,255,255,.03)',
+                                transition: 'all .2s', cursor: 'pointer', position: 'relative' }, onClick: () => document.getElementById('dir-img-input').click() },
+                            React.createElement("input", { id: "dir-img-input", type: "file", accept: "image/*", multiple: true, style: { display: 'none' }, onChange: async (e) => {
+                                    const files = [...e.target.files].slice(0, 6 - (editingDirective.images || []).length);
+                                    if (!files.length)
+                                        return;
+                                    try {
+                                        const b64s = await Promise.all(files.map(readImgAsBase64));
+                                        setEditingDirective(p => ({ ...p, images: [...(p.images || []), ...b64s].slice(0, 6) }));
+                                        e.target.value = '';
+                                    }
+                                    catch (err) {
+                                        showToast('\u26A0\uFE0F ' + err);
+                                    }
+                                } }),
+                            React.createElement("div", { style: { fontSize: 22, marginBottom: 4 } }, "\uD83D\uDDBC\uFE0F"),
+                            React.createElement("div", { style: { fontSize: 12, color: 'var(--muted)' } }, "\u62D6\u66F3\u5716\u7247\u81F3\u6B64\uFF0C\u6216\u9EDE\u64CA\u9078\u64C7"),
+                            React.createElement("div", { style: { fontSize: 10, color: 'var(--muted2)', marginTop: 3 } }, "\u6700\u591A 6 \u5F35\uFF0C\u6BCF\u5F35 5MB \u4EE5\u5167")),
+                        (editingDirective.images || []).length > 0 && (React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 } }, (editingDirective.images || []).map((img, i) => (React.createElement("div", { key: i, style: { position: 'relative', width: 80, height: 80 } },
+                            React.createElement("img", { src: img, alt: "", style: { width: 80, height: 80, objectFit: 'cover',
+                                    borderRadius: 8, border: '1px solid rgba(255,255,255,.12)' } }),
+                            React.createElement("button", { onClick: () => setEditingDirective(p => ({
+                                    ...p, images: (p.images || []).filter((_, j) => j !== i)
+                                })), style: { position: 'absolute', top: -5, right: -5, width: 18, height: 18,
+                                    borderRadius: '50%', background: '#F87171', border: 'none',
+                                    color: '#fff', fontSize: 10, cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontWeight: 700 } }, "\u2715"))))))),
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 } },
                         React.createElement("button", { className: `toggle ${editingDirective.pinned ? 'on' : 'off'}`, onClick: () => setEditingDirective(p => ({ ...p, pinned: !p.pinned })) },
                             React.createElement("div", { className: "toggle-thumb" })),
@@ -21038,6 +21083,8 @@ function App() {
                                     cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif" } }, "\uD83D\uDDD1\uFE0F")))),
                     React.createElement("div", { style: { fontSize: 13, color: 'var(--muted)', lineHeight: 1.7,
                             whiteSpace: 'pre-wrap', marginBottom: 8 } }, dir.content),
+                    (dir.images || []).length > 0 && (React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 } }, (dir.images || []).map((img, i) => (React.createElement("img", { key: i, src: img, alt: "", onClick: () => window.open(img, '_blank'), style: { maxWidth: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 8,
+                            border: '1px solid rgba(255,255,255,.12)', cursor: 'zoom-in' } }))))),
                     React.createElement("div", { style: { display: 'flex', gap: 12, fontSize: 11, color: 'var(--muted2)' } },
                         React.createElement("span", null, "\uD83D\uDC64 ", dir.author),
                         React.createElement("span", null, "\uD83D\uDDD3 ", dir.date))))))))),

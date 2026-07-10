@@ -58,6 +58,8 @@ var ANN_MAX_IMAGES = 3;
 // 試算表：宣導事項＆教育訓練 https://docs.google.com/spreadsheets/d/1AXhSEsR8ubdVdu8qgIJmQv7QnBJyYKBpkWQJQzoHD1I
 var DIRECTIVE_SHEET_ID   = "1AXhSEsR8ubdVdu8qgIJmQv7QnBJyYKBpkWQJQzoHD1I";
 var DIRECTIVE_SHEET_NAME = "宣導事項";
+var DIRECTIVE_MAX_IMAGES = 6;
+var DIRECTIVE_FOLDER_ID  = ANN_FOLDER_ID; // 宣導圖片沿用公告的 Drive 資料夾，如需分開存放可換成獨立資料夾 ID
 
 // ── 明日哨點推播用常數 ──
 var POST_SHEET_ID   = "1sIcdAhw0mz5iM3F5fulDNPOda2pv-t7xUhT6XXf9X7Q"; // 每日哨表試算表
@@ -830,9 +832,9 @@ function getDirectiveSheet_() {
   var sh = ss.getSheetByName(DIRECTIVE_SHEET_NAME);
   if (!sh) {
     sh = ss.insertSheet(DIRECTIVE_SHEET_NAME);
-    sh.appendRow(['ID', '標題', '內容', '發布者', '日期', '置頂', '更新時間']);
+    sh.appendRow(['ID', '標題', '內容', '發布者', '日期', '置頂', '圖片', '更新時間']);
     sh.setFrozenRows(1);
-    sh.getRange(1, 1, 1, 7)
+    sh.getRange(1, 1, 1, 8)
       .setBackground('#818CF8')
       .setFontColor('#0A0C10')
       .setFontWeight('bold');
@@ -840,14 +842,14 @@ function getDirectiveSheet_() {
   return sh;
 }
 
-// 讀取全部宣導事項 → 回傳給前端
+// 讀取全部宣導事項 → 回傳給前端（含圖片 Drive 連結陣列）
 function getDirectives() {
   try {
     var sh = getDirectiveSheet_();
     var last = sh.getLastRow();
     var rows = [];
     if (last >= 2) {
-      var vals = sh.getRange(2, 1, last - 1, 7).getValues();
+      var vals = sh.getRange(2, 1, last - 1, 8).getValues();
       for (var i = 0; i < vals.length; i++) {
         var r = vals[i];
         if (r[0] === '' && r[1] === '') continue;
@@ -855,13 +857,16 @@ function getDirectives() {
           ? Utilities.formatDate(r[4], 'Asia/Taipei', 'yyyy-MM-dd')
           : String(r[4] || '');
         var pin = (r[5] === true) || String(r[5]).toLowerCase() === 'true' || r[5] === '是';
+        var imgs = [];
+        try { var p = JSON.parse(r[6] || '[]'); if (Array.isArray(p)) imgs = p; } catch (e) {}
         rows.push({
           id: Number(r[0]) || r[0],
           title: String(r[1] || ''),
           content: String(r[2] || ''),
           author: String(r[3] || ''),
           date: dateStr,
-          pinned: pin
+          pinned: pin,
+          images: imgs
         });
       }
     }
@@ -871,7 +876,7 @@ function getDirectives() {
   }
 }
 
-// 整份覆寫宣導事項（最後寫入為準）
+// 整份覆寫宣導事項（最後寫入為準）。新圖(base64)上傳 Drive 換連結，舊圖(連結)沿用。
 function saveDirectives(e) {
   var lock = LockService.getScriptLock();
   try { lock.waitLock(20000); } catch (e0) {}
@@ -879,19 +884,35 @@ function saveDirectives(e) {
     var payload = JSON.parse(e.parameter.data || '{}');
     var list = payload.directives || [];
 
+    var folder = null;
+    try { folder = DriveApp.getFolderById(DIRECTIVE_FOLDER_ID); } catch (e1) { folder = null; }
+
     var out = [];
     var sheetRows = [];
     var now = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy/M/d HH:mm:ss');
 
     for (var i = 0; i < list.length; i++) {
       var a = list[i] || {};
+      var imgsIn = Array.isArray(a.images) ? a.images : [];
+      var imgsOut = [];
+      for (var j = 0; j < imgsIn.length && j < DIRECTIVE_MAX_IMAGES; j++) {
+        var src = String(imgsIn[j] || '');
+        if (src.indexOf('data:') === 0) {
+          var url = folder ? annUploadImage_(folder, src, '宣導_' + (a.id || '') + '_' + (j + 1) + '_' + Date.now()) : null;
+          if (url) imgsOut.push(url);
+        } else if (src) {
+          imgsOut.push(src);
+        }
+      }
+
       out.push({
         id: a.id,
         title: String(a.title || ''),
         content: String(a.content || ''),
         author: String(a.author || ''),
         date: String(a.date || ''),
-        pinned: !!a.pinned
+        pinned: !!a.pinned,
+        images: imgsOut
       });
       sheetRows.push([
         a.id != null ? a.id : '',
@@ -900,14 +921,15 @@ function saveDirectives(e) {
         String(a.author || ''),
         String(a.date || ''),
         a.pinned ? true : false,
+        JSON.stringify(imgsOut),
         now
       ]);
     }
 
     var sh = getDirectiveSheet_();
     var last = sh.getLastRow();
-    if (last >= 2) sh.getRange(2, 1, last - 1, 7).clearContent();
-    if (sheetRows.length) sh.getRange(2, 1, sheetRows.length, 7).setValues(sheetRows);
+    if (last >= 2) sh.getRange(2, 1, last - 1, 8).clearContent();
+    if (sheetRows.length) sh.getRange(2, 1, sheetRows.length, 8).setValues(sheetRows);
 
     return jsonRes({status:'ok', rows:out, count:out.length});
   } catch (err) {
