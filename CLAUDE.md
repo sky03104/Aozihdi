@@ -1338,10 +1338,10 @@ python3 snapshot-generator-simple.py
 
 | 項目 | 值 |
 |------|-----|
-| 資料來源 | 新開獨立「宣導事項」試算表（咖哩確認，非沿用公告欄），透過既有 `ACCOUNT_GAS_URL`（`天鷹保全APP_後端_GAS.gs`）以 `SpreadsheetApp.openById(DIRECTIVE_SHEET_ID)` 跨表讀寫，不需另外部署新 GAS |
-| 後端 | 新增 `getDirectives`/`saveDirectives`（doGet/doPost 路由）+ `getDirectiveSheet_()` 自動建分頁（欄位：ID/標題/內容/發布者/日期/置頂/更新時間） |
+| 資料來源 | 獨立試算表「宣導事項＆教育訓練」（`1AXhSEsR8ubdVdu8qgIJmQv7QnBJyYKBpkWQJQzoHD1I`），透過既有 `ACCOUNT_GAS_URL`（`天鷹保全APP_後端_GAS.gs`）以 `SpreadsheetApp.openById(DIRECTIVE_SHEET_ID)` 跨表讀寫，不需另外部署新 GAS |
+| 後端 | 新增 `getDirectives`/`saveDirectives`（doGet/doPost 路由）+ `getDirectiveSheet_()` 自動建「宣導事項」分頁（欄位：ID/標題/內容/發布者/日期/置頂/更新時間），`DIRECTIVE_SHEET_ID` 已回填 |
 | 前端 | 首頁原「可用工具」小卡（`stat-card`，🛠️＋`userTools.length`）改為「宣導事項」按鈕（📣＋`directives.length`，靛色），點擊開啟 `showDirectives` 全螢幕清單（比照公告欄 UI：置頂優先排序、admin/組長以上可新增/編輯/刪除，雲端＋本機 localStorage 雙寫） |
-| **待咖哩手動操作** | 1. 開一張新 Google 試算表（任意命名皆可，GAS 只認 ID）→ 複製試算表 ID → 貼到 `天鷹保全APP_後端_GAS.gs` 的 `DIRECTIVE_SHEET_ID` 常數（目前是預留字串「請貼上宣導事項試算表的ID」）2. 確認 GAS 執行帳號對新試算表有編輯權限（同帳號建立通常自動有）3. GAS「管理部署→編輯→新版本」重新部署 |
+| **待咖哩手動操作** | GAS「管理部署→編輯→新版本」重新部署（`/exec` 網址不變），部署後首頁「宣導事項」按鈕即可正常讀寫雲端資料 |
 
 #### [TODO-21] 車牌辨識工具修復優化
 - 車牌辨識目前功能待咖哩具體回報問題點（辨識失敗率／介面／速度等）

@@ -19,8 +19,7 @@
 //   ・bindLine / unbindLine / getLineBinding / getLineBindings
 //   ・generateLineCode
 //   ・getAnnouncements / saveAnnouncements（★公告欄雲端同步，圖片上傳至 Drive 資料夾）
-//   ・getDirectives / saveDirectives（★宣導事項雲端同步，獨立試算表 DIRECTIVE_SHEET_ID）
-//     部署前：另開一張新試算表存宣導事項 → 把 ID 貼到 DIRECTIVE_SHEET_ID → 確認本 GAS 執行帳號有該表編輯權限
+//   ・getDirectives / saveDirectives（★宣導事項雲端同步，獨立試算表：宣導事項＆教育訓練）
 //   ・請假 LINE 推播通知（Flex Message 卡片式，含核准/駁回按鈕）
 //   ・班表查詢Bot：本週班表/本月班表（早晚班選擇按鈕）、今日班表、明日班表
 //   ・班表異動推播：notifyScheduleChange / notifyScheduleChangeBatch / monthScheduleReleased
@@ -56,8 +55,8 @@ var ANN_FOLDER_ID  = "1K_RRPUjcWrdNAS2ppcx6OFDtlkfSfAl3"; // 公告圖片存放�
 var ANN_MAX_IMAGES = 3;
 
 // ── 宣導事項同步用常數（獨立試算表，非公告欄）──
-// 部署前請先開一張新試算表存放宣導事項，把它的 ID 貼到下面，並確保這支 GAS 執行帳號對該試算表有編輯權限
-var DIRECTIVE_SHEET_ID   = "請貼上宣導事項試算表的ID";
+// 試算表：宣導事項＆教育訓練 https://docs.google.com/spreadsheets/d/1AXhSEsR8ubdVdu8qgIJmQv7QnBJyYKBpkWQJQzoHD1I
+var DIRECTIVE_SHEET_ID   = "1AXhSEsR8ubdVdu8qgIJmQv7QnBJyYKBpkWQJQzoHD1I";
 var DIRECTIVE_SHEET_NAME = "宣導事項";
 
 // ── 明日哨點推播用常數 ──
