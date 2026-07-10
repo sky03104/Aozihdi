@@ -315,20 +315,20 @@ function triggerCam(){document.getElementById('camInp').value='';document.getEle
 document.getElementById('camInp').addEventListener('change',function(e){var f=e.target.files[0];if(f)startOCR(f);});
 
 // ═══════ 圖片壓縮 ═══════
-// 車牌是大塊清楚文字，不需要相片級精細度；長邊縮到1000px+品質78%
-// 可大幅縮小上傳量（手機拍照原始檔常好幾MB），辨識耗時主要花在
-// 上傳，縮小圖片是最直接的加速手段，不影響辨識準確率。
+// 車牌是大塊清楚文字，不需要相片級精細度；長邊縮到800px+品質70%
+// 進一步縮小上傳量加快辨識速度。若實測太模糊導致辨識率下降，
+// 可調回 1000px/0.78（2026-07-11 之前的設定）。
 function compressImg(file){
   return new Promise(function(resolve){
     var url=URL.createObjectURL(file);
     var img=new Image();
     img.onload=function(){
-      var MAX=1000;
+      var MAX=800;
       var sc=Math.min(1,MAX/Math.max(img.width,img.height));
       var cvs=document.createElement('canvas');
       cvs.width=Math.round(img.width*sc);cvs.height=Math.round(img.height*sc);
       cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);
-      resolve({dataUrl:cvs.toDataURL('image/jpeg',0.78),previewUrl:url});
+      resolve({dataUrl:cvs.toDataURL('image/jpeg',0.70),previewUrl:url});
     };
     img.src=url;
   });
