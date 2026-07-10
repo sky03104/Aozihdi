@@ -52,7 +52,10 @@ function doPost(e) {
       if (!apiKey) return jsonOut({ success: false, error: 'API Key 未設定：請開 /exec 網址查看設定說明' });
 
       // 解決 AQ 金鑰 OAuth 報錯：將 key 放在 URL 參數（與已驗證版本相同）
-      var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + apiKey;
+      // 改用固定機型（非 -latest 別名）：避免哪天 -latest 指到會「思考」的機型，
+      // 思考會吃掉 maxOutputTokens 導致辨識結果被截斷或空白（本 repo 2026-06-29 已踩過這坑）。
+      // gemini-2.0-flash 不會思考、速度快，OCR這種任務足夠。
+      var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey;
 
       // 清洗 Base64 資料
       var cleanBase64 = payload.imageBase64.split(',')[1] || payload.imageBase64;
@@ -60,10 +63,16 @@ function doPost(e) {
       var apiPayload = {
         "contents": [{
           "parts": [
-            { "text": "你是一個專業車牌辨識員。請辨識圖中的車牌號碼，只回傳號碼文字（如 ABC-1234）。其餘文字都不填。若看不清回 NONE。" },
+            { "text": "你是一個專業車牌辨識員，專門辨識台灣車牌。請仔細辨識圖中的車牌號碼，只回傳號碼文字（如 ABC-1234），其餘文字都不填。" +
+              "台灣車牌不使用字母 O 與 I，若看到圓形字元請判斷為數字 0、看到直線字元請判斷為數字 1，其餘容易混淆的字元（如 B/8、S/5、Z/2、D/0）請依上下文與台灣車牌常見格式判斷最合理的結果。" +
+              "若照片模糊、角度太斜、或完全看不到車牌，回 NONE，不要用猜的填答案。" },
             { "inline_data": { "mime_type": "image/jpeg", "data": cleanBase64 }}
           ]
         }],
+        "generationConfig": {
+          "temperature": 0,
+          "maxOutputTokens": 50
+        },
         "safetySettings": [
           { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE" },
           { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE" },
