@@ -52,10 +52,11 @@ function doPost(e) {
       if (!apiKey) return jsonOut({ success: false, error: 'API Key 未設定：請開 /exec 網址查看設定說明' });
 
       // 解決 AQ 金鑰 OAuth 報錯：將 key 放在 URL 參數（與已驗證版本相同）
-      // 改用固定機型（非 -latest 別名）：避免哪天 -latest 指到會「思考」的機型，
-      // 思考會吃掉 maxOutputTokens 導致辨識結果被截斷或空白（本 repo 2026-06-29 已踩過這坑）。
-      // gemini-2.0-flash 不會思考、速度快，OCR這種任務足夠。
-      var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey;
+      // 2026-07-11：曾改用固定機型 gemini-2.0-flash，結果這把金鑰對該機型
+      // 免費額度是 0（quota limit:0，非用完，是本來就沒配額），導致完全打不通。
+      // 改回 -latest 別名（原本就打得通，只是偶爾不穩），並用下方 thinkingConfig
+      // 關閉思考模式，防止「思考吃光 maxOutputTokens」的舊坑（2026-06-29 已踩過）。
+      var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + apiKey;
 
       // 清洗 Base64 資料
       var cleanBase64 = payload.imageBase64.split(',')[1] || payload.imageBase64;
@@ -71,7 +72,8 @@ function doPost(e) {
         }],
         "generationConfig": {
           "temperature": 0,
-          "maxOutputTokens": 50
+          "maxOutputTokens": 200,
+          "thinkingConfig": { "thinkingBudget": 0 }
         },
         "safetySettings": [
           { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE" },
