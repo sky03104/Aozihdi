@@ -19089,6 +19089,17 @@ function App() {
         ];
     });
     const [editingAnn, setEditingAnn] = useState(null);
+    const [annMarqueeIdx, setAnnMarqueeIdx] = useState(0); // 首頁公告跑馬燈目前播放到第幾則（置頂優先，其餘輪播）
+    // 宣導事項：獨立於公告欄，首頁「宣導事項」按鈕點開的清單（獨立試算表同步）
+    const [directives, setDirectives] = useState(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem('tianying_directives') || 'null');
+            if (Array.isArray(saved)) return saved;
+        } catch (e) { }
+        return [];
+    });
+    const [showDirectives, setShowDirectives] = useState(false);
+    const [editingDirective, setEditingDirective] = useState(null);
     const [showLeave, setShowLeave] = useState(false);
     const [leaveRequests, setLeaveRequests] = useState([]);
     const [expandedLeaveNames, setExpandedLeaveNames] = useState(() => new Set()); // 請假紀錄依人摺疊：已展開的工號集合
@@ -19159,6 +19170,54 @@ function App() {
     useEffect(() => {
         try { localStorage.setItem('tianying_announcements', JSON.stringify(announcements)); } catch (e) { }
     }, [announcements]);
+    // 公告跑馬燈輪播：置頂優先＋其餘輪流播放（原本只挑第一則，改成每 7 秒切換到下一則）
+    const annMarqueeList = [...announcements].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (Number(b.id) || 0) - (Number(a.id) || 0));
+    useEffect(() => {
+        if (annMarqueeList.length <= 1) { if (annMarqueeIdx !== 0) setAnnMarqueeIdx(0); return; }
+        const timer = setInterval(() => {
+            setAnnMarqueeIdx(i => (i + 1) % annMarqueeList.length);
+        }, 7000);
+        return () => clearInterval(timer);
+    }, [annMarqueeList.length]);
+    // 宣導事項持久化：新增／編輯／刪除任一變更即寫入本機，重開保留
+    useEffect(() => {
+        try { localStorage.setItem('tianying_directives', JSON.stringify(directives)); } catch (e) { }
+    }, [directives]);
+    // 宣導事項雲端讀取：自「宣導事項」獨立試算表拉最新
+    const loadDirectivesCloud = async () => {
+        if (!ACCOUNT_GAS_URL) return;
+        try {
+            const res = await fetch(ACCOUNT_GAS_URL + '?action=getDirectives');
+            const d = await res.json();
+            if (d && d.status === 'ok' && Array.isArray(d.rows)) {
+                setDirectives(d.rows);
+                try { localStorage.setItem('tianying_directives', JSON.stringify(d.rows)); } catch (e) { }
+            }
+        } catch (e) { /* 離線 → 沿用本機快取 */ }
+    };
+    // 宣導事項雲端同步：推送整份清單到「宣導事項」獨立試算表（最後寫入為準）
+    const pushDirectivesCloud = async (list) => {
+        if (!ACCOUNT_GAS_URL) return;
+        try {
+            const data = JSON.stringify({ directives: list || [] });
+            const res = await fetch(ACCOUNT_GAS_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'action=saveDirectives&data=' + encodeURIComponent(data)
+            });
+            const d = await res.json();
+            if (d && d.status === 'ok' && Array.isArray(d.rows)) {
+                setDirectives(d.rows);
+                try { localStorage.setItem('tianying_directives', JSON.stringify(d.rows)); } catch (e) { }
+            }
+        } catch (e) { /* 離線：本機已更新，下次連線再同步 */ }
+    };
+    // 宣導事項：開啟時自雲端載入最新
+    useEffect(() => { loadDirectivesCloud(); }, []);
+    useEffect(() => {
+        if (tab === 'home') loadDirectivesCloud();
+    }, [tab]);
+    const openDirectives = () => { setShowDirectives(true); loadDirectivesCloud(); };
     // 公告雲端讀取：自「公告欄」分頁拉最新（含圖片 Drive 連結），成功則更新並快取本機
     const loadAnnouncementsCloud = async () => {
         if (!ACCOUNT_GAS_URL) return;
@@ -19794,6 +19853,7 @@ function App() {
         reader.readAsDataURL(file);
     });
     const canManageAnn = CAN_MANAGE_ROLES.includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role);
+    const canManageDirective = CAN_MANAGE_ROLES.includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role);
     const categories = [...new Set(tools.map(t => t.category))];
     if (page === "login")
         return (React.createElement("div", { className: "app" },
@@ -19934,7 +19994,7 @@ function App() {
                     " \u00B7 ", (_a = ROLES.find(r => r.id === (currentUser === null || currentUser === void 0 ? void 0 : currentUser.role))) === null || _a === void 0 ? void 0 :
                     _a.label)),
             announcements.length > 0 && (() => {
-                const latest = [...announcements].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (Number(b.id) || 0) - (Number(a.id) || 0))[0]; // 置頂優先，其次最新（id 需轉數字，避免舊資料殘留的非數字id讓排序失真）
+                const latest = annMarqueeList[annMarqueeIdx % annMarqueeList.length] || annMarqueeList[0]; // 置頂優先，其餘每 7 秒輪流播放（不再永遠只顯示第一則）
                 const marqueeText = (latest.pinned ? '📌 ' : '') + latest.title + '：' + latest.content;
                 const marqueeDuration = Math.max(8, marqueeText.length * 0.22) + 's'; // 依文字長度調整速度，長文不會被壓縮得太趕
                 return (React.createElement("div", { className: "alert", style: { cursor: 'pointer' }, onClick: () => openBulletin() },
@@ -19944,10 +20004,10 @@ function App() {
                     React.createElement("span", { style: { color: 'var(--gold)', fontSize: 11, flexShrink: 0 } }, "\u67E5\u770B\u5168\u90E8 \u203A")));
             })(),
             React.createElement("div", { className: "stat-row" },
-                React.createElement("div", { className: "stat-card" },
-                    React.createElement("div", { style: { fontSize: 18, marginBottom: 2 } }, "\uD83D\uDEE0\uFE0F"),
-                    React.createElement("div", { className: "stat-num" }, userTools.length),
-                    React.createElement("div", { className: "stat-lbl" }, "\u53EF\u7528\u5DE5\u5177")),
+                React.createElement("div", { className: "stat-card", style: { cursor: 'pointer' }, onClick: () => openDirectives() },
+                    React.createElement("div", { style: { fontSize: 18, marginBottom: 2 } }, "\uD83D\uDCE3"),
+                    React.createElement("div", { className: "stat-num", style: { color: directives.length > 0 ? 'var(--indigo2)' : 'var(--muted)' } }, directives.length),
+                    React.createElement("div", { className: "stat-lbl" }, "\u5BA3\u5C0E\u4E8B\u9805")),
                 React.createElement("div", { className: "stat-card", style: { cursor: 'pointer' }, onClick: () => openBulletin() },
                     React.createElement("div", { style: { fontSize: 18, marginBottom: 2 } }, "\uD83D\uDCE2"),
                     React.createElement("div", { className: "stat-num", style: { color: announcements.length > 0 ? 'var(--gold2)' : 'var(--muted)' } }, announcements.length),
@@ -20884,6 +20944,103 @@ function App() {
                         React.createElement("span", null,
                             "\uD83D\uDDD3 ",
                             ann.date))))))))),
+        showDirectives && (React.createElement("div", { style: { position: 'fixed', inset: 0, zIndex: 300, background: '#0A0C10',
+                display: 'flex', flexDirection: 'column', fontFamily: "'Microsoft JhengHei',sans-serif" } },
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px',
+                    background: 'rgba(10,12,16,.95)', borderBottom: '1px solid rgba(99,102,241,.25)', flexShrink: 0 } },
+                React.createElement("button", { onClick: () => { setShowDirectives(false); setEditingDirective(null); }, style: { background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)',
+                        borderRadius: 8, color: '#F5F5F5', padding: '6px 12px', cursor: 'pointer',
+                        fontSize: 13, fontFamily: "'Microsoft JhengHei',sans-serif" } }, "\u2190 \u8FD4\u56DE"),
+                React.createElement("div", { style: { flex: 1, fontSize: 15, fontWeight: 900, color: 'var(--indigo2)' } }, "\uD83D\uDCE3 \u5BA3\u5C0E\u4E8B\u9805"),
+                canManageDirective && !editingDirective && (React.createElement("button", { onClick: () => setEditingDirective({ id: null, title: '', content: '', pinned: false }), style: { background: 'linear-gradient(135deg,#818CF8,#6366F1)', border: 'none',
+                        borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700,
+                        color: '#fff', cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif" } }, "\uFF0B \u65B0\u589E\u5BA3\u5C0E"))),
+            React.createElement("div", { style: { flex: 1, overflowY: 'auto', padding: 14 } },
+                editingDirective && (React.createElement("div", { style: { background: 'rgba(255,255,255,.055)', backdropFilter: 'blur(10px)',
+                        border: '1px solid rgba(99,102,241,.3)', borderRadius: 14, padding: 18, marginBottom: 16 } },
+                    React.createElement("div", { style: { fontSize: 14, fontWeight: 900, marginBottom: 14, color: 'var(--indigo2)' } }, editingDirective.id ? '\u270F\uFE0F \u7DE8\u8F2F\u5BA3\u5C0E\u4E8B\u9805' : '\uFF0B \u65B0\u589E\u5BA3\u5C0E\u4E8B\u9805'),
+                    React.createElement("div", { className: "input-group" },
+                        React.createElement("label", { className: "input-label" }, "\u6A19\u984C"),
+                        React.createElement("div", { className: "input-wrap" },
+                            React.createElement("span", { className: "input-icon" }, "\uD83D\uDCCC"),
+                            React.createElement("input", { className: "inp", placeholder: "\u8F38\u5165\u6A19\u984C", value: editingDirective.title, onChange: e => setEditingDirective(p => ({ ...p, title: e.target.value })) }))),
+                    React.createElement("div", { className: "input-group" },
+                        React.createElement("label", { className: "input-label" }, "\u5167\u5BB9"),
+                        React.createElement("textarea", { value: editingDirective.content, onChange: e => setEditingDirective(p => ({ ...p, content: e.target.value })), placeholder: "\u8F38\u5165\u5BA3\u5C0E\u5167\u5BB9\u2026", rows: 4, style: { width: '100%', background: 'rgba(255,255,255,.06)',
+                                border: '1px solid rgba(255,255,255,.10)', borderRadius: 8,
+                                padding: '10px 12px', fontSize: 14, color: 'var(--text)', resize: 'vertical',
+                                fontFamily: "'Microsoft JhengHei',sans-serif", outline: 'none',
+                                transition: 'border-color .2s', boxSizing: 'border-box' }, onFocus: e => e.target.style.borderColor = 'var(--indigo2)', onBlur: e => e.target.style.borderColor = 'rgba(255,255,255,.10)' })),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 } },
+                        React.createElement("button", { className: `toggle ${editingDirective.pinned ? 'on' : 'off'}`, onClick: () => setEditingDirective(p => ({ ...p, pinned: !p.pinned })) },
+                            React.createElement("div", { className: "toggle-thumb" })),
+                        React.createElement("span", { style: { fontSize: 13, color: editingDirective.pinned ? 'var(--indigo2)' : 'var(--muted)' } }, "\uD83D\uDCCC \u7F6E\u9802\u5BA3\u5C0E")),
+                    React.createElement("div", { style: { display: 'flex', gap: 8 } },
+                        React.createElement("button", { onClick: () => {
+                                if (!editingDirective.title.trim() || !editingDirective.content.trim()) {
+                                    showToast('\u26A0\uFE0F \u6A19\u984C\u8207\u5167\u5BB9\u4E0D\u80FD\u7A7A\u767D');
+                                    return;
+                                }
+                                const now = new Date().toLocaleDateString('zh-TW').replace(/\//g, '-');
+                                const isExisting = editingDirective.id != null && directives.some(d => d.id === editingDirective.id);
+                                if (isExisting) {
+                                    const next = directives.map(d => d.id === editingDirective.id
+                                        ? { ...d, ...editingDirective, id: d.id, date: now } : d);
+                                    setDirectives(next);
+                                    pushDirectivesCloud(next);
+                                    showToast('\u2705 \u5BA3\u5C0E\u4E8B\u9805\u5DF2\u66F4\u65B0\uFF08\u540C\u6B65\u96F2\u7AEF\uFF09');
+                                }
+                                else {
+                                    const next = [
+                                        { ...editingDirective, id: Date.now(),
+                                            author: (currentUser === null || currentUser === void 0 ? void 0 : currentUser.name) || '\u7BA1\u7406\u54E1', date: now },
+                                        ...directives
+                                    ];
+                                    setDirectives(next);
+                                    pushDirectivesCloud(next);
+                                    showToast('\u2705 \u5BA3\u5C0E\u4E8B\u9805\u5DF2\u65B0\u589E\uFF08\u540C\u6B65\u96F2\u7AEF\uFF09');
+                                }
+                                setEditingDirective(null);
+                            }, style: { flex: 1, background: 'linear-gradient(135deg,#818CF8,#6366F1)', border: 'none',
+                                borderRadius: 8, padding: 12, fontSize: 14, fontWeight: 700, color: '#fff',
+                                cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif",
+                                boxShadow: '0 3px 12px rgba(99,102,241,.35)' } }, "\uD83D\uDCBE \u5132\u5B58\u5BA3\u5C0E\u4E8B\u9805"),
+                        React.createElement("button", { onClick: () => setEditingDirective(null), style: { background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)',
+                                borderRadius: 8, padding: '12px 16px', fontSize: 13, color: 'var(--muted)',
+                                cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif" } }, "\u53D6\u6D88")))),
+                directives.length === 0 ? (React.createElement("div", { style: { textAlign: 'center', padding: '60px 0', color: 'var(--muted)' } },
+                    React.createElement("div", { style: { fontSize: 40, marginBottom: 12 } }, "\uD83D\uDCED"),
+                    React.createElement("div", { style: { fontSize: 14, fontWeight: 600 } }, "\u76EE\u524D\u6C92\u6709\u5BA3\u5C0E\u4E8B\u9805"))) : ([...directives]
+                    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (Number(b.id) || 0) - (Number(a.id) || 0))
+                    .map(dir => (React.createElement("div", { key: dir.id, style: { background: 'rgba(255,255,255,.055)', backdropFilter: 'blur(8px)',
+                        border: `1px solid ${dir.pinned ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.08)'}`,
+                        borderRadius: 13, padding: 16, marginBottom: 10,
+                        borderLeft: dir.pinned ? '3px solid var(--indigo2)' : '3px solid transparent' } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 } },
+                        React.createElement("div", { style: { flex: 1 } },
+                            dir.pinned && (React.createElement("span", { style: { fontSize: 10, background: 'rgba(99,102,241,.15)',
+                                    color: 'var(--indigo2)', border: '1px solid rgba(99,102,241,.35)',
+                                    borderRadius: 4, padding: '1px 6px', marginRight: 6 } }, "\uD83D\uDCCC \u7F6E\u9802")),
+                            React.createElement("span", { style: { fontSize: 15, fontWeight: 900 } }, dir.title)),
+                        canManageDirective && !editingDirective && (React.createElement("div", { style: { display: 'flex', gap: 5, flexShrink: 0 } },
+                            React.createElement("button", { onClick: () => setEditingDirective({ ...dir }), style: { background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.3)',
+                                    borderRadius: 6, padding: '3px 8px', fontSize: 11, color: 'var(--indigo2)',
+                                    cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif" } }, "\u270F\uFE0F"),
+                            React.createElement("button", { onClick: () => {
+                                    if (window.confirm(`\u78BA\u5B9A\u8981\u522A\u9664\u300C${dir.title}\u300D\u55CE\uFF1F`)) {
+                                        const next = directives.filter(d => d.id !== dir.id);
+                                        setDirectives(next);
+                                        pushDirectivesCloud(next);
+                                        showToast('\uD83D\uDDD1\uFE0F \u5BA3\u5C0E\u4E8B\u9805\u5DF2\u522A\u9664\uFF08\u540C\u6B65\u96F2\u7AEF\uFF09');
+                                    }
+                                }, style: { background: 'rgba(248,113,113,.12)', border: '1px solid rgba(248,113,113,.25)',
+                                    borderRadius: 6, padding: '3px 8px', fontSize: 11, color: 'var(--error)',
+                                    cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif" } }, "\uD83D\uDDD1\uFE0F")))),
+                    React.createElement("div", { style: { fontSize: 13, color: 'var(--muted)', lineHeight: 1.7,
+                            whiteSpace: 'pre-wrap', marginBottom: 8 } }, dir.content),
+                    React.createElement("div", { style: { display: 'flex', gap: 12, fontSize: 11, color: 'var(--muted2)' } },
+                        React.createElement("span", null, "\uD83D\uDC64 ", dir.author),
+                        React.createElement("span", null, "\uD83D\uDDD3 ", dir.date))))))))),
         changePwModal && (React.createElement("div", { className: "modal-overlay", onClick: () => setChangePwModal(false) },
             React.createElement("div", { className: "modal", onClick: e => e.stopPropagation() },
                 React.createElement("button", { className: "modal-close", onClick: () => setChangePwModal(false) }, "\u2715"),

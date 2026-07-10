@@ -19,6 +19,8 @@
 //   ・bindLine / unbindLine / getLineBinding / getLineBindings
 //   ・generateLineCode
 //   ・getAnnouncements / saveAnnouncements（★公告欄雲端同步，圖片上傳至 Drive 資料夾）
+//   ・getDirectives / saveDirectives（★宣導事項雲端同步，獨立試算表 DIRECTIVE_SHEET_ID）
+//     部署前：另開一張新試算表存宣導事項 → 把 ID 貼到 DIRECTIVE_SHEET_ID → 確認本 GAS 執行帳號有該表編輯權限
 //   ・請假 LINE 推播通知（Flex Message 卡片式，含核准/駁回按鈕）
 //   ・班表查詢Bot：本週班表/本月班表（早晚班選擇按鈕）、今日班表、明日班表
 //   ・班表異動推播：notifyScheduleChange / notifyScheduleChangeBatch / monthScheduleReleased
@@ -52,6 +54,11 @@ var SCHEDULE_SHEETS_ = {
 var ANN_SHEET_NAME = "公告欄";
 var ANN_FOLDER_ID  = "1K_RRPUjcWrdNAS2ppcx6OFDtlkfSfAl3"; // 公告圖片存放的 Drive 資料夾
 var ANN_MAX_IMAGES = 3;
+
+// ── 宣導事項同步用常數（獨立試算表，非公告欄）──
+// 部署前請先開一張新試算表存放宣導事項，把它的 ID 貼到下面，並確保這支 GAS 執行帳號對該試算表有編輯權限
+var DIRECTIVE_SHEET_ID   = "請貼上宣導事項試算表的ID";
+var DIRECTIVE_SHEET_NAME = "宣導事項";
 
 // ── 明日哨點推播用常數 ──
 var POST_SHEET_ID   = "1sIcdAhw0mz5iM3F5fulDNPOda2pv-t7xUhT6XXf9X7Q"; // 每日哨表試算表
@@ -109,6 +116,8 @@ function doPost(e) {
 
     if (action === 'saveAnnouncements')  return saveAnnouncements(e);
 
+    if (action === 'saveDirectives')     return saveDirectives(e);
+
     if (action === 'setSettings')        return setSettings(e);
 
     if (action === 'notifyScheduleChange')      return notifyScheduleChangeAction_(e);
@@ -142,6 +151,8 @@ function doGet(e) {
     if (action === 'getLineBindings')   return getLineBindings();
 
     if (action === 'getAnnouncements')  return getAnnouncements();
+
+    if (action === 'getDirectives')     return getDirectives();
 
     if (action === 'getSettings')       return getSettings();
 
@@ -801,6 +812,103 @@ function saveAnnouncements(e) {
     var last = sh.getLastRow();
     if (last >= 2) sh.getRange(2, 1, last - 1, 8).clearContent(); // 清舊資料（保留表頭）
     if (sheetRows.length) sh.getRange(2, 1, sheetRows.length, 8).setValues(sheetRows);
+
+    return jsonRes({status:'ok', rows:out, count:out.length});
+  } catch (err) {
+    return jsonRes({status:'err', msg:err.toString()});
+  } finally {
+    try { lock.releaseLock(); } catch (e2) {}
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 【宣導事項同步】── 獨立試算表，供首頁「宣導事項」按鈕讀取/編輯
+// ════════════════════════════════════════════════════════════
+
+// 取得（或建立）宣導事項分頁，並確保表頭存在
+function getDirectiveSheet_() {
+  var ss = SpreadsheetApp.openById(DIRECTIVE_SHEET_ID);
+  var sh = ss.getSheetByName(DIRECTIVE_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(DIRECTIVE_SHEET_NAME);
+    sh.appendRow(['ID', '標題', '內容', '發布者', '日期', '置頂', '更新時間']);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, 7)
+      .setBackground('#818CF8')
+      .setFontColor('#0A0C10')
+      .setFontWeight('bold');
+  }
+  return sh;
+}
+
+// 讀取全部宣導事項 → 回傳給前端
+function getDirectives() {
+  try {
+    var sh = getDirectiveSheet_();
+    var last = sh.getLastRow();
+    var rows = [];
+    if (last >= 2) {
+      var vals = sh.getRange(2, 1, last - 1, 7).getValues();
+      for (var i = 0; i < vals.length; i++) {
+        var r = vals[i];
+        if (r[0] === '' && r[1] === '') continue;
+        var dateStr = (r[4] instanceof Date)
+          ? Utilities.formatDate(r[4], 'Asia/Taipei', 'yyyy-MM-dd')
+          : String(r[4] || '');
+        var pin = (r[5] === true) || String(r[5]).toLowerCase() === 'true' || r[5] === '是';
+        rows.push({
+          id: Number(r[0]) || r[0],
+          title: String(r[1] || ''),
+          content: String(r[2] || ''),
+          author: String(r[3] || ''),
+          date: dateStr,
+          pinned: pin
+        });
+      }
+    }
+    return jsonRes({status:'ok', rows:rows});
+  } catch (err) {
+    return jsonRes({status:'err', msg:err.toString(), rows:[]});
+  }
+}
+
+// 整份覆寫宣導事項（最後寫入為準）
+function saveDirectives(e) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(20000); } catch (e0) {}
+  try {
+    var payload = JSON.parse(e.parameter.data || '{}');
+    var list = payload.directives || [];
+
+    var out = [];
+    var sheetRows = [];
+    var now = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy/M/d HH:mm:ss');
+
+    for (var i = 0; i < list.length; i++) {
+      var a = list[i] || {};
+      out.push({
+        id: a.id,
+        title: String(a.title || ''),
+        content: String(a.content || ''),
+        author: String(a.author || ''),
+        date: String(a.date || ''),
+        pinned: !!a.pinned
+      });
+      sheetRows.push([
+        a.id != null ? a.id : '',
+        String(a.title || ''),
+        String(a.content || ''),
+        String(a.author || ''),
+        String(a.date || ''),
+        a.pinned ? true : false,
+        now
+      ]);
+    }
+
+    var sh = getDirectiveSheet_();
+    var last = sh.getLastRow();
+    if (last >= 2) sh.getRange(2, 1, last - 1, 7).clearContent();
+    if (sheetRows.length) sh.getRange(2, 1, sheetRows.length, 7).setValues(sheetRows);
 
     return jsonRes({status:'ok', rows:out, count:out.length});
   } catch (err) {

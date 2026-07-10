@@ -225,7 +225,7 @@ const TOPICS = {
 const NODES = [
 
   // ── 主控台核心 ──
-  { id: 0, title: '主控台 index.html', topic: 'core', pos: [0.0, 0.0, 0.45], note: '主選單/登入/公告/工具權限/首頁卡片，編譯後 React.createElement（非 JSX）' },
+  { id: 0, title: '主控台 index.html', topic: 'core', pos: [0.0, 0.0, 0.45], note: '主選單/登入/公告/工具權限/首頁卡片，編譯後 React.createElement（非 JSX）；首頁「宣導事項」按鈕(原可用工具卡)＋公告跑馬燈置頂輪播' },
   { id: 1, title: '登入與角色系統', topic: 'core', pos: [-0.3897, 0.0, -0.225], note: 'localStorage hsh_session_user；CAN_MANAGE_ROLES 控管理職可見' },
   { id: 2, title: '首頁待審卡片', topic: 'core', pos: [0.3897, 0.0, -0.225], note: '待審請假/帳號/報告/表揚反應；報告、表揚兩格限 executive/admin' },
 
@@ -243,7 +243,7 @@ const NODES = [
 
   // ── 東海／後端 GAS ──
   { id: 13, title: '事故/表揚 GAS v3.1', topic: 'backend', pos: [1.6891, 1.2961, 0.0], note: 'action 分流 report/feedback/updateStatus/deleteRow/getReports/getFeedback；狀態/處置欄；新資料自動轉發LINE推播給主管/管理員' },
-  { id: 14, title: '帳號/請假 GAS', topic: 'backend', pos: [0.8592, 1.9478, 0.6421], note: 'ACCOUNT_GAS_URL；登入/帳號申請/請假審核' },
+  { id: 14, title: '帳號/請假 GAS', topic: 'backend', pos: [0.8592, 1.9478, 0.6421], note: 'ACCOUNT_GAS_URL；登入/帳號申請/請假審核；getDirectives/saveDirectives 讀寫宣導事項試算表(id66)' },
   { id: 15, title: '打烊/開店 GAS', topic: 'backend', pos: [0.5627, 1.138, 1.9043], note: '進出記錄 + _SharedDB（廠商/監工/檢查者即時同步）；2026-07-06 開店 GAS 補 updateRow/deleteRow（今日頁編輯刪除，先前漏接一律失敗）' },
   { id: 16, title: '照片上傳處理', topic: 'backend', pos: [1.0723, 1.8817, -0.8901], note: 'saveImages_；公告夾不可寫退回執行帳號夾；setSharing 非致命' },
 
@@ -329,7 +329,7 @@ const NODES = [
   // ── 北海／資料儲存 ──
   // ↳ 空節點（預留，外圍）
   { id: 65, title: '交接事項試算表', topic: 'data', pos: [-0.5772, 2.099, -1.4062], note: '新建試算表；交接事項分頁(A~I)：事項ID/內容/狀態/建立人工號/姓名/時間/最後修改人工號/姓名/時間' },
-  { id: 66, title: '空節點 #66', topic: 'data', pos: [-1.6916, 1.0127, 1.7242], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
+  { id: 66, title: '宣導事項試算表', topic: 'data', pos: [-1.6916, 1.0127, 1.7242], note: '獨立於主試算表；DIRECTIVE_SHEET_ID（部署前需手動建立並填入GAS）；首頁「宣導事項」按鈕讀寫' },
   { id: 67, title: '空節點 #67', topic: 'data', pos: [-1.8028, 1.916, 0.2784], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 68, title: '空節點 #68', topic: 'data', pos: [-2.2774, 0.6941, -1.2103], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 69, title: '空節點 #69', topic: 'data', pos: [-0.8967, 1.686, -1.902], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
@@ -444,6 +444,8 @@ const EDGES = [
   [13, 14],
   // 帶班交接事項：主控台→工具→GAS→試算表
   [0, 135], [135, 43], [43, 65],
+  // 宣導事項：主控台首頁按鈕→帳號/請假 GAS→獨立試算表
+  [0, 14], [14, 66],
 ];
 
 // === BRAIN_MAP_DATA_END ===
