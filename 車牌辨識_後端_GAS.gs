@@ -113,7 +113,11 @@ function doPost(e) {
     // --- 功能 B: 資料登記到試算表 ---
     if (payload.action === 'vehicleReg') {
       var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-      var sheet = ss.getSheets()[0];
+      // 依類型名稱找對應分頁（原本寫死 getSheets()[0]永遠抓最左邊分頁，
+      // 若有人在Sheets手動調過分頁順序，所有類型都會被寫到同一頁——
+      // 2026-07-11踩過這坑）。找不到對應分頁時明確報錯，不要沉默寫錯地方。
+      var sheet = ss.getSheetByName(payload.typeLabel);
+      if (!sheet) return jsonOut({ success: false, error: '找不到「' + payload.typeLabel + '」分頁，請確認試算表分頁名稱是否與類型名稱一致' });
       var timestamp = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss');
       sheet.appendRow([
         timestamp,
@@ -222,8 +226,16 @@ function sendDailySummary() {
   var endKey   = todayStr     + ' 08:00:00';
 
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  var sheet = ss.getSheets()[0];
-  var rows = sheet.getDataRange().getValues();
+  // 原本只讀 getSheets()[0]（最左邊分頁），三種類型分開存在不同分頁時
+  // 只會統計到其中一頁，其他分頁的登記全部漏掉（2026-07-11發現連帶修正）。
+  // 改成三種類型分頁都讀，合併統計。
+  var TYPE_LABELS = ['館內機車', '館內汽車', '新莊停車場'];
+  var rows = [];
+  for (var s = 0; s < TYPE_LABELS.length; s++) {
+    var typeSheet = ss.getSheetByName(TYPE_LABELS[s]);
+    if (!typeSheet) continue;
+    rows = rows.concat(typeSheet.getDataRange().getValues());
+  }
 
   var hits = [];        // [時間, 類型, 車牌, 登記人]
   var byType = {};      // 類型 → 台數
