@@ -17715,6 +17715,23 @@ const css = `
   @keyframes fadeIn { from{opacity:0} to{opacity:1} }
   @keyframes slideUp { from{transform:translateY(70px);opacity:0} to{transform:translateY(0);opacity:1} }
 
+  /* 互動吉祥物：待機呼吸＋搖擺，拖曳時交給 inline 傾斜，放開落地回彈 */
+  .mascot-widget { animation: mascotIdle 3.2s ease-in-out infinite; transform-origin: 50% 88%; }
+  .mascot-widget.dragging { animation: none; cursor:grabbing !important; }
+  .mascot-widget.landing { animation: mascotLand .32s ease-out; }
+  @keyframes mascotIdle {
+    0%, 100% { transform: translateY(0) rotate(-2deg) scale(1); }
+    30% { transform: translateY(-7px) rotate(2deg) scale(1.03); }
+    60% { transform: translateY(-3px) rotate(-1deg) scale(1.015); }
+  }
+  @keyframes mascotLand {
+    0% { transform: scale(1,1); }
+    45% { transform: scale(1.14,0.82); }
+    100% { transform: scale(1,1); }
+  }
+  .mascot-pick { border-radius:10px; padding:6px; cursor:pointer; text-align:center; transition:all .15s; }
+  .mascot-pick:hover { transform:translateY(-2px); }
+
   /* chips */
   .chip { display:inline-flex; align-items:center; gap:4px;
     background:rgba(212,168,0,.10); border:1px solid rgba(212,168,0,.22);
@@ -19037,6 +19054,133 @@ function UsersTab({ userDb, setUserDb, showToast, setSelectedUser, canEdit }) {
                             cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif" } }, "\u9084\u539F 123")))))));
 }
 // ═══════════════════════════════════════════════════════════
+// 互動吉祥物：主控台角落可拖曳，點擊（非拖曳）開衣橱換角色
+// 角色/拖曳位置皮依 empId 存 localStorage，單機版，不動 GAS
+const MASCOT_CHARACTERS = [
+    { id: 'luffy', name: '路飛', img: './chars/luffy.png' },
+    { id: 'zoro', name: '索隆', img: './chars/zoro.png' },
+    { id: 'nami', name: '娜美', img: './chars/nami.png' },
+    { id: 'chopper', name: '喬巴', img: './chars/chopper.png' },
+    { id: 'sanji', name: '香吉士', img: './chars/sanji.png' },
+    { id: 'kapo', name: '咖波', img: './chars/kapo.webp' },
+];
+function MascotWidget({ empId }) {
+    const posKey = `tianying_mascot_pos_${empId}`;
+    const charKey = `tianying_mascot_char_${empId}`;
+    const [charId, setCharId] = useState(() => {
+        try { return localStorage.getItem(charKey) || MASCOT_CHARACTERS[0].id; } catch (e) { return MASCOT_CHARACTERS[0].id; }
+    });
+    const [pos, setPos] = useState(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem(posKey) || 'null');
+            if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') return saved;
+        } catch (e) {}
+        return { x: window.innerWidth - 84, y: window.innerHeight - 190 };
+    });
+    const [open, setOpen] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
+    const [tilt, setTilt] = useState(0);
+    const [landing, setLanding] = useState(false);
+    const dragRef = useRef({ dragging: false, moved: false, startX: 0, startY: 0, origX: 0, origY: 0, lastX: 0 });
+
+    const clampPos = (x, y) => {
+        const size = 64;
+        const maxX = Math.max(8, window.innerWidth - size - 8);
+        const maxY = Math.max(8, window.innerHeight - size - 8);
+        return { x: Math.min(Math.max(x, 8), maxX), y: Math.min(Math.max(y, 8), maxY) };
+    };
+
+    const handlePointerDown = (e) => {
+        const point = e.touches ? e.touches[0] : e;
+        dragRef.current = { dragging: true, moved: false, startX: point.clientX, startY: point.clientY, origX: pos.x, origY: pos.y, lastX: point.clientX };
+        setIsDragging(true);
+    };
+
+    useEffect(() => {
+        const handleMove = (e) => {
+            if (!dragRef.current.dragging) return;
+            const point = e.touches ? e.touches[0] : e;
+            const dx = point.clientX - dragRef.current.startX;
+            const dy = point.clientY - dragRef.current.startY;
+            if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragRef.current.moved = true;
+            setPos(clampPos(dragRef.current.origX + dx, dragRef.current.origY + dy));
+            // 依左右移動速度傾斜身體，走位感更像被拖著跑
+            const stepX = point.clientX - dragRef.current.lastX;
+            dragRef.current.lastX = point.clientX;
+            setTilt(Math.max(-18, Math.min(18, stepX * 2.2)));
+        };
+        const handleUp = () => {
+            if (!dragRef.current.dragging) return;
+            dragRef.current.dragging = false;
+            setIsDragging(false);
+            setTilt(0);
+            setPos(p => { try { localStorage.setItem(posKey, JSON.stringify(p)); } catch (e) {} return p; });
+            if (!dragRef.current.moved) {
+                setOpen(true);
+            } else {
+                // 放開時落地回彈一下
+                setLanding(true);
+                setTimeout(() => setLanding(false), 340);
+            }
+        };
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleUp);
+        window.addEventListener('touchmove', handleMove, { passive: false });
+        window.addEventListener('touchend', handleUp);
+        return () => {
+            window.removeEventListener('mousemove', handleMove);
+            window.removeEventListener('mouseup', handleUp);
+            window.removeEventListener('touchmove', handleMove);
+            window.removeEventListener('touchend', handleUp);
+        };
+    }, [posKey]);
+
+    const activeChar = MASCOT_CHARACTERS.find(c => c.id === charId) || MASCOT_CHARACTERS[0];
+
+    return React.createElement(React.Fragment, null,
+        React.createElement("div", {
+            className: `mascot-widget${isDragging ? ' dragging' : ''}${landing ? ' landing' : ''}`,
+            onMouseDown: handlePointerDown,
+            onTouchStart: handlePointerDown,
+            style: {
+                position: 'fixed', left: pos.x, top: pos.y, width: 64, height: 64, zIndex: 90,
+                cursor: 'grab', touchAction: 'none', userSelect: 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transform: isDragging ? `rotate(${tilt}deg)` : undefined,
+                transition: isDragging ? 'transform 90ms ease-out' : undefined,
+            }
+        },
+            React.createElement("img", {
+                src: activeChar.img, alt: activeChar.name, draggable: false,
+                style: { width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 6px 10px rgba(0,0,0,.45))', pointerEvents: 'none' }
+            })),
+        open && React.createElement("div", { className: "modal-overlay", onClick: () => setOpen(false) },
+            React.createElement("div", { className: "modal", onClick: e => e.stopPropagation(), style: { maxWidth: 320 } },
+                React.createElement("button", { className: "modal-close", onClick: () => setOpen(false) }, "✕"),
+                React.createElement("div", { className: "modal-title" }, "🧸 換裝小幫手"),
+                React.createElement("div", { style: { display: 'flex', justifyContent: 'center', marginBottom: 16 } },
+                    React.createElement("img", { src: activeChar.img, alt: activeChar.name, style: { width: 96, height: 96, objectFit: 'contain', filter: 'drop-shadow(0 8px 14px rgba(0,0,0,.4))' } })),
+                React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 18 } },
+                    MASCOT_CHARACTERS.map(c => React.createElement("div", {
+                        key: c.id,
+                        className: 'mascot-pick',
+                        onClick: () => setCharId(c.id),
+                        style: {
+                            border: c.id === charId ? '2px solid var(--gold2)' : '1px solid var(--border)',
+                            background: c.id === charId ? 'rgba(212,168,0,.15)' : 'rgba(255,255,255,.04)',
+                        }
+                    },
+                        React.createElement("img", { src: c.img, alt: c.name, style: { width: '100%', height: 40, objectFit: 'contain' } }),
+                        React.createElement("div", { style: { fontSize: 10, marginTop: 4, color: c.id === charId ? 'var(--gold2)' : 'var(--muted)' } }, c.name)))),
+                React.createElement("button", {
+                    className: "save-btn",
+                    onClick: () => {
+                        try { localStorage.setItem(charKey, charId); } catch (e) {}
+                        setOpen(false);
+                        if (typeof showToast === 'function') showToast('✅ 已換裝！');
+                    }
+                }, "💾 保存"))));
+}
 function App() {
     var _a;
     const [page, setPage] = useState("login"); // login | register | home | tools | admin | profile
@@ -21285,7 +21429,9 @@ function App() {
                                 setSelectedUser(null);
                                 showToast("✅ 員工資料已更新！");
                             } }, "\uD83D\uDCBE \u5132\u5B58\u8B8A\u66F4"));
-                })())))));
+                })()))),
+        currentUser && React.createElement(MascotWidget, { key: "mascot-widget", empId: currentUser.empId })
+    ));
 }
 const rootEl = document.getElementById('root');
 const reactRoot = ReactDOM.createRoot(rootEl);
