@@ -19063,6 +19063,7 @@ const MASCOT_CHARACTERS = [
     { id: 'chopper', name: '喬巴', img: './chars/chopper.png' },
     { id: 'sanji', name: '香吉士', img: './chars/sanji.png' },
     { id: 'kapo', name: '咖波', img: './chars/kapo.webp' },
+    { id: 'bailan', name: '白爛貓', img: './chars/bailan.webp' },
 ];
 function MascotWidget({ empId }) {
     const posKey = `tianying_mascot_pos_${empId}`;
@@ -19075,8 +19076,18 @@ function MascotWidget({ empId }) {
             const saved = JSON.parse(localStorage.getItem(posKey) || 'null');
             if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') return saved;
         } catch (e) {}
-        return { x: window.innerWidth - 84, y: window.innerHeight - 190 };
+        return null; // 首次掛載後才量得到頂欄位置，見下方 useEffect
     });
+
+    useEffect(() => {
+        if (pos !== null) return;
+        // 預設位置：貼在頂欄右下角（公告鈴鐺/大頭貼下方），topbar 這時才確定已掛載到 DOM
+        const topbar = document.querySelector('.topbar');
+        const next = topbar
+            ? { x: topbar.getBoundingClientRect().right - 74, y: topbar.getBoundingClientRect().bottom + 10 }
+            : { x: window.innerWidth - 84, y: window.innerHeight - 190 };
+        setPos(next);
+    }, [pos]);
     const [open, setOpen] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [tilt, setTilt] = useState(0);
@@ -19134,6 +19145,8 @@ function MascotWidget({ empId }) {
             window.removeEventListener('touchend', handleUp);
         };
     }, [posKey]);
+
+    if (pos === null) return null; // 等 useEffect 量完頂欄位置再顯示，避免閃一下錯誤座標
 
     const activeChar = MASCOT_CHARACTERS.find(c => c.id === charId) || MASCOT_CHARACTERS[0];
 
