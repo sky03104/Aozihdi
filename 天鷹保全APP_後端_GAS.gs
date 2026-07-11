@@ -2851,6 +2851,20 @@ function parsePostSheet_(sheetName) {
   return { hit: hit, noEmpId: Object.keys(noEmpId), dateInfo: dateInfo };
 }
 
+// 從表頭找出「晚班人員」實際落在第幾欄，當作早/晚班的分界欄。
+// 找不到時退回舊的寫死欄位6，避免表頭文字被改掉時整個解析失效。
+function findLateBlockStartCol_(values) {
+  var maxR = Math.min(values.length, 5);
+  for (var r = 0; r < maxR; r++) {
+    var row = values[r];
+    for (var c = 0; c < row.length; c++) {
+      var v = String(row[c] == null ? '' : row[c]).trim();
+      if (v.indexOf('晚班') !== -1) return c;
+    }
+  }
+  return 7; // fallback：對應舊版 c<=6 為早班的邊界
+}
+
 function parsePostFullList_(sheetName) {
   sheetName = sheetName || POST_SHEET_NAME;
   var ss = SpreadsheetApp.openById(POST_SHEET_ID);
@@ -2862,6 +2876,7 @@ function parsePostFullList_(sheetName) {
   var empSet = {}; for (var k in nameMap) empSet[k] = true;
   var timeRe = /(\d{4}-\d{4})/;
   var cnRe = /^[一-龥]{2,4}$/;
+  var lateStartCol = findLateBlockStartCol_(values);
 
   var early = [], late = [];
   for (var r = 0; r < values.length; r++) {
@@ -2874,7 +2889,7 @@ function parsePostFullList_(sheetName) {
       var time = raw.match(timeRe)[1];
       var loc = (raw.indexOf('帶隊幹部') !== -1) ? '帶隊幹部' : findPostLocation_(values, r, c, empSet);
       var item = { loc: loc, name: name, time: time, empId: nameMap[name] || '' };
-      if (c <= 6) early.push(item); else late.push(item);
+      if (c < lateStartCol) early.push(item); else late.push(item);
     }
   }
   var dateInfo = parsePostDate_(values);
