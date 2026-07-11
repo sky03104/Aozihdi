@@ -98,10 +98,18 @@
        是刻意的，這樣不論螢幕寬度多少，兩側都會自動留出相同間距，不會撞到 ───── */
     #tool-launcher-bar {
       position: fixed; top: 18px; left: 360px; right: 170px; z-index: 120;
-      display: flex; justify-content: center; gap: 8px; padding: 0;
-      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 0;
     }
-    #tool-launcher-bar::-webkit-scrollbar { height: 4px; }
+    /* 工具按鈕群組：往右收合時整組寬度縮到0，靠 justify-content:flex-end
+       讓收合鈕自然貼齊右側不跑位；展開時往左長出來 ───── */
+    #tlb-items {
+      display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
+      max-width: 2000px; opacity: 1; transition: max-width .32s ease, opacity .22s ease .05s;
+    }
+    #tlb-items::-webkit-scrollbar { height: 4px; }
+    #tool-launcher-bar.tlb-collapsed #tlb-items {
+      max-width: 0; opacity: 0; transition: max-width .32s ease, opacity .15s ease;
+    }
     .tlb-btn {
       flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
       background: rgba(10,12,16,0.82); border: 1px solid rgba(255,255,255,0.08);
@@ -111,6 +119,11 @@
     }
     .tlb-btn:hover { border-color: rgba(212,168,0,0.45); background: rgba(212,168,0,0.08); }
     .tlb-icon { font-size: 17px; line-height: 1; }
+    .tlb-toggle-btn {
+      flex-shrink: 0; width: 26px; height: 26px; padding: 0; display: flex;
+      align-items: center; justify-content: center; font-size: 13px; color: #FFD700;
+    }
+    .tlb-toggle-btn:hover { border-color: rgba(212,168,0,0.6); background: rgba(212,168,0,0.12); }
 
     /* ── 工具畫中畫視窗（左側浮動面板）───────────────── */
     #tool-pip {
@@ -1150,13 +1163,37 @@ function renderToolLauncherBar() {
   const allowed = new Set(bmAllowedToolIds());
   const visible = BM_TOOLS.filter(t => allowed.has(t.id));
   bar.innerHTML = '';
+
+  const items = document.createElement('div');
+  items.id = 'tlb-items';
   visible.forEach(t => {
     const btn = document.createElement('div');
     btn.className = 'tlb-btn';
     btn.innerHTML = '<span class="tlb-icon">' + t.icon + '</span><span>' + t.name + '</span>';
     btn.onclick = () => openToolPip(t);
-    bar.appendChild(btn);
+    items.appendChild(btn);
   });
+  bar.appendChild(items);
+
+  const toggle = document.createElement('div');
+  toggle.className = 'tlb-btn tlb-toggle-btn';
+  toggle.id = 'tlb-toggle';
+  toggle.title = '收合/展開工具列';
+  toggle.onclick = toggleToolBar;
+  bar.appendChild(toggle);
+
+  // 記住上次收合狀態（localStorage），重新整理頁面維持一致
+  const collapsed = localStorage.getItem('tianying_tlb_collapsed') === '1';
+  bar.classList.toggle('tlb-collapsed', collapsed);
+  toggle.innerHTML = '<span class="tlb-icon">' + (collapsed ? '‹' : '›') + '</span>';
+}
+function toggleToolBar() {
+  const bar = document.getElementById('tool-launcher-bar');
+  const toggle = document.getElementById('tlb-toggle');
+  const nowCollapsed = !bar.classList.contains('tlb-collapsed');
+  bar.classList.toggle('tlb-collapsed', nowCollapsed);
+  toggle.innerHTML = '<span class="tlb-icon">' + (nowCollapsed ? '‹' : '›') + '</span>';
+  localStorage.setItem('tianying_tlb_collapsed', nowCollapsed ? '1' : '0');
 }
 renderToolLauncherBar();
 
