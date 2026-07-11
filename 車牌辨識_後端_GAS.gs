@@ -6,8 +6,9 @@
  *
  * 【API Key 設定：兩種方式擇一，屬性優先】
  *   方式一（推薦）：GAS「專案設定 → 指令碼屬性」新增
- *     名稱：GEMINI_API_KEY   值：你的 key（AQ. 或 AIzaSy 開頭皆可）
- *   方式二：直接把 key 貼進下方 API_KEY_FALLBACK 的引號內
+ *     名稱：GEMINI_API_KEYS  值：多把 key 用逗號分隔（不同 Google Cloud 專案的 key 額度才是分開的）
+ *     （也相容舊名稱 GEMINI_API_KEY 單把 key，兩個都設時 KEYS 優先）
+ *   方式二：直接把 key 貼進下方 API_KEY_FALLBACK 的引號內（多把同樣逗號分隔）
  *     ⚠️ 只能貼在 GAS 編輯器裡，絕對不可 commit 回 GitHub（公開 repo 會外洩）
  *
  * 【自我檢查】瀏覽器直接開 /exec 網址，狀態頁會顯示金鑰是否已設定。
@@ -20,18 +21,28 @@
 var SPREADSHEET_ID   = '1K46ZEq2zbh7Jw5yv3X9aPgyjWZF43ZUJfjc-x-xunnQ'; // 車輛登記試算表
 var API_KEY_FALLBACK = ''; // ← 不想用指令碼屬性時，把 key 貼進引號內（僅限 GAS 編輯器，勿上傳 GitHub）
 
-// 取金鑰：指令碼屬性 GEMINI_API_KEY 優先，沒有就用上面的備用常數
-function getApiKey_() {
-  return PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY') || API_KEY_FALLBACK || '';
+// 取金鑰清單：GEMINI_API_KEYS（多把逗號分隔）> GEMINI_API_KEY（單把舊名）> 備用常數
+// 注意：免費額度是算「Google Cloud 專案」不是算金鑰，多把 key 要來自不同專案才有加乘效果
+function getApiKeys_() {
+  var props = PropertiesService.getScriptProperties();
+  var rawKeys = props.getProperty('GEMINI_API_KEYS') || props.getProperty('GEMINI_API_KEY') || API_KEY_FALLBACK || '';
+  var keys = [];
+  var parts = rawKeys.split(',');
+  for (var i = 0; i < parts.length; i++) {
+    var k = parts[i].trim();
+    if (k) keys.push(k);
+  }
+  return keys;
 }
 
 // ── 狀態頁（直接點開網址時顯示，並自我檢查金鑰）──
 function doGet() {
-  var key = getApiKey_();
-  var keyStatus = key
-    ? '✅ API Key 已設定（' + key.slice(0, 4) + '…，來源：' +
-      (PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY') ? '指令碼屬性' : '程式碼備用欄') + '）'
-    : '❌ API Key 未設定！請到「專案設定 → 指令碼屬性」新增 GEMINI_API_KEY，或貼進程式碼 API_KEY_FALLBACK';
+  var keys = getApiKeys_();
+  var props = PropertiesService.getScriptProperties();
+  var keyStatus = keys.length
+    ? '✅ API Key 已設定 ' + keys.length + ' 把（' + keys[0].slice(0, 4) + '…，來源：' +
+      (props.getProperty('GEMINI_API_KEYS') || props.getProperty('GEMINI_API_KEY') ? '指令碼屬性' : '程式碼備用欄') + '）'
+    : '❌ API Key 未設定！請到「專案設定 → 指令碼屬性」新增 GEMINI_API_KEYS（多把逗號分隔），或貼進程式碼 API_KEY_FALLBACK';
   return HtmlService.createHtmlOutput(
     '<h1>🚗 車牌辨識系統後端運行中</h1>' +
     '<p>請從 GitHub 前端頁面進行操作。若看到此頁面，代表後端部署成功。</p>' +
@@ -48,8 +59,8 @@ function doPost(e) {
 
     // --- 功能 A: 車牌辨識 ---
     if (payload.action === 'recognizePlate') {
-      var apiKey = getApiKey_();
-      if (!apiKey) return jsonOut({ success: false, error: 'API Key 未設定：請開 /exec 網址查看設定說明' });
+      var apiKeys = getApiKeys_();
+      if (!apiKeys.length) return jsonOut({ success: false, error: 'API Key 未設定：請開 /exec 網址查看設定說明' });
 
       // 清洗 Base64 資料
       var cleanBase64 = payload.imageBase64.split(',')[1] || payload.imageBase64;
@@ -83,10 +94,11 @@ function doPost(e) {
         "muteHttpExceptions": true
       };
 
-      // 模型備援鏈：每個模型的免費額度分開計算，主模型額度用完（429/quota）
-      // 自動換下一個。2026-07-12 起因：-latest 被 Google 指到 gemini-3.5-flash，
-      // 免費層限 20 次/日，快速連拍很快撞頂（實機截圖確認）。
-      // 注意：2026-07-11 曾發現此金鑰對 gemini-2.0-flash 配額為 0（打不通），
+      // 雙層備援：外層模型、內層金鑰——先用最準的模型把所有金鑰額度用完，
+      // 才降到備援模型（每個模型/每把金鑰的免費額度都是分開計算的）。
+      // 2026-07-12 起因：-latest 被 Google 指到 gemini-3.5-flash，免費層限 20 次/日，
+      // 快速連拍很快撞頂（實機截圖確認）。
+      // 注意：2026-07-11 曾發現金鑰對 gemini-2.0-flash 配額為 0（打不通），
       // 所以備援鏈不放 2.0 系列；鏈上模型若配額為 0 也會自然跳下一個。
       var MODELS = [
         'gemini-flash-latest',      // 主力（現指 3.5-flash，最準）
@@ -95,36 +107,42 @@ function doPost(e) {
         'gemini-flash-lite-latest'  // 備援3
       ];
       var lastError = '';
+      var deadKeys = {}; // 金鑰無效/沒權限 → 之後的模型也不用再試這把
       for (var mi = 0; mi < MODELS.length; mi++) {
-        var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODELS[mi] + ':generateContent?key=' + apiKey;
-        var res = UrlFetchApp.fetch(url, options); // key 放 URL 參數：解決 AQ 金鑰 OAuth 報錯（已驗證版本作法）
-        var result = JSON.parse(res.getContentText());
+        for (var ki = 0; ki < apiKeys.length; ki++) {
+          if (deadKeys[ki]) continue;
+          var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODELS[mi] + ':generateContent?key=' + apiKeys[ki];
+          var res = UrlFetchApp.fetch(url, options); // key 放 URL 參數：解決 AQ 金鑰 OAuth 報錯（已驗證版本作法）
+          var result = JSON.parse(res.getContentText());
 
-        if (result.error) {
-          var msg = String(result.error.message || '');
-          var code = result.error.code || res.getResponseCode();
-          lastError = 'API 報錯(' + MODELS[mi] + '): ' + msg;
-          // 只有額度爆掉(429)/伺服器忙(500,503)才換下一個模型；
-          // 其他錯誤（請求格式、金鑰無效）換模型也沒用，直接回報。
-          if (code === 429 || code === 500 || code === 503 || /quota|exhausted|overloaded/i.test(msg)) continue;
-          return jsonOut({ success: false, error: lastError });
-        }
-
-        if (result.candidates && result.candidates[0] && result.candidates[0].content) {
-          var raw = result.candidates[0].content.parts[0].text.trim().toUpperCase();
-          if (raw !== "" && !raw.includes("NONE")) {
-            // 先嘗試套台灣車牌格式正規化（補連字號、O→0、I→1）；
-            // 套不出格式就照原樣回傳（與已驗證版本行為一致，絕不比它更嚴格）
-            var plate = extractPlate_(raw) || raw.replace(/[^A-Z0-9\-]/g, '');
-            if (plate) return jsonOut({ success: true, plate: plate, raw: raw, model: MODELS[mi] });
+          if (result.error) {
+            var msg = String(result.error.message || '');
+            var code = result.error.code || res.getResponseCode();
+            lastError = 'API 報錯(' + MODELS[mi] + '/金鑰' + (ki + 1) + '): ' + msg;
+            // 額度爆掉(429)/伺服器忙(500,503) → 換下一把金鑰或下一個模型
+            if (code === 429 || code === 500 || code === 503 || /quota|exhausted|overloaded/i.test(msg)) continue;
+            // 金鑰本身壞掉（無效/沒權限）→ 這把作廢，換下一把；不是最後一把就繼續
+            if (code === 400 && /api key/i.test(msg) || code === 403) { deadKeys[ki] = true; continue; }
+            // 其他錯誤（請求格式等）換金鑰/模型也沒用，直接回報
+            return jsonOut({ success: false, error: lastError });
           }
-          // 模型有回但判定沒車牌（NONE/空白）＝照片問題，換模型也認不出來，直接回報
-          return jsonOut({ success: false, error: "辨識失敗：請確保照片清晰且包含車牌" });
+
+          if (result.candidates && result.candidates[0] && result.candidates[0].content) {
+            var raw = result.candidates[0].content.parts[0].text.trim().toUpperCase();
+            if (raw !== "" && !raw.includes("NONE")) {
+              // 先嘗試套台灣車牌格式正規化（補連字號、O→0、I→1）；
+              // 套不出格式就照原樣回傳（與已驗證版本行為一致，絕不比它更嚴格）
+              var plate = extractPlate_(raw) || raw.replace(/[^A-Z0-9\-]/g, '');
+              if (plate) return jsonOut({ success: true, plate: plate, raw: raw, model: MODELS[mi] });
+            }
+            // 模型有回但判定沒車牌（NONE/空白）＝照片問題，換模型/金鑰也認不出來，直接回報
+            return jsonOut({ success: false, error: "辨識失敗：請確保照片清晰且包含車牌" });
+          }
+          // 沒有 candidates 也沒有 error（罕見），當暫時性問題繼續換
+          lastError = '模型無回應(' + MODELS[mi] + '/金鑰' + (ki + 1) + ')';
         }
-        // 沒有 candidates 也沒有 error（罕見），當暫時性問題換下一個模型
-        lastError = '模型無回應(' + MODELS[mi] + ')';
       }
-      return jsonOut({ success: false, error: '所有備援模型額度都已用完，請稍等 1 分鐘再拍，或手動輸入車牌。' + (lastError ? '（' + lastError + '）' : '') });
+      return jsonOut({ success: false, error: '所有模型×金鑰的額度都已用完，請稍等 1 分鐘再拍，或手動輸入車牌。' + (lastError ? '（' + lastError + '）' : '') });
     }
 
     // --- 功能 B: 資料登記到試算表 ---
