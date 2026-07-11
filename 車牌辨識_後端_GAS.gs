@@ -51,13 +51,6 @@ function doPost(e) {
       var apiKey = getApiKey_();
       if (!apiKey) return jsonOut({ success: false, error: 'API Key 未設定：請開 /exec 網址查看設定說明' });
 
-      // 解決 AQ 金鑰 OAuth 報錯：將 key 放在 URL 參數（與已驗證版本相同）
-      // 2026-07-11：曾改用固定機型 gemini-2.0-flash，結果這把金鑰對該機型
-      // 免費額度是 0（quota limit:0，非用完，是本來就沒配額），導致完全打不通。
-      // 改回 -latest 別名（原本就打得通，只是偶爾不穩），並用下方 thinkingConfig
-      // 關閉思考模式，防止「思考吃光 maxOutputTokens」的舊坑（2026-06-29 已踩過）。
-      var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + apiKey;
-
       // 清洗 Base64 資料
       var cleanBase64 = payload.imageBase64.split(',')[1] || payload.imageBase64;
 
@@ -90,24 +83,48 @@ function doPost(e) {
         "muteHttpExceptions": true
       };
 
-      var res = UrlFetchApp.fetch(url, options);
-      var resText = res.getContentText();
-      var result = JSON.parse(resText);
+      // 模型備援鏈：每個模型的免費額度分開計算，主模型額度用完（429/quota）
+      // 自動換下一個。2026-07-12 起因：-latest 被 Google 指到 gemini-3.5-flash，
+      // 免費層限 20 次/日，快速連拍很快撞頂（實機截圖確認）。
+      // 注意：2026-07-11 曾發現此金鑰對 gemini-2.0-flash 配額為 0（打不通），
+      // 所以備援鏈不放 2.0 系列；鏈上模型若配額為 0 也會自然跳下一個。
+      var MODELS = [
+        'gemini-flash-latest',      // 主力（現指 3.5-flash，最準）
+        'gemini-2.5-flash',         // 備援1
+        'gemini-2.5-flash-lite',    // 備援2（lite 免費額度較高）
+        'gemini-flash-lite-latest'  // 備援3
+      ];
+      var lastError = '';
+      for (var mi = 0; mi < MODELS.length; mi++) {
+        var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODELS[mi] + ':generateContent?key=' + apiKey;
+        var res = UrlFetchApp.fetch(url, options); // key 放 URL 參數：解決 AQ 金鑰 OAuth 報錯（已驗證版本作法）
+        var result = JSON.parse(res.getContentText());
 
-      if (result.error) {
-        return jsonOut({ success: false, error: "API 報錯: " + result.error.message });
-      }
-
-      if (result.candidates && result.candidates[0] && result.candidates[0].content) {
-        var raw = result.candidates[0].content.parts[0].text.trim().toUpperCase();
-        if (raw !== "" && !raw.includes("NONE")) {
-          // 先嘗試套台灣車牌格式正規化（補連字號、O→0、I→1）；
-          // 套不出格式就照原樣回傳（與已驗證版本行為一致，絕不比它更嚴格）
-          var plate = extractPlate_(raw) || raw.replace(/[^A-Z0-9\-]/g, '');
-          if (plate) return jsonOut({ success: true, plate: plate, raw: raw });
+        if (result.error) {
+          var msg = String(result.error.message || '');
+          var code = result.error.code || res.getResponseCode();
+          lastError = 'API 報錯(' + MODELS[mi] + '): ' + msg;
+          // 只有額度爆掉(429)/伺服器忙(500,503)才換下一個模型；
+          // 其他錯誤（請求格式、金鑰無效）換模型也沒用，直接回報。
+          if (code === 429 || code === 500 || code === 503 || /quota|exhausted|overloaded/i.test(msg)) continue;
+          return jsonOut({ success: false, error: lastError });
         }
+
+        if (result.candidates && result.candidates[0] && result.candidates[0].content) {
+          var raw = result.candidates[0].content.parts[0].text.trim().toUpperCase();
+          if (raw !== "" && !raw.includes("NONE")) {
+            // 先嘗試套台灣車牌格式正規化（補連字號、O→0、I→1）；
+            // 套不出格式就照原樣回傳（與已驗證版本行為一致，絕不比它更嚴格）
+            var plate = extractPlate_(raw) || raw.replace(/[^A-Z0-9\-]/g, '');
+            if (plate) return jsonOut({ success: true, plate: plate, raw: raw, model: MODELS[mi] });
+          }
+          // 模型有回但判定沒車牌（NONE/空白）＝照片問題，換模型也認不出來，直接回報
+          return jsonOut({ success: false, error: "辨識失敗：請確保照片清晰且包含車牌" });
+        }
+        // 沒有 candidates 也沒有 error（罕見），當暫時性問題換下一個模型
+        lastError = '模型無回應(' + MODELS[mi] + ')';
       }
-      return jsonOut({ success: false, error: "辨識失敗：請確保照片清晰且包含車牌" });
+      return jsonOut({ success: false, error: '所有備援模型額度都已用完，請稍等 1 分鐘再拍，或手動輸入車牌。' + (lastError ? '（' + lastError + '）' : '') });
     }
 
     // --- 功能 B: 資料登記到試算表 ---
