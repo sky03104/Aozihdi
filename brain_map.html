@@ -80,6 +80,36 @@
       line-height: 2.1; z-index: 100; pointer-events: none;
     }
 
+    /* ── 節點搜尋（貼在節點/關聯計數下方）───────────────── */
+    #node-search { position: fixed; top: 96px; left: 26px; z-index: 130; }
+    #ns-toggle {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: rgba(10,12,16,0.82); border: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(10px); color: #C9D1D9; font-size: 14px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: border-color .15s, background .15s;
+    }
+    #ns-toggle:hover { border-color: rgba(212,168,0,0.45); background: rgba(212,168,0,0.08); }
+    #node-search.open #ns-toggle { display: none; }
+    #ns-input {
+      display: none; width: 220px; background: rgba(10,12,16,0.92);
+      border: 1px solid rgba(212,168,0,0.35); border-radius: 8px; padding: 7px 10px;
+      color: #F5F5F5; font-size: 13px; font-family: 'Microsoft JhengHei', sans-serif; outline: none;
+    }
+    #node-search.open #ns-input { display: block; }
+    #ns-results {
+      display: none; margin-top: 6px; max-height: 300px; overflow-y: auto;
+      background: rgba(10,12,16,0.96); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px; backdrop-filter: blur(20px); box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    }
+    #node-search.open.has-results #ns-results { display: block; }
+    .ns-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .ns-item:last-child { border-bottom: none; }
+    .ns-item:hover, .ns-item.active { background: rgba(212,168,0,0.12); }
+    .ns-item .ns-title { font-size: 12px; color: #F0EDE6; font-weight: 600; }
+    .ns-item .ns-note { font-size: 10px; color: #6B7280; margin-top: 2px; line-height: 1.4;
+      overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    #ns-empty { padding: 10px 12px; font-size: 11px; color: #6B7280; }
+
     /* ── 喚醒 Claude Code 按鈕（浮動在圖例上方，避免疊到）───── */
     #claude-fab {
       position: fixed; bottom: 213px; right: 26px; z-index: 110;
@@ -167,6 +197,12 @@
 
 <div id="stats">
   <b id="s-nodes">0</b> 節點 &nbsp;·&nbsp; <b id="s-edges">0</b> 關聯
+</div>
+
+<div id="node-search">
+  <button id="ns-toggle" title="搜尋節點">🔍</button>
+  <input id="ns-input" type="text" placeholder="搜尋節點名稱…" autocomplete="off" />
+  <div id="ns-results"></div>
 </div>
 
 <div id="legend">
@@ -744,6 +780,79 @@ function moveDrag(x, y)  {
 }
 function endDrag()  { isDragging = false; canvas.style.cursor = 'grab'; autoTimer = setTimeout(() => { autoRotate = true; }, 5000); }
 function doZoom(d)  { sph.r = Math.max(2.2, Math.min(40, sph.r + d * 0.0025)); applySph(); }
+
+// ── 節點搜尋 ─────────────────────────────────────────────────
+// 61個節點只靠角色圖/地點圖識別，功能名稱（NODES[].title）平常看不到，
+// 只有滑過才知道——找不到特定節點時無從下手。加搜尋框：輸入名稱/說明
+// 關鍵字，點結果會轉動鏡頭對準該節點並持續高亮幾秒。
+let camAnim = null;             // {fromTheta, fromPhi, toTheta, toPhi, startT, dur, nodeIdx}
+let searchHighlightIdx = -1;
+let searchHighlightUntil = 0;
+
+function focusCameraOnNode(idx) {
+  const wp = worldPos[idx];
+  const wr = wp.length() || 1;
+  const toPhi = Math.acos(Math.max(-1, Math.min(1, wp.y / wr)));
+  let toTheta = Math.atan2(wp.x, wp.z);
+  // 走最短路徑轉過去，避免繞遠路轉一大圈
+  let dTheta = toTheta - sph.theta;
+  dTheta = ((dTheta + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+  toTheta = sph.theta + dTheta;
+
+  autoRotate = false; clearTimeout(autoTimer);
+  autoTimer = setTimeout(() => { autoRotate = true; }, 5000);
+
+  camAnim = { fromTheta: sph.theta, fromPhi: sph.phi, toTheta, toPhi, startT: clock.getElapsedTime(), dur: 0.6, nodeIdx: idx };
+}
+
+const nsRoot    = document.getElementById('node-search');
+const nsToggle  = document.getElementById('ns-toggle');
+const nsInput   = document.getElementById('ns-input');
+const nsResults = document.getElementById('ns-results');
+
+function nsOpen() { nsRoot.classList.add('open'); nsInput.focus(); }
+function nsClose() { nsRoot.classList.remove('open', 'has-results'); nsInput.value = ''; nsResults.innerHTML = ''; }
+
+function nsRunSearch(q) {
+  q = q.trim();
+  if (!q) { nsRoot.classList.remove('has-results'); nsResults.innerHTML = ''; return; }
+  const ql = q.toLowerCase();
+  const matches = NODES
+    .map((n, idx) => ({ n, idx }))
+    .filter(({ n }) => n.title.toLowerCase().includes(ql) || (n.note && n.note.toLowerCase().includes(ql)))
+    .slice(0, 15);
+  if (matches.length === 0) {
+    nsResults.innerHTML = '<div id="ns-empty">找不到符合「' + q.replace(/</g, '&lt;') + '」的節點</div>';
+    nsRoot.classList.add('has-results');
+    return;
+  }
+  nsResults.innerHTML = matches.map(({ n, idx }) =>
+    '<div class="ns-item" data-idx="' + idx + '">' +
+      '<div class="ns-title">' + n.title.replace(/</g, '&lt;') + '</div>' +
+      (n.note ? '<div class="ns-note">' + n.note.replace(/</g, '&lt;') + '</div>' : '') +
+    '</div>'
+  ).join('');
+  nsRoot.classList.add('has-results');
+}
+
+nsToggle.addEventListener('click', nsOpen);
+nsInput.addEventListener('input', () => nsRunSearch(nsInput.value));
+nsInput.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { nsClose(); nsInput.blur(); }
+  if (e.key === 'Enter') {
+    const first = nsResults.querySelector('.ns-item');
+    if (first) { focusCameraOnNode(parseInt(first.dataset.idx)); nsClose(); }
+  }
+});
+nsResults.addEventListener('click', e => {
+  const item = e.target.closest('.ns-item');
+  if (!item || item.dataset.idx === undefined) return;
+  focusCameraOnNode(parseInt(item.dataset.idx));
+  nsClose();
+});
+document.addEventListener('click', e => {
+  if (!nsRoot.contains(e.target)) nsClose();
+});
 
 canvas.addEventListener('mousedown', e => startDrag(e.clientX, e.clientY));
 window.addEventListener('mousemove', e => {
@@ -1642,16 +1751,38 @@ function animate() {
 
   if (autoRotate && !isDragging) { sph.theta += 0.0014; applySph(); }
 
+  // 搜尋結果轉鏡頭動畫：ease-out 轉到目標節點，轉到後亮節點+開tooltip
+  if (camAnim) {
+    const p = Math.min(1, (t - camAnim.startT) / camAnim.dur);
+    const ease = 1 - Math.pow(1 - p, 3);
+    sph.theta = camAnim.fromTheta + (camAnim.toTheta - camAnim.fromTheta) * ease;
+    sph.phi   = camAnim.fromPhi   + (camAnim.toPhi   - camAnim.fromPhi) * ease;
+    applySph();
+    if (p >= 1) {
+      const idx = camAnim.nodeIdx;
+      camAnim = null;
+      searchHighlightIdx = idx;
+      searchHighlightUntil = t + 3.5;
+      const scr = worldToScreen(worldPos[idx]);
+      if (scr) showTip(NODES[idx], scr.x, scr.y);
+    }
+  }
+
   glowSprites.forEach((sp, i) => {
-    const hl = sp.userData.highlighted;
+    const hl = sp.userData.highlighted || (i === searchHighlightIdx && t < searchHighlightUntil);
     const dim = sp.userData.isEmpty ? 0.53 : 1; // 空節點呼吸動畫等比縮小，不被每幀覆寫回原尺寸
     const s  = ((hl ? 0.95 : 0.54) + Math.sin(t * (hl ? 2.2 : 1.3) + i * 0.68) * (hl ? 0.16 : 0.07)) * dim;
     sp.scale.set(s, s, 1);
   });
   coreMeshes.forEach((core, i) => {
-    const target = glowSprites[i].userData.highlighted ? 1.6 : 1.0;
+    const hl = glowSprites[i].userData.highlighted || (i === searchHighlightIdx && t < searchHighlightUntil);
+    const target = hl ? 1.6 : 1.0;
     core.scale.setScalar(core.scale.x + (target - core.scale.x) * 0.12);
   });
+  if (searchHighlightIdx !== -1 && t >= searchHighlightUntil) {
+    if (hoveredIdx !== searchHighlightIdx) hideTip();
+    searchHighlightIdx = -1;
+  }
 
   raycaster.setFromCamera(mouseNDC, camera);
   const hits = raycaster.intersectObjects(hitMeshes);
