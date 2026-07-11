@@ -19064,12 +19064,17 @@ const MASCOT_CHARACTERS = [
     { id: 'sanji', name: '香吉士', img: './chars/sanji.png' },
     { id: 'kapo', name: '咖波', img: './chars/kapo.webp' },
     { id: 'bailan', name: '白爛貓', img: './chars/bailan.webp' },
+    { id: 'couplecat', name: '情侶貓', img: './chars/couplecat.webp' },
+    { id: 'wolfcat', name: '愛心小狼', img: './chars/wolfcat.webp' },
+    { id: 'sheep', name: '瞌睡羊', img: './chars/sheep.webp' },
+    { id: 'sunglasses_chicken', name: '墨鏡雞', img: './chars/sunglasses_chicken.webp' },
 ];
+const DEFAULT_MASCOT_ID = 'bailan';
 function MascotWidget({ empId }) {
     const posKey = `tianying_mascot_pos_${empId}`;
     const charKey = `tianying_mascot_char_${empId}`;
     const [charId, setCharId] = useState(() => {
-        try { return localStorage.getItem(charKey) || MASCOT_CHARACTERS[0].id; } catch (e) { return MASCOT_CHARACTERS[0].id; }
+        try { return localStorage.getItem(charKey) || DEFAULT_MASCOT_ID; } catch (e) { return DEFAULT_MASCOT_ID; }
     });
     const [pos, setPos] = useState(() => {
         try {
@@ -19148,7 +19153,7 @@ function MascotWidget({ empId }) {
 
     if (pos === null) return null; // 等 useEffect 量完頂欄位置再顯示，避免閃一下錯誤座標
 
-    const activeChar = MASCOT_CHARACTERS.find(c => c.id === charId) || MASCOT_CHARACTERS[0];
+    const activeChar = MASCOT_CHARACTERS.find(c => c.id === charId) || MASCOT_CHARACTERS.find(c => c.id === DEFAULT_MASCOT_ID) || MASCOT_CHARACTERS[0];
 
     return React.createElement(React.Fragment, null,
         React.createElement("div", {
