@@ -17715,10 +17715,20 @@ const css = `
   @keyframes fadeIn { from{opacity:0} to{opacity:1} }
   @keyframes slideUp { from{transform:translateY(70px);opacity:0} to{transform:translateY(0);opacity:1} }
 
-  /* 互動吉祥物 */
-  .mascot-widget { animation: mascotFloat 2.6s ease-in-out infinite; }
-  .mascot-widget:active { cursor:grabbing !important; animation-play-state:paused; }
-  @keyframes mascotFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+  /* 互動吉祥物：待機呼吸＋搖擺，拖曳時交給 inline 傾斜，放開落地回彈 */
+  .mascot-widget { animation: mascotIdle 3.2s ease-in-out infinite; transform-origin: 50% 88%; }
+  .mascot-widget.dragging { animation: none; cursor:grabbing !important; }
+  .mascot-widget.landing { animation: mascotLand .32s ease-out; }
+  @keyframes mascotIdle {
+    0%, 100% { transform: translateY(0) rotate(-2deg) scale(1); }
+    30% { transform: translateY(-7px) rotate(2deg) scale(1.03); }
+    60% { transform: translateY(-3px) rotate(-1deg) scale(1.015); }
+  }
+  @keyframes mascotLand {
+    0% { transform: scale(1,1); }
+    45% { transform: scale(1.14,0.82); }
+    100% { transform: scale(1,1); }
+  }
   .mascot-pick { border-radius:10px; padding:6px; cursor:pointer; text-align:center; transition:all .15s; }
   .mascot-pick:hover { transform:translateY(-2px); }
 
@@ -19067,7 +19077,10 @@ function MascotWidget({ empId }) {
         return { x: window.innerWidth - 84, y: window.innerHeight - 190 };
     });
     const [open, setOpen] = useState(false);
-    const dragRef = useRef({ dragging: false, moved: false, startX: 0, startY: 0, origX: 0, origY: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [tilt, setTilt] = useState(0);
+    const [landing, setLanding] = useState(false);
+    const dragRef = useRef({ dragging: false, moved: false, startX: 0, startY: 0, origX: 0, origY: 0, lastX: 0 });
 
     const clampPos = (x, y) => {
         const size = 64;
@@ -19078,7 +19091,8 @@ function MascotWidget({ empId }) {
 
     const handlePointerDown = (e) => {
         const point = e.touches ? e.touches[0] : e;
-        dragRef.current = { dragging: true, moved: false, startX: point.clientX, startY: point.clientY, origX: pos.x, origY: pos.y };
+        dragRef.current = { dragging: true, moved: false, startX: point.clientX, startY: point.clientY, origX: pos.x, origY: pos.y, lastX: point.clientX };
+        setIsDragging(true);
     };
 
     useEffect(() => {
@@ -19089,12 +19103,24 @@ function MascotWidget({ empId }) {
             const dy = point.clientY - dragRef.current.startY;
             if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragRef.current.moved = true;
             setPos(clampPos(dragRef.current.origX + dx, dragRef.current.origY + dy));
+            // 依左右移動速度傾斜身體，走位感更像被拖著跑
+            const stepX = point.clientX - dragRef.current.lastX;
+            dragRef.current.lastX = point.clientX;
+            setTilt(Math.max(-18, Math.min(18, stepX * 2.2)));
         };
         const handleUp = () => {
             if (!dragRef.current.dragging) return;
             dragRef.current.dragging = false;
+            setIsDragging(false);
+            setTilt(0);
             setPos(p => { try { localStorage.setItem(posKey, JSON.stringify(p)); } catch (e) {} return p; });
-            if (!dragRef.current.moved) setOpen(true);
+            if (!dragRef.current.moved) {
+                setOpen(true);
+            } else {
+                // 放開時落地回彈一下
+                setLanding(true);
+                setTimeout(() => setLanding(false), 340);
+            }
         };
         window.addEventListener('mousemove', handleMove);
         window.addEventListener('mouseup', handleUp);
@@ -19112,13 +19138,15 @@ function MascotWidget({ empId }) {
 
     return React.createElement(React.Fragment, null,
         React.createElement("div", {
-            className: 'mascot-widget',
+            className: `mascot-widget${isDragging ? ' dragging' : ''}${landing ? ' landing' : ''}`,
             onMouseDown: handlePointerDown,
             onTouchStart: handlePointerDown,
             style: {
                 position: 'fixed', left: pos.x, top: pos.y, width: 64, height: 64, zIndex: 90,
                 cursor: 'grab', touchAction: 'none', userSelect: 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transform: isDragging ? `rotate(${tilt}deg)` : undefined,
+                transition: isDragging ? 'transform 90ms ease-out' : undefined,
             }
         },
             React.createElement("img", {
