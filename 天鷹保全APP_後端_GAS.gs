@@ -2658,6 +2658,38 @@ function 測試群組哨表推播() {
 }
 
 // ════════════════════════════════════════════════════════════
+// 【診斷】明日/今日哨表重複姓名檢查 — 在編輯器執行看 Log
+// 若哨表頁面又出現同一人被算進早晚班兩次、或哨位/時間對不上，
+// 執行這個函式，Log 會列出每個「出現超過一次」的姓名＋其所有
+// loc/time，方便對照試算表原始儲存格找出是哪一格資料有問題。
+// ════════════════════════════════════════════════════════════
+function 診斷哨表重複姓名(sheetName) {
+  var full = parsePostFullList_(sheetName || POST_SHEET_NAME);
+  if (full.error) { Logger.log('解析失敗：' + full.error); return; }
+  Logger.log('日期：' + full.dateInfo.label + '　早班 ' + full.early.length + ' 人　晚班 ' + full.late.length + ' 人');
+
+  var byName = {};
+  var all = full.early.map(function (it) { return Object.assign({ block: '早班' }, it); })
+    .concat(full.late.map(function (it) { return Object.assign({ block: '晚班' }, it); }));
+  for (var i = 0; i < all.length; i++) {
+    var n = all[i].name;
+    if (!byName[n]) byName[n] = [];
+    byName[n].push(all[i]);
+  }
+  var dupCount = 0;
+  for (var name in byName) {
+    if (byName[name].length <= 1) continue;
+    dupCount++;
+    Logger.log('⚠️ 「' + name + '」出現 ' + byName[name].length + ' 次：');
+    for (var j = 0; j < byName[name].length; j++) {
+      var it2 = byName[name][j];
+      Logger.log('   - ' + it2.block + '｜' + it2.loc + '｜' + it2.time + '｜empId=' + it2.empId);
+    }
+  }
+  if (!dupCount) Logger.log('✅ 沒有姓名重複出現的項目。');
+}
+
+// ════════════════════════════════════════════════════════════
 // 【診斷】事故報告/匿名表揚 LINE 推播測試 — 在編輯器執行看 Log
 // ════════════════════════════════════════════════════════════
 function 測試事故表揚推播() {
@@ -2727,10 +2759,15 @@ function fillMergedCells_(sh, values) {
   return values;
 }
 
-function findPostLocation_(values, r, c, empSet) {
+function findPostLocation_(values, r, c, empSet, lateStartCol) {
   var timeRe = /(\d{4}-\d{4})/;
   var row = values[r];
-  var minC = (c >= 8) ? 8 : 0;
+  // 邊界必須跟 findLateBlockStartCol_ 動態偵測到的早/晚班分界一致，
+  // 否則某天表頭合併範圍跟預設值 8 不同時，往回找哨位名稱會跨過班別
+  // 邊界抓到對面班別的標籤（2026-07-13 踩坑：陳國榮的早班資料被誤標成
+  // 晚班的「帶隊幹部」「漢來飯店」）。沒傳入時退回舊預設 8，向下相容。
+  var boundary = (typeof lateStartCol === 'number') ? lateStartCol : 8;
+  var minC = (c >= boundary) ? boundary : 0;
   for (var cc = c - 1; cc >= minC; cc--) {
     var v = String(row[cc] == null ? '' : row[cc]).trim();
     if (!v) continue;
@@ -2819,6 +2856,7 @@ function parsePostSheet_(sheetName) {
   var nameMap = buildEmpNameMap_();
   var empSet = {}; for (var k in nameMap) empSet[k] = true;
   var timeRe = /(\d{4}-\d{4})/;
+  var lateStartCol = findLateBlockStartCol_(values);
 
   var hit = {};
   var noEmpId = {};
@@ -2836,7 +2874,7 @@ function parsePostSheet_(sheetName) {
       }
       var tm = raw.match(timeRe);
       var time = tm ? tm[1] : '依排班';
-      var loc = (raw.indexOf('帶隊幹部') !== -1) ? '帶隊幹部' : findPostLocation_(values, r, c, empSet);
+      var loc = (raw.indexOf('帶隊幹部') !== -1) ? '帶隊幹部' : findPostLocation_(values, r, c, empSet, lateStartCol);
       var empId = nameMap[name];
       if (!hit[empId]) hit[empId] = { name: name, posts: [] };
       var dup = false;
@@ -2879,6 +2917,10 @@ function parsePostFullList_(sheetName) {
   var lateStartCol = findLateBlockStartCol_(values);
 
   var early = [], late = [];
+  // 合併儲存格會把同一個值複製到範圍內每一欄，同一筆資料可能被掃到不只
+  // 一次；用「哨位+姓名+時間」去重，避免同一人在早/晚班區各自重複出現
+  // （2026-07-13 踩坑：陳國榮在晚班區出現兩筆不同哨位/時間的重複資料）。
+  var seenEarly = {}, seenLate = {};
   for (var r = 0; r < values.length; r++) {
     var row = values[r];
     for (var c = 0; c < row.length; c++) {
@@ -2887,9 +2929,14 @@ function parsePostFullList_(sheetName) {
       var name = extractPostName_(raw);
       if (!cnRe.test(name)) continue;
       var time = raw.match(timeRe)[1];
-      var loc = (raw.indexOf('帶隊幹部') !== -1) ? '帶隊幹部' : findPostLocation_(values, r, c, empSet);
+      var loc = (raw.indexOf('帶隊幹部') !== -1) ? '帶隊幹部' : findPostLocation_(values, r, c, empSet, lateStartCol);
       var item = { loc: loc, name: name, time: time, empId: nameMap[name] || '' };
-      if (c < lateStartCol) early.push(item); else late.push(item);
+      var key = loc + '|' + name + '|' + time;
+      if (c < lateStartCol) {
+        if (!seenEarly[key]) { seenEarly[key] = true; early.push(item); }
+      } else {
+        if (!seenLate[key]) { seenLate[key] = true; late.push(item); }
+      }
     }
   }
   var dateInfo = parsePostDate_(values);
