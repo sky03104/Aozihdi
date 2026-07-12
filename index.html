@@ -17418,6 +17418,46 @@ const css = `
   .app { min-height:100vh; display:flex; flex-direction:column; max-width:420px; margin:0 auto;
     background:var(--bg); position:relative; overflow-x:hidden; }
 
+  /* ── 個人化背景系統（2026-07-12）：內建預設用CSS漸層/動畫（零圖檔），自訂上傳存localStorage ── */
+  .bg-layer{position:fixed;top:0;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:420px;
+    z-index:0;pointer-events:none;overflow:hidden;background-size:cover;background-position:center}
+  .app.custombg{background:transparent}
+  .app.custombg .page{position:relative;z-index:1}
+  /* 自訂照片固定蓋深色遮罩，保住金字/白字可讀性（使用者不能關，防白底圖看不到字） */
+  .bgp-custom::after{content:'';position:absolute;inset:0;background:rgba(10,12,16,.55)}
+  /* 深色系預設 */
+  .bgp-navy{background:linear-gradient(165deg,#0A0E1A 0%,#101A33 45%,#0A0C14 100%)}
+  .bgp-goldmist{background:radial-gradient(ellipse at 20% 10%,rgba(212,168,0,.14),transparent 50%),
+    radial-gradient(ellipse at 85% 80%,rgba(212,168,0,.08),transparent 45%),#0B0D12}
+  .bgp-nebula{background:radial-gradient(ellipse at 75% 20%,rgba(129,140,248,.16),transparent 50%),
+    radial-gradient(ellipse at 15% 85%,rgba(88,60,160,.14),transparent 45%),#0A0B12}
+  .bgp-stars{background:#080A12}
+  .bgstar{position:absolute;background:#fff;border-radius:50%;animation:bgTw 3s infinite}
+  @keyframes bgTw{0%,100%{opacity:.15}50%{opacity:.9}}
+  .bgp-aurora{background:linear-gradient(120deg,#0A0C14,#0D1424,#101A2E,#0C1020,#0A0C14);
+    background-size:400% 400%;animation:bgAur 14s ease infinite}
+  @keyframes bgAur{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+  .bgp-dust{background:#0B0C11}
+  .bgdust{position:absolute;background:rgba(255,215,0,.55);border-radius:50%;bottom:-6px;animation:bgFl linear infinite}
+  @keyframes bgFl{0%{transform:translateY(0);opacity:0}12%{opacity:.7}85%{opacity:.4}100%{transform:translateY(-105vh);opacity:0}}
+  /* 亮色系預設 */
+  .bgp-sky{background:linear-gradient(170deg,#8FB8E8 0%,#C8DEF5 45%,#EAF3FC 100%)}
+  .bgp-sakura{background:linear-gradient(165deg,#F5C8D8 0%,#FBE3EC 50%,#FFF3F7 100%)}
+  .bgp-cloud{background:linear-gradient(120deg,#BFD8F0,#F0D8E8,#D8EFDF,#C8DCF2,#BFD8F0);
+    background-size:400% 400%;animation:bgAur 16s ease infinite}
+  .bgp-petal{background:linear-gradient(170deg,#F3CFDD 0%,#FBEAF1 60%,#FFF6FA 100%)}
+  .bgpetal{position:absolute;background:rgba(233,120,160,.55);border-radius:60% 40% 55% 45%;top:-10px;
+    animation:bgPt linear infinite}
+  @keyframes bgPt{0%{transform:translateY(-10px) rotate(0deg);opacity:0}10%{opacity:.8}
+    100%{transform:translateY(105vh) rotate(300deg);opacity:.2}}
+  /* 亮色補償：卡片轉深色實底、區塊標題轉深字、問候區加深色墊底（亮底配白字會看不見） */
+  .app.brightbg{--card:rgba(14,17,26,.82);--border:rgba(10,14,22,.25)}
+  .app.brightbg .section-title{color:#33405A;border-bottom-color:rgba(20,30,50,.25)}
+  .app.brightbg .home-greet{background:rgba(12,16,26,.6);backdrop-filter:blur(6px);
+    border-radius:12px;padding:10px 12px}
+  .app.brightbg .tool-card.raised{background:linear-gradient(160deg,rgba(212,168,0,.25),#1A2130 60%)}
+  .app.brightbg .tool-card.pressed{background:#141924;filter:saturate(.5) brightness(.85)}
+
   /* ── LOGO ANIMATIONS ── */
   @keyframes ring1 { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
   @keyframes ring2 { from{transform:rotate(0deg)} to{transform:rotate(-360deg)} }
@@ -17570,33 +17610,33 @@ const css = `
     text-transform:uppercase; margin-bottom:10px; padding-bottom:6px;
     border-bottom:1px solid rgba(255,255,255,.07); }
 
-  /* ── TOOL CARDS ── */
-  .tool-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  /* ── TOOL CARDS（2026-07-12 改B款：緊湊三欄，一頁可視9~12個） ── */
+  .tool-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
   .tool-card { background:var(--card); backdrop-filter:blur(10px);
-    border:1px solid var(--border); border-radius:var(--radius); padding:16px 12px;
-    display:flex; flex-direction:column; align-items:center; gap:8px;
+    border:1px solid var(--border); border-radius:12px; padding:10px 6px;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
     cursor:pointer; transition:border-color .2s,transform .15s,box-shadow .2s; text-align:center; }
   .tool-card:hover { border-color:var(--gold); transform:translateY(-2px);
     box-shadow:0 6px 20px rgba(212,168,0,.15); }
   .tool-card.locked { opacity:.35; cursor:not-allowed; }
-  /* 有功能且有權限：實體金色按鍵感（F款） */
+  /* 有功能且有權限：實體金色按鍵感（F款立體感，B款尺寸） */
   .tool-card.raised {
     background: linear-gradient(160deg, rgba(212,168,0,.16), #161B26 60%);
     border: 1px solid rgba(212,168,0,.5);
     border-top-color: rgba(255,225,120,.55);
     border-bottom-color: rgba(120,90,0,.7);
-    box-shadow: 0 7px 0 rgba(90,70,0,.55), 0 10px 18px rgba(0,0,0,.55), 0 0 16px rgba(212,168,0,.12),
+    box-shadow: 0 4px 0 rgba(90,70,0,.55), 0 6px 12px rgba(0,0,0,.5), 0 0 12px rgba(212,168,0,.1),
                 inset 0 1px 0 rgba(255,255,255,.15);
-    transform: translateY(-3px);
+    transform: translateY(-2px);
   }
   .tool-card.raised:hover {
-    box-shadow: 0 8px 0 rgba(90,70,0,.6), 0 12px 22px rgba(0,0,0,.6), 0 0 22px rgba(212,168,0,.22),
+    box-shadow: 0 5px 0 rgba(90,70,0,.6), 0 8px 16px rgba(0,0,0,.55), 0 0 16px rgba(212,168,0,.2),
                 inset 0 1px 0 rgba(255,255,255,.18);
-    transform: translateY(-4px);
+    transform: translateY(-3px);
   }
   .tool-card.raised:active {
-    transform: translateY(2px);
-    box-shadow: 0 2px 0 rgba(90,70,0,.5), inset 0 4px 10px rgba(0,0,0,.5);
+    transform: translateY(1px);
+    box-shadow: 0 1px 0 rgba(90,70,0,.5), inset 0 3px 8px rgba(0,0,0,.5);
   }
   /* 沒功能或沒權限：凹陷下沉感（F款） */
   .tool-card.pressed {
@@ -17604,14 +17644,14 @@ const css = `
     border: 1px solid rgba(0,0,0,.5);
     border-top-color: rgba(0,0,0,.65);
     border-bottom-color: rgba(255,255,255,.03);
-    box-shadow: inset 0 5px 12px rgba(0,0,0,.85), inset 0 -1px 0 rgba(255,255,255,.02);
+    box-shadow: inset 0 4px 10px rgba(0,0,0,.85), inset 0 -1px 0 rgba(255,255,255,.02);
     transform: translateY(1px);
     filter: saturate(.4) brightness(.7);
   }
-  .tool-card.pressed:hover { transform: translateY(1px); box-shadow: inset 0 5px 12px rgba(0,0,0,.85), inset 0 -1px 0 rgba(255,255,255,.02); }
-  .tool-emoji { font-size:26px; }
-  .tool-name { font-size:12px; font-weight:600; line-height:1.3; }
-  .tool-cat { font-size:10px; color:var(--muted); }
+  .tool-card.pressed:hover { transform: translateY(1px); box-shadow: inset 0 4px 10px rgba(0,0,0,.85), inset 0 -1px 0 rgba(255,255,255,.02); }
+  .tool-emoji { font-size:22px; }
+  .tool-name { font-size:11px; font-weight:600; line-height:1.25; }
+  .tool-cat { display:none; }
   .lock-badge { font-size:10px; background:rgba(248,113,113,.12); color:var(--error);
     border:1px solid rgba(248,113,113,.25); border-radius:4px; padding:1px 5px; }
 
@@ -19205,6 +19245,76 @@ function App() {
     const [page, setPage] = useState("login"); // login | register | home | tools | admin | profile
     const [tab, setTab] = useState("home");
     const [currentUser, setCurrentUser] = useState(null);
+    /* ── 個人化背景（存本機，換手機需重設）：type=none|navy|goldmist|nebula|stars|aurora|dust|sky|sakura|cloud|petal|custom ── */
+    const [bgType, setBgType] = useState(() => {
+        try { return localStorage.getItem('hsh_bg_type') || 'none'; } catch (e) { return 'none'; }
+    });
+    const [customBgData, setCustomBgData] = useState(() => {
+        try { return localStorage.getItem('hsh_bg_custom') || ''; } catch (e) { return ''; }
+    });
+    const BG_BRIGHT_SET = ['sky', 'sakura', 'cloud', 'petal'];
+    const BG_PRESETS = [
+        { id: 'none', name: '純黑（預設）' }, { id: 'navy', name: '深藍夜空' },
+        { id: 'goldmist', name: '暗金流光' }, { id: 'nebula', name: '暗紫星雲' },
+        { id: 'stars', name: '星空閃爍 ✨' }, { id: 'aurora', name: '深海極光 🌊' },
+        { id: 'dust', name: '金塵飄浮 ⭐' }, { id: 'sky', name: '晨曦藍天 ☀️' },
+        { id: 'sakura', name: '櫻花粉彩 🌸' }, { id: 'cloud', name: '彩雲流光 🌈' },
+        { id: 'petal', name: '花瓣飄落 💮' },
+    ];
+    const applyBgType = (t) => {
+        setBgType(t);
+        try { localStorage.setItem('hsh_bg_type', t); } catch (e) {}
+        if (t !== 'custom') showToast('🎨 背景已套用');
+    };
+    /* 自訂上傳：GIF保留動態直接存(限3MB)；一般照片縮到長邊1280再壓JPEG，控制localStorage用量 */
+    const handleBgUpload = (file) => {
+        if (!file) return;
+        if (file.type === 'image/gif') {
+            if (file.size > 3 * 1024 * 1024) { showToast('⚠️ 動圖請小於 3MB（太大會拖慢APP）', 'err'); return; }
+            const fr = new FileReader();
+            fr.onload = () => {
+                try {
+                    localStorage.setItem('hsh_bg_custom', fr.result);
+                    setCustomBgData(fr.result); applyBgType('custom'); showToast('🎨 動態背景已套用');
+                } catch (e) { showToast('⚠️ 手機儲存空間不足，請換小一點的圖', 'err'); }
+            };
+            fr.readAsDataURL(file);
+            return;
+        }
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            const MAX = 1280;
+            let w = img.width, h = img.height;
+            if (Math.max(w, h) > MAX) { const k = MAX / Math.max(w, h); w = Math.round(w * k); h = Math.round(h * k); }
+            const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+            cv.getContext('2d').drawImage(img, 0, 0, w, h);
+            const data = cv.toDataURL('image/jpeg', 0.8);
+            try {
+                localStorage.setItem('hsh_bg_custom', data);
+                setCustomBgData(data); applyBgType('custom'); showToast('🎨 自訂背景已套用');
+            } catch (e) { showToast('⚠️ 手機儲存空間不足，請換小一點的圖', 'err'); }
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); showToast('⚠️ 圖片讀取失敗', 'err'); };
+        img.src = url;
+    };
+    /* 粒子背景（星空/金塵/花瓣）的隨機位置：useMemo固定，避免每次重繪重新洗牌閃爍 */
+    const bgParticles = useMemo(() => {
+        if (bgType === 'stars') return Array.from({ length: 46 }, (_, i) => ({
+            k: i, cls: 'bgstar', s: (Math.random() * 2 + 1).toFixed(1),
+            l: (Math.random() * 100).toFixed(1), t: (Math.random() * 100).toFixed(1),
+            de: (Math.random() * 3).toFixed(1), du: (2 + Math.random() * 3).toFixed(1) }));
+        if (bgType === 'dust') return Array.from({ length: 16 }, (_, i) => ({
+            k: i, cls: 'bgdust', s: (Math.random() * 3 + 1.5).toFixed(1),
+            l: (Math.random() * 100).toFixed(1), t: null,
+            de: (Math.random() * 8).toFixed(1), du: (6 + Math.random() * 5).toFixed(1) }));
+        if (bgType === 'petal') return Array.from({ length: 14 }, (_, i) => ({
+            k: i, cls: 'bgpetal', s: (Math.random() * 6 + 5).toFixed(1),
+            l: (Math.random() * 100).toFixed(1), t: null,
+            de: (Math.random() * 9).toFixed(1), du: (7 + Math.random() * 6).toFixed(1) }));
+        return [];
+    }, [bgType]);
     const [regStep, setRegStep] = useState(1);
     const [toast, setToast] = useState(null);
     const [perms, setPerms] = useState(DEFAULT_PERMS);
@@ -20146,7 +20256,7 @@ function App() {
     const renderHome = () => {
         var _a;
         return (React.createElement("div", { className: "page" },
-            React.createElement("div", { style: { marginBottom: 16 } },
+            React.createElement("div", { className: "home-greet", style: { marginBottom: 16 } },
                 React.createElement("div", { style: { fontSize: 13, color: 'var(--muted)' } }, "\u65E9\u5B89\uFF0C"),
                 React.createElement("div", { style: { fontSize: 22, fontWeight: 900 } }, currentUser === null || currentUser === void 0 ? void 0 :
                     currentUser.name,
@@ -20493,6 +20603,27 @@ function App() {
                 t.icon,
                 " ",
                 t.name)))),
+            React.createElement("div", { className: "section-title", style: { marginBottom: 8 } }, "🎨 個人化背景"),
+            React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 } }, BG_PRESETS.map(p => (React.createElement("div", { key: p.id, onClick: () => applyBgType(p.id), style: {
+                    position: 'relative', borderRadius: 10, height: 58, cursor: 'pointer', overflow: 'hidden',
+                    border: bgType === p.id ? '2px solid var(--gold2)' : '1px solid var(--border)',
+                    boxShadow: bgType === p.id ? '0 0 10px rgba(255,215,0,.35)' : 'none' } },
+                React.createElement("div", { className: p.id === 'none' ? '' : 'bgp-' + p.id, style: {
+                        position: 'absolute', inset: 0, background: p.id === 'none' ? '#0A0C10' : undefined } }),
+                React.createElement("div", { style: {
+                        position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,.55)',
+                        fontSize: 9, padding: '3px 5px', color: '#fff', lineHeight: 1.2 } }, p.name),
+                bgType === p.id && React.createElement("div", { style: {
+                        position: 'absolute', top: 3, right: 5, fontSize: 12 } }, "✅"))))),
+            React.createElement("label", { style: { display: 'block', width: '100%', background: 'rgba(212,168,0,.1)',
+                    border: '1px dashed rgba(212,168,0,.45)', borderRadius: 8, padding: 12, fontSize: 13,
+                    color: 'var(--gold2)', textAlign: 'center', cursor: 'pointer', marginBottom: 6,
+                    fontFamily: "'Microsoft JhengHei',sans-serif" } },
+                "🖼️ 上傳自己的背景（支援GIF動圖）",
+                React.createElement("input", { type: 'file', accept: 'image/*', style: { display: 'none' },
+                    onChange: e => { handleBgUpload(e.target.files[0]); e.target.value = ''; } })),
+            React.createElement("div", { style: { fontSize: 10, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.6 } },
+                "背景存在這支手機本機，換手機需重設一次；自訂照片會自動蓋上深色遮罩保持文字清晰；動態背景較耗電"),
             React.createElement("button", { onClick: () => setChangePwModal(true), style: { width: '100%', background: 'linear-gradient(135deg,#6366F1,#818CF8)',
                     border: 'none', borderRadius: 8, padding: 13, fontSize: 14, fontWeight: 700,
                     color: '#fff', cursor: 'pointer', marginBottom: 10,
@@ -20518,8 +20649,15 @@ function App() {
         }
         setTab('admin');
     };
-    return (React.createElement("div", { className: "app" },
+    return (React.createElement("div", { className: "app" + (bgType !== 'none' ? ' custombg' : '') + (BG_BRIGHT_SET.includes(bgType) ? ' brightbg' : '') },
         React.createElement("style", null, css),
+        bgType !== 'none' && React.createElement("div", {
+            className: 'bg-layer bgp-' + bgType,
+            style: bgType === 'custom' && customBgData ? { backgroundImage: 'url(' + customBgData + ')' } : undefined
+        }, bgParticles.map(p => React.createElement("span", { key: p.k, className: p.cls, style: {
+                width: p.s + 'px', height: p.cls === 'bgpetal' ? (p.s * 0.75) + 'px' : p.s + 'px',
+                left: p.l + '%', top: p.t != null ? p.t + '%' : undefined,
+                animationDelay: p.de + 's', animationDuration: p.du + 's' } }))),
         toast && React.createElement("div", { className: `toast${toast.type === 'err' ? ' toast-err' : ''}` }, toast.msg),
         React.createElement("div", { className: "topbar" },
             React.createElement("div", { className: "topbar-logo" },
