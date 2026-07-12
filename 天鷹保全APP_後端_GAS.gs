@@ -2951,6 +2951,12 @@ function parsePostSheet_(sheetName) {
   for (var r = 0; r < values.length; r++) {
     var row = values[r];
     for (var c = 0; c < row.length; c++) {
+      // 早/晚班表頭合併範圍以外的欄位（例如另外獨立列在旁邊的「巡檢增派」
+      // 名單，跟哨位欄格完全脫鉤）直接跳過，不猜測歸屬、不亂貼哨位標籤。
+      // 2026-07-13 抓到：陳國榮的「帶隊幹部」「漢來飯店」兩筆重複，就是
+      // P欄一份獨立的增援名單被誤判成晚班資料，往回搜尋撞到晚班區最近
+      // 的文字硬貼上去的（P欄根本沒有對應哨位，跟陳國榮的班表無關）。
+      if (!colBlockMap[c]) continue;
       var raw = String(row[c] == null ? '' : row[c]).trim();
       if (!raw) continue;
       var name = extractPostName_(raw);
@@ -3012,6 +3018,10 @@ function parsePostFullList_(sheetName) {
   for (var r = 0; r < values.length; r++) {
     var row = values[r];
     for (var c = 0; c < row.length; c++) {
+      // 早/晚班表頭合併範圍以外的欄位直接跳過（見上方 2026-07-13 註解：
+      // 「巡檢增派」等獨立名單常常另外放在表格最右邊，沒有自己的哨位欄，
+      // 硬塞進晚班只會產生誤標的重複資料）。
+      if (!colBlockMap[c]) continue;
       var raw = String(row[c] == null ? '' : row[c]).trim();
       if (!raw || !timeRe.test(raw)) continue;
       var name = extractPostName_(raw);
@@ -3020,9 +3030,7 @@ function parsePostFullList_(sheetName) {
       var loc = (raw.indexOf('帶隊幹部') !== -1) ? '帶隊幹部' : findPostLocation_(values, r, c, empSet, lateStartCol, colBlockMap);
       var item = { loc: loc, name: name, time: time, empId: nameMap[name] || '' };
       var key = loc + '|' + name + '|' + time;
-      // 早/晚班判斷優先用表頭逐欄判斷（colBlockMap，早班增派欄不管落在
-      // 哪一欄都會正確歸類），該欄沒有表頭文字時才退回舊版單一分界欄位。
-      var block = colBlockMap[c] || (c < lateStartCol ? 'early' : 'late');
+      var block = colBlockMap[c];
       if (block === 'early') {
         if (!seenEarly[key]) { seenEarly[key] = true; early.push(item); }
       } else {
