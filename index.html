@@ -19120,7 +19120,16 @@ function MascotWidget({ empId }) {
     const [pos, setPos] = useState(() => {
         try {
             const saved = JSON.parse(localStorage.getItem(posKey) || 'null');
-            if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') return saved;
+            if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
+                // 2026-07-13 修：存起來的座標沒有跟著「現在視窗多大」重新校正，
+                // 換裝置/換視窗尺寸後舊座標可能落在畫面外，使用者看不到也拖不回來，
+                // 永久卡死（真實案例：left:1047.5px 但視窗遠沒那麼寬）。
+                // 讀回來的當下就用目前視窗大小夾回可視範圍內。
+                const size = 64;
+                const maxX = Math.max(8, window.innerWidth - size - 8);
+                const maxY = Math.max(8, window.innerHeight - size - 8);
+                return { x: Math.min(Math.max(saved.x, 8), maxX), y: Math.min(Math.max(saved.y, 8), maxY) };
+            }
         } catch (e) {}
         return null; // 首次掛載後才量得到頂欄位置，見下方 useEffect
     });
@@ -19180,15 +19189,20 @@ function MascotWidget({ empId }) {
                 setTimeout(() => setLanding(false), 340);
             }
         };
+        // 視窗尺寸中途改變（拉小視窗、轉螢幕方向）也重新夾回可視範圍，
+        // 不用等重新整理才校正（同一個bug的第二道防線）
+        const handleResize = () => setPos(p => (p ? clampPos(p.x, p.y) : p));
         window.addEventListener('mousemove', handleMove);
         window.addEventListener('mouseup', handleUp);
         window.addEventListener('touchmove', handleMove, { passive: false });
         window.addEventListener('touchend', handleUp);
+        window.addEventListener('resize', handleResize);
         return () => {
             window.removeEventListener('mousemove', handleMove);
             window.removeEventListener('mouseup', handleUp);
             window.removeEventListener('touchmove', handleMove);
             window.removeEventListener('touchend', handleUp);
+            window.removeEventListener('resize', handleResize);
         };
     }, [posKey]);
 
