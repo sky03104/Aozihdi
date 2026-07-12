@@ -19117,30 +19117,42 @@ function MascotWidget({ empId }) {
     const [charId, setCharId] = useState(() => {
         try { return localStorage.getItem(charKey) || DEFAULT_MASCOT_ID; } catch (e) { return DEFAULT_MASCOT_ID; }
     });
-    const [pos, setPos] = useState(() => {
-        try {
-            const saved = JSON.parse(localStorage.getItem(posKey) || 'null');
-            if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
-                // 2026-07-13 修：存起來的座標沒有跟著「現在視窗多大」重新校正，
-                // 換裝置/換視窗尺寸後舊座標可能落在畫面外，使用者看不到也拖不回來，
-                // 永久卡死（真實案例：left:1047.5px 但視窗遠沒那麼寬）。
-                // 讀回來的當下就用目前視窗大小夾回可視範圍內。
-                const size = 64;
-                const maxX = Math.max(8, window.innerWidth - size - 8);
-                const maxY = Math.max(8, window.innerHeight - size - 8);
-                return { x: Math.min(Math.max(saved.x, 8), maxX), y: Math.min(Math.max(saved.y, 8), maxY) };
-            }
-        } catch (e) {}
-        return null; // 首次掛載後才量得到頂欄位置，見下方 useEffect
-    });
+    // 2026-07-13 修：夾回範圍要對齊「.app 卡片本身」，不能用整個瀏覽器視窗。
+    // 手機直式畫面 .app 剛好貼滿全螢幕不會露餡，但桌面版寬視窗 .app 是置中
+    // 一小塊卡片（max-width:420px），用 window 當邊界會把吉祥物推到卡片
+    // 外面的空白區域，看起來像「跑到畫面外」（真實案例：桌面版PWA回報過）。
+    // 找不到 .app（極早期尚未掛載）才退回 window 當備援邊界。
+    const getBounds = () => {
+        const size = 64, pad = 8;
+        const el = document.querySelector('.app');
+        const rect = el ? el.getBoundingClientRect() : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+        return {
+            minX: rect.left + pad, minY: rect.top + pad,
+            maxX: Math.max(rect.left + pad, rect.right - size - pad),
+            maxY: Math.max(rect.top + pad, rect.bottom - size - pad),
+        };
+    };
+    const clampPos = (x, y) => {
+        const b = getBounds();
+        return { x: Math.min(Math.max(x, b.minX), b.maxX), y: Math.min(Math.max(y, b.minY), b.maxY) };
+    };
+
+    const [pos, setPos] = useState(null); // 首次掛載後才量得到 .app/頂欄位置，見下方 useEffect（存過的舊座標也在同一個effect裡校正）
 
     useEffect(() => {
         if (pos !== null) return;
+        try {
+            const saved = JSON.parse(localStorage.getItem(posKey) || 'null');
+            if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
+                setPos(clampPos(saved.x, saved.y)); // 換裝置/換視窗尺寸後的舊座標，對齊目前 .app 卡片重新夾回
+                return;
+            }
+        } catch (e) {}
         // 預設位置：貼在頂欄右下角（公告鈴鐺/大頭貼下方），topbar 這時才確定已掛載到 DOM
         const topbar = document.querySelector('.topbar');
         const next = topbar
             ? { x: topbar.getBoundingClientRect().right - 74, y: topbar.getBoundingClientRect().bottom + 10 }
-            : { x: window.innerWidth - 84, y: window.innerHeight - 190 };
+            : clampPos(window.innerWidth - 84, window.innerHeight - 190);
         setPos(next);
     }, [pos]);
     const [open, setOpen] = useState(false);
@@ -19148,13 +19160,6 @@ function MascotWidget({ empId }) {
     const [tilt, setTilt] = useState(0);
     const [landing, setLanding] = useState(false);
     const dragRef = useRef({ dragging: false, moved: false, startX: 0, startY: 0, origX: 0, origY: 0, lastX: 0 });
-
-    const clampPos = (x, y) => {
-        const size = 64;
-        const maxX = Math.max(8, window.innerWidth - size - 8);
-        const maxY = Math.max(8, window.innerHeight - size - 8);
-        return { x: Math.min(Math.max(x, 8), maxX), y: Math.min(Math.max(y, 8), maxY) };
-    };
 
     const handlePointerDown = (e) => {
         const point = e.touches ? e.touches[0] : e;
