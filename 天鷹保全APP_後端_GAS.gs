@@ -2725,7 +2725,7 @@ function 診斷哨表原始格內容(sheetName, maxRows) {
   }
 
   Logger.log('----- 合併儲存格範圍（列於前 ' + rowsToShow + ' 列內的）-----');
-  var ranges = sh.getMergedRanges();
+  var ranges = sh.getDataRange().getMergedRanges(); // getMergedRanges 是 Range 的方法，不是 Sheet 的（上次執行報錯就是這裡）
   var shown = 0;
   for (var i = 0; i < ranges.length; i++) {
     var rng = ranges[i];
@@ -2793,7 +2793,14 @@ var LOC_BLACKLIST_ = { '外圍': 1, '巡檢': 1, '哨位': 1, '姓名': 1, '帶�
 
 function fillMergedCells_(sh, values) {
   try {
-    var ranges = sh.getMergedRanges();
+    // 注意：getMergedRanges() 是 Range 的方法，不是 Sheet 的方法！
+    // 2026-07-13 抓到：這裡原本寫 sh.getMergedRanges()，Sheet 物件根本沒有
+    // 這個方法，每次呼叫都丟 TypeError，被外層 try/catch 整個吞掉——這個
+    // 函式從一開始就沒有真正執行過，所有合併儲存格的哨位標籤，只有合併
+    // 範圍左上角那一格讀得到值，其餘被合併蓋住的格子在 values 裡其實是
+    // 空的。這就是哨位常常「未標示」、或往回找標籤時撲空、跨欄跨去搜到
+    // 別排的哨位標籤（陳國榮被誤標成「帶隊幹部」「漢來飯店」）的真正原因。
+    var ranges = sh.getDataRange().getMergedRanges();
     for (var i = 0; i < ranges.length; i++) {
       var rng = ranges[i];
       var r0 = rng.getRow() - 1, c0 = rng.getColumn() - 1;
