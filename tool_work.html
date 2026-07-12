@@ -57,7 +57,7 @@ function doPost(e) {
 :root{
   --bg:#0A0C10;--bg2:#0D0F14;--sur:#111827;
   --gld:#D4A800;--gld2:#FFD700;--gld3:#C9A227;--gldg:rgba(212,168,0,.14);
-  --ind:#818CF8;--wrn:#FB923C;--red:#F87171;
+  --ind:#818CF8;--wrn:#FB923C;--red:#F87171;--grn:#4ADE80;
   --t1:#F5F5F5;--t2:#8A95A8;--t3:#4B5563;
   --bdr:rgba(255,255,255,.07);
 }
@@ -109,6 +109,7 @@ input[type=date]{color-scheme:dark}
 .vbtn{padding:.35rem .95rem;border-radius:20px;cursor:pointer;font-size:.84rem;font-weight:600;border:1px solid var(--bdr);background:var(--sur);color:var(--t2);transition:all .2s;display:flex;align-items:center;gap:.28rem;user-select:none}
 .vbtn.on-tonight{background:rgba(212,168,0,.12);border-color:var(--gld);color:var(--gld)}
 .vbtn.on-morning{background:rgba(129,140,248,.12);border-color:var(--ind);color:var(--ind)}
+.vbtn.on-applied{background:rgba(74,222,128,.12);border-color:var(--grn);color:var(--grn)}
 .vbtn.on-history{background:rgba(75,85,99,.12);border-color:var(--t3);color:#9CA3AF}
 
 /* ── SEARCH ── */
@@ -145,7 +146,7 @@ input[type=date]{color-scheme:dark}
 .card{background:var(--sur);border:1px solid var(--bdr);border-radius:12px;padding:.85rem;position:relative;overflow:hidden;transition:border-color .2s,box-shadow .2s}
 .card::before{content:'';position:absolute;left:0;top:0;width:3px;height:100%;background:var(--ca,transparent)}
 .card:hover{border-color:rgba(212,168,0,.2);box-shadow:0 4px 18px rgba(0,0,0,.32)}
-.c-tn{--ca:var(--gld)}.c-mo{--ca:var(--ind)}.c-hi{--ca:var(--t3)}.c-hw{--ca:var(--wrn)}
+.c-tn{--ca:var(--gld)}.c-mo{--ca:var(--ind)}.c-ap{--ca:var(--grn)}.c-hi{--ca:var(--t3)}.c-hw{--ca:var(--wrn)}
 .chead{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.52rem;gap:.35rem}
 .cdate-lbl{font-size:.78rem;font-weight:700;color:var(--t2);display:flex;align-items:center;gap:.22rem;flex-shrink:0;background:rgba(255,255,255,.05);border:1px solid var(--bdr);padding:.08rem .4rem;border-radius:5px}
 .cdate-lbl i{font-size:.72rem;color:var(--t3)}
@@ -259,6 +260,9 @@ input[type=date]{color-scheme:dark}
     </button>
     <button class="vbtn" id="vbtn-morning" onclick="switchView('morning')">
       <i class="ti ti-calendar-week"></i>明天
+    </button>
+    <button class="vbtn" id="vbtn-applied" onclick="switchView('applied')">
+      <i class="ti ti-calendar-plus"></i>已申請
     </button>
     <button class="vbtn" id="vbtn-history" onclick="switchView('history')">
       <i class="ti ti-history"></i>歷史
@@ -531,6 +535,7 @@ function getTodayStr(){
    過濾 + 排序
    今天 (tonight)：全天所有今日施工記錄
    明天 (morning)：明日記錄 + 今日通宵退場
+   已申請 (applied)：施工日期在明天之後的未來申請（今天/明天/歷史都查不到的區間）
    歷史 (history)：預設顯示近三日；有搜尋/日期則全量
 ══════════════════════════════════════════ */
 function filterRows(rows, view, search, histDate){
@@ -561,6 +566,12 @@ function filterRows(rows, view, search, histDate){
       if(g.s<=tmr && tmr<=g.e) return true;
       var ei=toInt(r['進場時間輸入']), xi=toInt(r['退場時間輸入']);
       return sameDay(g.s,today) && ei>=1700 && xi>=0 && xi<1200;
+    });
+  } else if(view==='applied'){
+    // 已申請：施工區間整段在明天之後才開始（今天/明天分頁涵蓋不到的未來申請）
+    res = rows.filter(function(r){
+      var g=jobRange(r);
+      return g && g.s>tmr;
     });
   } else {
     // 歷史：施工已結束（退場日期 < today）；進行中的跨日施工歸「今天」不留歷史
@@ -627,7 +638,7 @@ function maskName(s){
 
 function cardHtml(rec, view, isHot, idx){
   var today=d0(new Date());
-  var cls='card '+(isHot?'c-hw':view==='tonight'?'c-tn':view==='morning'?'c-mo':'c-hi');
+  var cls='card '+(isHot?'c-hw':view==='tonight'?'c-tn':view==='morning'?'c-mo':view==='applied'?'c-ap':'c-hi');
   // 晚上8點後，今晚頁籤把20:00前進場的舊資料用灰階弱化，20:00~24:00(含跨夜)進場維持原色凸顯
   var eveningDim = !isHot && isEveningSplitActive(view) && !isNightEntry(rec);
   if(eveningDim) cls+=' card-day-dim';
@@ -772,7 +783,8 @@ function render(){
   var preview=document.getElementById('stats-preview');
 
   sinp.placeholder = S.view==='tonight'?'搜尋今天記錄…（廠商、地點、監工）':
-                     S.view==='morning'?'搜尋明天記錄…':'搜尋歷史記錄…';
+                     S.view==='morning'?'搜尋明天記錄…':
+                     S.view==='applied'?'搜尋已申請記錄…':'搜尋歷史記錄…';
   dinp.style.display = S.view==='history'?'':'none';
   dinp.max = getTodayStr();
 
@@ -808,7 +820,7 @@ function render(){
     var isPreview = !S.search.trim() && !S.histDate;
     preview.style.display = isPreview ? '' : 'none';
   } else {
-    var vLbl = S.view==='tonight'?' 今天':' 明天';
+    var vLbl = S.view==='tonight'?' 今天':S.view==='morning'?' 明天':' 已申請';
     document.getElementById('stats-cnt').innerHTML='共 <em>'+filtered.length+'</em> 筆'+vLbl+'記錄';
     preview.style.display = 'none';
   }
@@ -817,10 +829,11 @@ function render(){
     (isHot?'動火申請查詢':'施工單查詢')+(S.view==='morning'?' · 含通宵退場':'');
 
   if(!filtered.length){
-    var ico =S.view==='tonight'?'ti-calendar-day':S.view==='morning'?'ti-calendar-week':'ti-archive';
-    var ttl =S.view==='tonight'?'今天無施工作業':S.view==='morning'?'明天無施工作業':'查無符合記錄';
+    var ico =S.view==='tonight'?'ti-calendar-day':S.view==='morning'?'ti-calendar-week':S.view==='applied'?'ti-calendar-plus':'ti-archive';
+    var ttl =S.view==='tonight'?'今天無施工作業':S.view==='morning'?'明天無施工作業':S.view==='applied'?'尚無已申請的未來排程':'查無符合記錄';
     var desc=S.view==='tonight'?'今日尚無進場記錄':
              S.view==='morning'?'今晚無通宵 / 明日無進場記錄':
+             S.view==='applied'?'目前沒有明天以後的申請記錄':
              (S.search.trim()?'請調整搜尋條件':'近三日無歷史資料');
     content.innerHTML='<div class="stctr"><i class="ti '+ico+' st-ico"></i>'
       +'<div class="st-h">'+ttl+'</div><div class="st-p">'+desc+'</div></div>';
@@ -945,7 +958,7 @@ function switchView(v){
   S.view=v; S.search=''; S.histDate=''; S.floor='';
   document.getElementById('sinp').value='';
   document.getElementById('dinp').value='';
-  ['tonight','morning','history'].forEach(function(x){
+  ['tonight','morning','applied','history'].forEach(function(x){
     document.getElementById('vbtn-'+x).className='vbtn'+(x===v?' on-'+x:'');
   });
   render();
