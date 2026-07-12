@@ -2690,6 +2690,57 @@ function 診斷哨表重複姓名(sheetName) {
 }
 
 // ════════════════════════════════════════════════════════════
+// 【診斷】哨表原始儲存格內容 dump — 在編輯器執行看 Log
+// 逐欄印出每一列有值的儲存格（含欄位英文字母 A/B/C…方便對照試算表），
+// 以及所有合併儲存格範圍。用來精準定位「哪一欄的資料被算錯」，
+// 不用再靠截圖猜欄位。預設只印前 6 列（表頭＋前幾個哨位就夠對照結構），
+// 需要印更多列可自行帶入 maxRows。
+// ════════════════════════════════════════════════════════════
+function 診斷哨表原始格內容(sheetName, maxRows) {
+  sheetName = sheetName || POST_SHEET_NAME;
+  maxRows = maxRows || 6;
+  var ss = SpreadsheetApp.openById(POST_SHEET_ID);
+  var sh = ss.getSheetByName(sheetName);
+  if (!sh) { Logger.log('找不到分頁：' + sheetName); return; }
+  var values = sh.getDataRange().getValues();
+
+  function colLetter(c) {
+    var s = '';
+    c++;
+    while (c > 0) { var m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - m) / 26); }
+    return s;
+  }
+
+  Logger.log('===== 分頁「' + sheetName + '」原始內容（未展開合併儲存格前）=====');
+  var rowsToShow = Math.min(maxRows, values.length);
+  for (var r = 0; r < rowsToShow; r++) {
+    var row = values[r];
+    var parts = [];
+    for (var c = 0; c < row.length; c++) {
+      var v = String(row[c] == null ? '' : row[c]).replace(/\n/g, '⏎');
+      if (v.trim() === '') continue;
+      parts.push(colLetter(c) + r + '=[' + v + ']');
+    }
+    Logger.log('R' + r + ': ' + (parts.length ? parts.join('  ') : '(全空)'));
+  }
+
+  Logger.log('----- 合併儲存格範圍（列於前 ' + rowsToShow + ' 列內的）-----');
+  var ranges = sh.getMergedRanges();
+  var shown = 0;
+  for (var i = 0; i < ranges.length; i++) {
+    var rng = ranges[i];
+    var r0 = rng.getRow() - 1, c0 = rng.getColumn() - 1;
+    if (r0 >= rowsToShow) continue;
+    Logger.log('merge: ' + colLetter(c0) + r0 + ' 起，' + rng.getNumRows() + '列×' + rng.getNumColumns() + '欄，值=[' +
+      String(values[r0] && values[r0][c0] != null ? values[r0][c0] : '').replace(/\n/g, '⏎') + ']');
+    shown++;
+  }
+  if (!shown) Logger.log('（前 ' + rowsToShow + ' 列內沒有合併儲存格，或此範圍內的合併都在更下面）');
+
+  Logger.log('===== 若要看更後面的哨位列，執行「診斷哨表原始格內容("' + sheetName + '", 20)」把列數加大 =====');
+}
+
+// ════════════════════════════════════════════════════════════
 // 【診斷】事故報告/匿名表揚 LINE 推播測試 — 在編輯器執行看 Log
 // ════════════════════════════════════════════════════════════
 function 測試事故表揚推播() {
@@ -2759,16 +2810,44 @@ function fillMergedCells_(sh, values) {
   return values;
 }
 
-function findPostLocation_(values, r, c, empSet, lateStartCol) {
+// 逐欄判斷屬於早班區還是晚班區：直接看表頭列（合併儲存格已被
+// fillMergedCells_ 展開複製到整個合併範圍）該欄底下寫的是「早班」還是
+// 「晚班」，而不是用單一欄位數字當分界。
+// 2026-07-13 踩坑：原本只用一個固定分界欄位數字（findLateBlockStartCol_
+// 抓到的第一個「晚班」欄），但哨表模板每天的「早班增派」欄實際位置會
+// 跟著當天人數浮動，只要早班增派欄位落在那個數字之後，就會被整批誤判
+// 成晚班（症狀：晚班每個哨位都多一筆時間是「1200-2000」的人，那其實
+// 是早班的8小時增派時段；陳國榮的1100-2200/2230也是早班12小時增派時段
+// 被誤標成晚班的「帶隊幹部」「漢來飯店」）。改成逐欄直接讀表頭文字，
+// 不管早班增派欄實際落在哪一欄，都能正確判斷。
+function buildColBlockMap_(values) {
+  var maxR = Math.min(values.length, 5);
+  var maxC = 0;
+  for (var r = 0; r < maxR; r++) if (values[r]) maxC = Math.max(maxC, values[r].length);
+  var map = {};
+  for (var c = 0; c < maxC; c++) {
+    for (var r = 0; r < maxR; r++) {
+      var row = values[r]; if (!row) continue;
+      var v = String(row[c] == null ? '' : row[c]).trim();
+      if (!v) continue;
+      if (v.indexOf('晚班') !== -1) { map[c] = 'late'; break; }
+      if (v.indexOf('早班') !== -1) { map[c] = 'early'; break; }
+    }
+  }
+  return map;
+}
+
+function findPostLocation_(values, r, c, empSet, lateStartCol, colBlockMap) {
   var timeRe = /(\d{4}-\d{4})/;
   var row = values[r];
-  // 邊界必須跟 findLateBlockStartCol_ 動態偵測到的早/晚班分界一致，
-  // 否則某天表頭合併範圍跟預設值 8 不同時，往回找哨位名稱會跨過班別
-  // 邊界抓到對面班別的標籤（2026-07-13 踩坑：陳國榮的早班資料被誤標成
-  // 晚班的「帶隊幹部」「漢來飯店」）。沒傳入時退回舊預設 8，向下相容。
+  var myBlock = colBlockMap ? colBlockMap[c] : undefined;
+  // 邊界退回舊版單一分界欄位數字，只在該欄沒有表頭文字可判斷時當備援。
   var boundary = (typeof lateStartCol === 'number') ? lateStartCol : 8;
   var minC = (c >= boundary) ? boundary : 0;
   for (var cc = c - 1; cc >= minC; cc--) {
+    // 逐欄表頭判斷優先：往回搜尋途中一旦跨到對面班別的欄位就停止，
+    // 沒有表頭文字可判斷的欄位（間隔欄）不會誤擋，直接放行繼續往回找。
+    if (colBlockMap && myBlock && colBlockMap[cc] && colBlockMap[cc] !== myBlock) break;
     var v = String(row[cc] == null ? '' : row[cc]).trim();
     if (!v) continue;
     if (timeRe.test(v)) continue;
@@ -2857,6 +2936,7 @@ function parsePostSheet_(sheetName) {
   var empSet = {}; for (var k in nameMap) empSet[k] = true;
   var timeRe = /(\d{4}-\d{4})/;
   var lateStartCol = findLateBlockStartCol_(values);
+  var colBlockMap = buildColBlockMap_(values);
 
   var hit = {};
   var noEmpId = {};
@@ -2874,7 +2954,7 @@ function parsePostSheet_(sheetName) {
       }
       var tm = raw.match(timeRe);
       var time = tm ? tm[1] : '依排班';
-      var loc = (raw.indexOf('帶隊幹部') !== -1) ? '帶隊幹部' : findPostLocation_(values, r, c, empSet, lateStartCol);
+      var loc = (raw.indexOf('帶隊幹部') !== -1) ? '帶隊幹部' : findPostLocation_(values, r, c, empSet, lateStartCol, colBlockMap);
       var empId = nameMap[name];
       if (!hit[empId]) hit[empId] = { name: name, posts: [] };
       var dup = false;
@@ -2915,6 +2995,7 @@ function parsePostFullList_(sheetName) {
   var timeRe = /(\d{4}-\d{4})/;
   var cnRe = /^[一-龥]{2,4}$/;
   var lateStartCol = findLateBlockStartCol_(values);
+  var colBlockMap = buildColBlockMap_(values);
 
   var early = [], late = [];
   // 合併儲存格會把同一個值複製到範圍內每一欄，同一筆資料可能被掃到不只
@@ -2929,10 +3010,13 @@ function parsePostFullList_(sheetName) {
       var name = extractPostName_(raw);
       if (!cnRe.test(name)) continue;
       var time = raw.match(timeRe)[1];
-      var loc = (raw.indexOf('帶隊幹部') !== -1) ? '帶隊幹部' : findPostLocation_(values, r, c, empSet, lateStartCol);
+      var loc = (raw.indexOf('帶隊幹部') !== -1) ? '帶隊幹部' : findPostLocation_(values, r, c, empSet, lateStartCol, colBlockMap);
       var item = { loc: loc, name: name, time: time, empId: nameMap[name] || '' };
       var key = loc + '|' + name + '|' + time;
-      if (c < lateStartCol) {
+      // 早/晚班判斷優先用表頭逐欄判斷（colBlockMap，早班增派欄不管落在
+      // 哪一欄都會正確歸類），該欄沒有表頭文字時才退回舊版單一分界欄位。
+      var block = colBlockMap[c] || (c < lateStartCol ? 'early' : 'late');
+      if (block === 'early') {
         if (!seenEarly[key]) { seenEarly[key] = true; early.push(item); }
       } else {
         if (!seenLate[key]) { seenLate[key] = true; late.push(item); }
