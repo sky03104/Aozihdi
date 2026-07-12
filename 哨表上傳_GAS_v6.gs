@@ -7,6 +7,10 @@
 var GUARD_SS_ID = '1sIcdAhw0mz5iM3F5fulDNPOda2pv-t7xUhT6XXf9X7Q';
 var HOLIDAY_API = 'https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/';
 var HISTORY_SHEET_NAME = '歷史哨表';
+// 早/晚班完整哨位表格只到 N 欄（第14欄）；P欄以後是使用者自己在來源
+// Excel 用來做下拉選單的選項清單，跟正式哨表無關，不應該寫進試算表
+// （2026-07-13 使用者確認：P欄以後只是輔助選單來源，不用寫入）。
+var GUARD_MAX_COLS = 14;
 
 function doPost(e) {
   try {
@@ -37,6 +41,9 @@ function handleGuardUpload(payload) {
   var colWidths   = payload.colWidths;
 
   if (!rows || !rows.length) throw new Error('未收到資料，請重試');
+
+  // 只保留早/晚班表格本身（A~N欄），下拉選單用的輔助欄位不寫進試算表
+  rows = rows.map(function (row) { return row.slice(0, GUARD_MAX_COLS); });
 
   var isHoliday = checkIsHoliday(year, month, day);
   var tgtSs = SpreadsheetApp.openById(GUARD_SS_ID);
