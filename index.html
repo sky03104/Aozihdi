@@ -18086,6 +18086,9 @@ function ok(obj) {
         const [prev, setPrev] = useState(null);
         const [upSt, setUpSt] = useState("drop");
         const fileRef = useRef();
+        /* ── 月班表橫向捲動位置：雲端資料回填會讓 MonthView 整個重新掛載（見下方說明），
+              用掛在 ScheduleApp 的 ref 記住捲動位置，重新掛載後復原，避免「查詢到一半彈回月初」 ── */
+        const monthScrollLeft = useRef(0);
         const canE = user && ROLE_LV[user.role] >= ROLE_LV["leader"] && curShift !== 'all';
         const canCaptain = user && ROLE_LV[user.role] >= ROLE_LV["captain"];
         const T = (msg, type = "ok") => { setToast({ msg, type }); setTimeout(() => setToast(null), 2800); };
@@ -18636,6 +18639,11 @@ function ok(obj) {
             const [staffSearch, setStaffSearch] = useState('');
             const list = selSt ? staff.filter(s => s.id === selSt) : filtered;
             const cols = Array.from({ length: DAYS }, (_, i) => i + 1);
+            const monthScrollEl = useRef(null);
+            /* 掛載時（含雲端資料回填造成的重新掛載）復原上次捲動位置 */
+            useEffect(() => {
+                if (monthScrollEl.current) monthScrollEl.current.scrollLeft = monthScrollLeft.current;
+            }, []);
             return (React.createElement("div", null,
                 React.createElement("div", { style: { padding: "8px 13px 4px" } },
                     React.createElement("div", { style: { position: "relative", marginBottom: 8 } },
@@ -18660,7 +18668,7 @@ function ok(obj) {
                             "\u627E\u4E0D\u5230\u300C",
                             staffSearch,
                             "\u300D")))),
-                React.createElement("div", { style: { overflowX: "auto", overflowY: "auto", maxHeight: "60vh", WebkitOverflowScrolling: "touch" } },
+                React.createElement("div", { ref: monthScrollEl, onScroll: e => { monthScrollLeft.current = e.target.scrollLeft; }, style: { overflowX: "auto", overflowY: "auto", maxHeight: "60vh", WebkitOverflowScrolling: "touch" } },
                     React.createElement("div", { style: { minWidth: 90 + cols.length * 30 } },
                         React.createElement("div", { style: { display: "flex", background: C.bg2, borderBottom: `1px solid ${C.cardBd}`, position: "sticky", top: 0, zIndex: 5 } },
                             React.createElement("div", { style: { width: 90, flexShrink: 0, padding: "6px 8px", fontSize: 12, color: C.textMute, fontWeight: 700, position: "sticky", left: 0, background: C.bg2, zIndex: 6 } }, "\u59D3\u540D"),
@@ -19344,7 +19352,13 @@ function App() {
     const [loginForm, setLoginForm] = useState({ id: "", pw: "", remember: false });
     const [regForm, setRegForm] = useState({ name: "", id: "", dept: "", role: "fulltime", pw: "", pw2: "" });
     const [searchQuery, setSearchQuery] = useState("");
-    const [tools, setTools] = useState(TOOLS);
+    /* ── 工具名稱/圖示/分類：管理員後台編輯後要跨裝置持久化，
+          用「覆寫表」(id → {icon,name,category}) 疊在寫死的 TOOLS 上，而非整包取代，
+          避免以後 TOOLS 新增工具時被舊的雲端/本機快取蓋掉 ── */
+    const [toolsOverrides, setToolsOverrides] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('tianying_tools_overrides') || '{}'); } catch (e) { return {}; }
+    });
+    const [tools, setTools] = useState(() => TOOLS.map(t => toolsOverrides[t.id] ? { ...t, ...toolsOverrides[t.id] } : t));
     const [users, setUsers] = useState(DEMO_USERS);
     const [pending, setPending] = useState(DEMO_PENDING);
     const [favorites, setFavorites] = useState(() => {
@@ -19805,6 +19819,25 @@ function App() {
             setWorkAllowedIds(d.workAllowedIds);
             try { localStorage.setItem('tianying_work_allowed_ids', JSON.stringify(d.workAllowedIds)); } catch (e) { }
         }
+        if (d.toolsConfig) {
+            try {
+                const tc = typeof d.toolsConfig === 'string' ? JSON.parse(d.toolsConfig) : d.toolsConfig;
+                if (tc && typeof tc === 'object') {
+                    setToolsOverrides(tc);
+                    setTools(TOOLS.map(t => tc[t.id] ? { ...t, ...tc[t.id] } : t));
+                    try { localStorage.setItem('tianying_tools_overrides', JSON.stringify(tc)); } catch (e) { }
+                }
+            } catch (e) { }
+        }
+    };
+    /* ── 管理員編輯工具名稱/圖示/分類後同步到雲端（系統設定分頁，跟 toolPerms 共用同一支 setSettings）── */
+    const saveToolsOverridesCloud = async (overrides) => {
+        try {
+            const body = new FormData();
+            body.append('action', 'setSettings');
+            body.append('data', JSON.stringify({ toolsConfig: JSON.stringify(overrides) }));
+            await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
+        } catch (e) { /* 離線：本機已存，其他裝置下次讀 getSettings 時會跟著同步 */ }
     };
     const loadLeaveSettings = async () => {
         try {
@@ -21494,6 +21527,10 @@ function App() {
                     React.createElement("select", { className: "select-inp", value: editingTool.category, onChange: e => setEditingTool({ ...editingTool, category: e.target.value }) }, [...new Set(TOOLS.map(t => t.category))].map(c => (React.createElement("option", { key: c }, c))))),
                 React.createElement("button", { className: "save-btn", onClick: () => {
                         setTools(prev => prev.map(t => t.id === editingTool.id ? editingTool : t));
+                        const nextOverrides = { ...toolsOverrides, [editingTool.id]: { icon: editingTool.icon, name: editingTool.name, category: editingTool.category } };
+                        setToolsOverrides(nextOverrides);
+                        try { localStorage.setItem('tianying_tools_overrides', JSON.stringify(nextOverrides)); } catch (e) { }
+                        saveToolsOverridesCloud(nextOverrides);
                         setEditingTool(null);
                         showToast("✅ 工具資訊已更新！");
                     } }, "\uD83D\uDCBE \u78BA\u8A8D\u5132\u5B58")))),

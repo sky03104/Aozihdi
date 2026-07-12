@@ -2346,6 +2346,7 @@ var SETTING_KEY_CAP_MORNING = 'leaveCapMorning';
 var SETTING_KEY_CAP_NIGHT   = 'leaveCapNight';
 var SETTING_KEY_TOOL_PERMS  = 'toolPerms';   // ★ 工具權限雲端同步用設定鍵
 var SETTING_KEY_WORK_ALLOWED = 'workAllowedIds'; // ★ 施工單查詢 正職/兼職個別白名單（JSON字串；空=不限制）
+var SETTING_KEY_TOOLS_CONFIG = 'toolsConfig'; // ★ 工具名稱/圖示/分類 覆寫表（JSON字串，id→{icon,name,category}；空=沿用預設）
 var DEFAULT_CAP_MORNING = 5;
 var DEFAULT_CAP_NIGHT   = 3;
 
@@ -2424,6 +2425,9 @@ function getSettings() {
         if (Array.isArray(waArr)) res.workAllowedIds = waArr;
       } catch (e2) {}
     }
+    // ★ 工具名稱/圖示/分類：有設定才回傳（空字串代表雲端尚未設定，前端沿用本機/預設）
+    var tc = readSettingStr_(SETTING_KEY_TOOLS_CONFIG, '');
+    if (tc) res.toolsConfig = tc;
     return jsonRes(res);
   } catch (err) {
     return jsonRes({status:'err', msg:err.toString(),
@@ -2474,6 +2478,11 @@ function setSettings(e) {
       writeSetting_(SETTING_KEY_WORK_ALLOWED, '');
     }
 
+    // ★ 工具名稱/圖示/分類覆寫表：前端有帶非空字串才寫入（toolsConfig 為 JSON 字串）
+    if (typeof d.toolsConfig === 'string' && d.toolsConfig.trim() !== '') {
+      writeSetting_(SETTING_KEY_TOOLS_CONFIG, d.toolsConfig);
+    }
+
     var res = {
       status: 'ok',
       leaveCapMorning: readSetting_(SETTING_KEY_CAP_MORNING, DEFAULT_CAP_MORNING),
@@ -2488,6 +2497,8 @@ function setSettings(e) {
         if (Array.isArray(waArr2)) res.workAllowedIds = waArr2;
       } catch (e3) {}
     }
+    var tc2 = readSettingStr_(SETTING_KEY_TOOLS_CONFIG, '');
+    if (tc2) res.toolsConfig = tc2;
     return jsonRes(res);
   } catch (err) {
     return jsonRes({status:'err', msg:err.toString()});
