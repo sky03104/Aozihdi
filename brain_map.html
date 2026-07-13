@@ -938,6 +938,16 @@ const RUN_IMG_MAP = {
   // 路飛跑步循環（2026-07-05 咖哩提供路飛5檔run_luffy5.gif，從跑步段第61~76幀
   // 抽6張側面跨步畫面，OpenCV GrabCut去背+去背景色去污法）：6張完整循環
   '路飛': ['run_luffy_f1.png','run_luffy_f2.png','run_luffy_f3.png','run_luffy_f4.png','run_luffy_f5.png','run_luffy_f6.png'],
+  // 2026-07-13 咖哩提供12格跑步姿勢格狀圖（黑底），去背(flood fill + FIXED_RANGE，
+  // 避免深色陰影漸層誤判成背景)+切格+縮圖量化後補齊：索隆/娜美/喬巴/山治/烏索普
+  // 各6欄x2列=12幀，羅是5欄x3列=15幀。ace/coby/jinbe/perona/brook/franky的來源圖
+  // 有暈光背景或角色互相重疊/數字標籤，品質不穩暫不處理，見技術經驗筆記。
+  '索隆': Array.from({length:12}, (_,i) => `run_zoro_f${i+1}.png`),
+  '娜美': Array.from({length:12}, (_,i) => `run_nami_f${i+1}.png`),
+  '喬巴': Array.from({length:12}, (_,i) => `run_chopper_f${i+1}.png`),
+  '山治': Array.from({length:12}, (_,i) => `run_sanji_f${i+1}.png`),
+  '烏索普': Array.from({length:12}, (_,i) => `run_usopp_f${i+1}.png`),
+  '羅': Array.from({length:15}, (_,i) => `run_law_f${i+1}.png`),
 };
 const RUN_IMAGES = {};
 Object.entries(RUN_IMG_MAP).forEach(([role, files]) => {
