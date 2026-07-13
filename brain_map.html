@@ -940,11 +940,17 @@ const RUN_IMG_MAP = {
   '路飛': ['run_luffy_f1.png','run_luffy_f2.png','run_luffy_f3.png','run_luffy_f4.png','run_luffy_f5.png','run_luffy_f6.png'],
   // 2026-07-13 咖哩提供12格跑步姿勢格狀圖（黑底），去背(flood fill + FIXED_RANGE，
   // 避免深色陰影漸層誤判成背景)+切格+縮圖量化後補齊：索隆/娜美/喬巴/山治/烏索普
-  // 各6欄x2列=12幀，羅是5欄x3列=15幀。ace/coby/jinbe/perona/brook/franky的來源圖
-  // 有暈光背景或角色互相重疊/數字標籤，品質不穩暫不處理，見技術經驗筆記。
+  // 各6欄x2列=12幀，羅是5欄x3列=15幀。
   '索隆': Array.from({length:12}, (_,i) => `run_zoro_f${i+1}.png`),
   '娜美': Array.from({length:12}, (_,i) => `run_nami_f${i+1}.png`),
   '喬巴': Array.from({length:12}, (_,i) => `run_chopper_f${i+1}.png`),
+  // 2026-07-13 咖哩重新出圖(改乾淨純黑或純白底、無重疊、無標籤)後補齊：
+  // 艾斯/佩羅娜是黑底，克比/甚平/布魯克是白底，去背腳本自動偵測背景色。
+  '艾斯': Array.from({length:12}, (_,i) => `run_ace_f${i+1}.png`),
+  '克比': Array.from({length:12}, (_,i) => `run_coby_f${i+1}.png`),
+  '甚平': Array.from({length:12}, (_,i) => `run_jinbe_f${i+1}.png`),
+  '佩羅娜': Array.from({length:12}, (_,i) => `run_perona_f${i+1}.png`),
+  '布魯克': Array.from({length:12}, (_,i) => `run_brook_f${i+1}.png`),
   '山治': Array.from({length:12}, (_,i) => `run_sanji_f${i+1}.png`),
   '烏索普': Array.from({length:12}, (_,i) => `run_usopp_f${i+1}.png`),
   '羅': Array.from({length:15}, (_,i) => `run_law_f${i+1}.png`),
