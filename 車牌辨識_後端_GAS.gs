@@ -100,11 +100,15 @@ function doPost(e) {
       // 快速連拍很快撞頂（實機截圖確認）。
       // 注意：2026-07-11 曾發現金鑰對 gemini-2.0-flash 配額為 0（打不通），
       // 所以備援鏈不放 2.0 系列；鏈上模型若配額為 0 也會自然跳下一個。
+      // 2026-07-14 移除 gemini-2.5-flash：Google 已下架此模型（"no longer available to
+      // new users"），回應是 HTTP 200 包一個文字錯誤、沒有標準 429/500/503 碼，舊版重試判斷
+      // 判不出來會直接中止整個請求，導致鏈上排在它後面的健康模型（2.5-flash-lite、
+      // flash-lite-latest）完全沒機會被試到——金鑰越多，越容易先耗光主模型額度後撞上這個
+      // 死模型，反而讓成功率變差，這才是「多把金鑰額度不升反降」的真正原因。
       var MODELS = [
         'gemini-flash-latest',      // 主力（現指 3.5-flash，最準）
-        'gemini-2.5-flash',         // 備援1
-        'gemini-2.5-flash-lite',    // 備援2（lite 免費額度較高）
-        'gemini-flash-lite-latest'  // 備援3
+        'gemini-2.5-flash-lite',    // 備援1（lite 免費額度較高）
+        'gemini-flash-lite-latest'  // 備援2
       ];
       var lastError = '';
       var deadKeys = {}; // 金鑰無效/沒權限 → 之後的模型也不用再試這把
@@ -123,6 +127,9 @@ function doPost(e) {
             if (code === 429 || code === 500 || code === 503 || /quota|exhausted|overloaded/i.test(msg)) continue;
             // 金鑰本身壞掉（無效/沒權限）→ 這把作廢，換下一把；不是最後一把就繼續
             if (code === 400 && /api key/i.test(msg) || code === 403) { deadKeys[ki] = true; continue; }
+            // 模型被下架/找不到（Google 常包成 HTTP 200 + 文字訊息，沒有標準錯誤碼）
+            // → 這個模型對所有金鑰都沒用，直接跳下一個模型，不要整組中止
+            if (/no longer available|not found|not supported/i.test(msg)) break;
             // 其他錯誤（請求格式等）換金鑰/模型也沒用，直接回報
             return jsonOut({ success: false, error: lastError });
           }
