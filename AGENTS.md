@@ -105,6 +105,7 @@ tianying-security/
 只有在確認過上述狀態後，才開始處理咖哩這次的請求。
 
 ### 工作流程（一律遵守）
+0. **中大型任務先講清楚再動手＋三方會議審查**：全域規則，見 `~/.claude/rules/10-model-dispatch.md`「動手前先講清楚」與「三方會議審查」兩節（適用所有專案，不是天鷹專屬）。三方會議審查用到的天鷹審查角色：`code-reviewer`/`simplicity-reviewer`/`standards-gatekeeper`。
 1. **改檔前**：用一兩句說明做什麼 → 直接修改 → 測試（node --check、QA 檢查清單）
 2. **Commit 前**：
    - ✅ node --check 通過
