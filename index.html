@@ -17836,6 +17836,7 @@ const ScheduleApp = (() => {
         離: { label: "離職", time: "—", color: C.textMute, bg: "rgba(31,41,55,0.4)", hours: 0 },
         國例: { label: "國定補假", time: "—", color: "#FCD34D", bg: "rgba(217,119,6,0.2)", hours: 0 },
         休B: { label: "停休加班", time: "—", color: "#EADC00", bg: "rgba(234,220,0,0.30)", hours: 12 },
+        休A: { label: "停休加班", time: "—", color: "#EADC00", bg: "rgba(234,220,0,0.30)", hours: 12 },
     };
     /* 自訂班別：從 localStorage 載入使用者新增的班別代號，套入 SHIFT_TYPES */
     (function() { try { const cs = JSON.parse(localStorage.getItem('tianying_custom_shifts') || '{}'); Object.assign(SHIFT_TYPES, cs); } catch(e) {} })();
@@ -18086,9 +18087,10 @@ function ok(obj) {
         const [prev, setPrev] = useState(null);
         const [upSt, setUpSt] = useState("drop");
         const fileRef = useRef();
-        /* ── 月班表橫向捲動位置：雲端資料回填會讓 MonthView 整個重新掛載（見下方說明），
-              用掛在 ScheduleApp 的 ref 記住捲動位置，重新掛載後復原，避免「查詢到一半彈回月初」 ── */
+        /* ── 月班表捲動位置（橫向+縱向）：雲端資料回填會讓 MonthView 整個重新掛載（見下方說明），
+              用掛在 ScheduleApp 的 ref 記住捲動位置，重新掛載後復原，避免「查詢到一半彈回月初/最上面」 ── */
         const monthScrollLeft = useRef(0);
+        const monthScrollTop = useRef(0);
         const canE = user && ROLE_LV[user.role] >= ROLE_LV["leader"] && curShift !== 'all';
         const canCaptain = user && ROLE_LV[user.role] >= ROLE_LV["captain"];
         const T = (msg, type = "ok") => { setToast({ msg, type }); setTimeout(() => setToast(null), 2800); };
@@ -18642,7 +18644,10 @@ function ok(obj) {
             const monthScrollEl = useRef(null);
             /* 掛載時（含雲端資料回填造成的重新掛載）復原上次捲動位置 */
             useEffect(() => {
-                if (monthScrollEl.current) monthScrollEl.current.scrollLeft = monthScrollLeft.current;
+                if (monthScrollEl.current) {
+                    monthScrollEl.current.scrollLeft = monthScrollLeft.current;
+                    monthScrollEl.current.scrollTop = monthScrollTop.current;
+                }
             }, []);
             return (React.createElement("div", null,
                 React.createElement("div", { style: { padding: "8px 13px 4px" } },
@@ -18668,7 +18673,7 @@ function ok(obj) {
                             "\u627E\u4E0D\u5230\u300C",
                             staffSearch,
                             "\u300D")))),
-                React.createElement("div", { ref: monthScrollEl, onScroll: e => { monthScrollLeft.current = e.target.scrollLeft; }, style: { overflowX: "auto", overflowY: "auto", maxHeight: "60vh", WebkitOverflowScrolling: "touch" } },
+                React.createElement("div", { ref: monthScrollEl, onScroll: e => { monthScrollLeft.current = e.target.scrollLeft; monthScrollTop.current = e.target.scrollTop; }, style: { overflowX: "auto", overflowY: "auto", maxHeight: "60vh", WebkitOverflowScrolling: "touch" } },
                     React.createElement("div", { style: { minWidth: 90 + cols.length * 30 } },
                         React.createElement("div", { style: { display: "flex", background: C.bg2, borderBottom: `1px solid ${C.cardBd}`, position: "sticky", top: 0, zIndex: 5 } },
                             React.createElement("div", { style: { width: 90, flexShrink: 0, padding: "6px 8px", fontSize: 12, color: C.textMute, fontWeight: 700, position: "sticky", left: 0, background: C.bg2, zIndex: 6 } }, "\u59D3\u540D"),
@@ -18798,7 +18803,7 @@ function ok(obj) {
             const [showAdd, setShowAdd] = useState(false);
             const [addForm, setAddForm] = useState({ code: '', label: '', time: '', hours: '', color: '#60A5FA' });
             const saveST = (extra) => {
-                const baseCodes = new Set(["B","海","A","S","L","H","H2","LN","N","休","排休","事","病","補","見","離","國例","休B"]);
+                const baseCodes = new Set(["B","海","A","S","L","H","H2","LN","N","休","排休","事","病","補","見","離","國例","休B","休A"]);
                 const custom = Object.entries(SHIFT_TYPES)
                     .filter(([k]) => !baseCodes.has(k))
                     .map(([code, v]) => ({ code, label: v.label, time: v.time, hours: v.hours, color: v.color }));
