@@ -1333,6 +1333,44 @@ function unbindLine_internal_(lineUserId) {
 
 var LEAVE_APPROVER_ROLES_ = ['captain', 'vicecaptain', 'leader', 'admin', 'executive'];
 
+// 2026-07-14：請假送出通知改版——LINE 免費推播額度有限，原本整部門主管
+// 全推太浪費。角色階級 captain(隊長) > vicecaptain(副隊長) > leader(帶班
+// 幹部)，同班別只推給階級最高的一位；並列最高就都推（現況咖哩確認同班
+// 別不會並列，但保留這個容錯，避免哪天真的並列時漏推）。
+// admin 不分班別、不分部門，維持全部都收；executive 改為不再自動收。
+var LEAVE_ROLE_RANK_ = { captain: 1, vicecaptain: 2, leader: 3 };
+
+// 找「該部門＋該班別」階級最高的主管（可能並列多位）＋不分班別都收的 admin
+function getShiftLeaveSupervisors_(dept, shift) {
+  var sh = getUserDbSheet_();
+  var data = sh.getDataRange().getValues();
+  var shiftIdx = colIndexByName_(sh, '班別');
+  var list = [];
+  var bestRank = null;
+  var bestOnes = [];
+  for (var r = 1; r < data.length; r++) {
+    var empId = String(data[r][0]);
+    if (!empId) continue;
+    var role = String(data[r][3]);
+    var udept = String(data[r][4]);
+    var status = String(data[r][5] || 'active');
+    if (status !== 'active') continue;
+    if (role === 'admin') { list.push({ empId: empId, name: String(data[r][1]), role: role }); continue; }
+    var rank = LEAVE_ROLE_RANK_[role];
+    if (rank === undefined) continue; // vicecaptain/leader/captain 以外（含 executive）不再自動推
+    if (udept !== dept) continue;
+    var sv = (shiftIdx >= 0) ? String(data[r][shiftIdx] || '').trim() : '';
+    if (sv !== shift) continue;
+    if (bestRank === null || rank < bestRank) {
+      bestRank = rank;
+      bestOnes = [{ empId: empId, name: String(data[r][1]), role: role }];
+    } else if (rank === bestRank) {
+      bestOnes.push({ empId: empId, name: String(data[r][1]), role: role });
+    }
+  }
+  return list.concat(bestOnes);
+}
+
 var LEAVE_TYPE_COLOR_ = {
   '事假': '#FB923C',
   '病假': '#F87171',
@@ -1609,7 +1647,7 @@ function buildLeaveResultFlex_(leaveInfo, decision) {
 
 function notifyLeaveSubmitted_(d) {
   try {
-    var supervisors = getDeptSupervisors_(d.dept || '');
+    var supervisors = getShiftLeaveSupervisors_(d.dept || '', d.shift || '');
     if (supervisors.length === 0) return;
 
     var flex = buildLeaveApprovalFlex_(d);
@@ -2574,6 +2612,7 @@ function 初始化早晚班分軌() {
 // ════════════════════════════════════════════════════════════
 function 測試請假推播() {
   var dept = '漢神巨蛋';  // 要測的部門
+  var shift = '早班';     // 要測的班別（早班/晚班）
   Logger.log('===== 請假推播診斷開始 =====');
 
   // 1. Token 是否存在
@@ -2581,12 +2620,12 @@ function 測試請假推播() {
   Logger.log('① LINE Token：' + (token ? '存在（長度 ' + token.length + '）' : '❌ 不存在！請到 專案設定→指令碼屬性 設定 LINE_CHANNEL_ACCESS_TOKEN'));
   if (!token) { Logger.log('===== 中止：沒有 Token ====='); return; }
 
-  // 2. 篩出該部門主管
-  var supervisors = getDeptSupervisors_(dept);
-  Logger.log('② 篩到主管 ' + supervisors.length + ' 人：' +
+  // 2. 篩出「該部門＋該班別」階級最高的主管 + admin（2026-07-14 改版：不再整部門全推）
+  var supervisors = getShiftLeaveSupervisors_(dept, shift);
+  Logger.log('② 篩到 ' + shift + ' 通知對象 ' + supervisors.length + ' 人：' +
     supervisors.map(function(s){ return s.name + '(' + s.empId + '/' + s.role + ')'; }).join('、'));
   if (supervisors.length === 0) {
-    Logger.log('❌ 沒篩到任何主管 → 檢查帳號管理分頁：部門是否為「' + dept + '」、角色是否為審核角色、狀態是否 active');
+    Logger.log('❌ 沒篩到任何通知對象 → 檢查帳號管理分頁：部門是否為「' + dept + '」、班別是否為「' + shift + '」、角色是否為 captain/vicecaptain/leader/admin、狀態是否 active');
     Logger.log('===== 中止 ====='); return;
   }
 
