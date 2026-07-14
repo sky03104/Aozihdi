@@ -275,20 +275,20 @@ const NODES = [
 
   // ── 主控台核心 ──
   { id: 0, title: '主控台 index.html', topic: 'core', pos: [0.0, 0.0, 0.45], note: '主選單/登入/公告/工具權限/首頁卡片，編譯後 React.createElement（非 JSX）；首頁「宣導事項」按鈕(原可用工具卡)＋公告跑馬燈置頂輪播' },
-  { id: 1, title: '登入與角色系統', topic: 'core', pos: [-0.3897, 0.0, -0.225], note: 'localStorage hsh_session_user；CAN_MANAGE_ROLES 控管理職可見' },
-  { id: 2, title: '首頁待審卡片', topic: 'core', pos: [0.3897, 0.0, -0.225], note: '待審請假/帳號/報告/表揚反應；報告、表揚兩格限 executive/admin' },
+  { id: 1, title: '登入與角色系統', topic: 'core', pos: [0.174, 0.0, -0.435], note: 'localStorage hsh_session_user；CAN_MANAGE_ROLES 控管理職可見（2026-07-15 咖哩手繪佈局微調：艾斯莫比迪克號往右移）' },
+  { id: 2, title: '首頁待審卡片', topic: 'core', pos: [0.3897, -0.9, -0.225], note: '待審請假/帳號/報告/表揚反應；報告、表揚兩格限 executive/admin（2026-07-15 咖哩手繪佈局微調：薩波革命軍本部往下移）' },
 
   // ── 前端工具（直立雙圈環繞核心） ──
-  { id: 3, title: '事故報告工具', topic: 'tools', pos: [2.3, 0.4, 0.0], note: 'tool_report.html；?mode=admin 主管審閱（未讀/待處理/已處理）' },
-  { id: 4, title: '匿名表揚/反應', topic: 'tools', pos: [1.15, 0.4, 1.9919], note: 'tool_feedback.html；前台匿名，主管裁決寫「處置」欄' },
-  { id: 5, title: '開店前進出登錄', topic: 'tools', pos: [-1.15, 0.4, 1.9919], note: 'tool_opening.html 獨立檔，雙 GAS（共用 _SharedDB）' },
-  { id: 6, title: '打烊後快速登錄', topic: 'tools', pos: [-2.3, 0.4, 0.0], note: 'index 內嵌 tpl-closing（base64）' },
-  { id: 7, title: '今/明日哨表', topic: 'tools', pos: [-1.15, 0.4, -1.9919], note: 'post.html，iframe src 串接；今日/明日切換鈕，未更新顯示「尚未更新」；每日08:00自動快照明日哨表→今日哨表（gid不變、完全靜默）' },
-  { id: 8, title: '班表查詢', topic: 'tools', pos: [1.15, 0.4, -1.9919], note: 'ScheduleApp；SHIFT_TYPES 班別代號（早/晚班）' },
-  { id: 9, title: '緊急聯絡清單', topic: 'tools', pos: [1.9919, -0.4, 1.15], note: 'tpl-emergency；normalizePhone 補回開頭 0' },
-  { id: 10, title: '資料上傳工具', topic: 'tools', pos: [0.0, -0.4, 2.3], note: 'tpl-upload（base64 內嵌）；施工單/班表/哨表，SheetJS 解析 Excel；獨立版見 cec-up(id32)' },
-  { id: 11, title: '簽到/車輛/工作', topic: 'tools', pos: [-1.9919, -0.4, 1.15], note: 'tool_signin / tool_car / tool_work；施工單查詢(id9)新增正職/兼職個人白名單(workAllowedIds)，組長以上不受影響，tool_work.html 自帶檢查防貼網址繞過' },
-  { id: 12, title: '請假申請', topic: 'tools', pos: [-1.9919, -0.4, -1.15], note: 'liff_leave + 雲端請假清單' },
+  { id: 3, title: '事故報告工具', topic: 'tools', pos: [2.99, 0.52, 0.0], note: 'tool_report.html；?mode=admin 主管審閱（未讀/待處理/已處理）（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
+  { id: 4, title: '匿名表揚/反應', topic: 'tools', pos: [1.495, 0.52, 2.5895], note: 'tool_feedback.html；前台匿名，主管裁決寫「處置」欄（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
+  { id: 5, title: '開店前進出登錄', topic: 'tools', pos: [-1.495, 0.52, 2.5895], note: 'tool_opening.html 獨立檔，雙 GAS（共用 _SharedDB）（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
+  { id: 6, title: '打烊後快速登錄', topic: 'tools', pos: [-2.99, 0.52, 0.0], note: 'index 內嵌 tpl-closing（base64）（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
+  { id: 7, title: '今/明日哨表', topic: 'tools', pos: [-1.495, 0.52, -2.5895], note: 'post.html，iframe src 串接；今日/明日切換鈕，未更新顯示「尚未更新」；每日08:00自動快照明日哨表→今日哨表（gid不變、完全靜默）（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
+  { id: 8, title: '班表查詢', topic: 'tools', pos: [1.495, 0.52, -2.5895], note: 'ScheduleApp；SHIFT_TYPES 班別代號（早/晚班）（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
+  { id: 9, title: '緊急聯絡清單', topic: 'tools', pos: [2.5895, -0.52, 1.495], note: 'tpl-emergency；normalizePhone 補回開頭 0（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
+  { id: 10, title: '資料上傳工具', topic: 'tools', pos: [-3.864, 0.0, 1.035], note: 'tpl-upload（base64 內嵌）；施工單/班表/哨表，SheetJS 解析 Excel；獨立版見 cec-up(id32)（2026-07-15 咖哩手繪佈局微調：弗蘭奇工房往左移＋外圈整體拉開1.3倍間距；2026-07-15 再調：頂視圖角度轉到165°避開id5/id137同扇形擠壓）' },
+  { id: 11, title: '簽到/車輛/工作', topic: 'tools', pos: [-2.5895, -0.52, 1.495], note: 'tool_signin / tool_car / tool_work；施工單查詢(id9)新增正職/兼職個人白名單(workAllowedIds)，組長以上不受影響，tool_work.html 自帶檢查防貼網址繞過（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
+  { id: 12, title: '請假申請', topic: 'tools', pos: [-2.5895, -0.52, -1.495], note: 'liff_leave + 雲端請假清單（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
 
   // ── 東海／後端 GAS ──
   { id: 13, title: '事故/表揚 GAS v3.1', topic: 'backend', pos: [1.6891, 1.2961, 0.0], note: 'action 分流 report/feedback/updateStatus/deleteRow/getReports/getFeedback；狀態/處置欄；新資料自動轉發LINE推播給主管/管理員' },
@@ -315,7 +315,7 @@ const NODES = [
   { id: 28, title: 'TODO-13 對話助手', topic: 'todo', pos: [-0.4572, -1.6235, -1.547], note: '✅ 已完成：天鷹 AI 小助手（小天鷹）J.A.R.V.I.S. 風格' },
 
   // ── 前端工具（直立雙圈環繞核心） ──
-  { id: 29, title: '天鷹 AI 小助手', topic: 'tools', pos: [-0.0, -0.4, -2.3], note: 'tool_ai_chat.html；J.A.R.V.I.S. 風格 LOGO 光環＋語音輸入/輸出；個人化習慣記憶 hsh_ai_profile；admin 控制台調禁止規則' },
+  { id: 29, title: '天鷹 AI 小助手', topic: 'tools', pos: [0.3898, 0.52, -2.7729], note: 'tool_ai_chat.html；J.A.R.V.I.S. 風格 LOGO 光環＋語音輸入/輸出；個人化習慣記憶 hsh_ai_profile；admin 控制台調禁止規則（2026-07-15 咖哩手繪佈局微調：布魯克鋼琴往右上移＋外圈整體拉開1.3倍間距；2026-07-15 再調：頂視圖半徑內縮回2.8並調角度避開id8太近）' },
 
   // ── 東海／後端 GAS ──
   { id: 30, title: '小天鷹 GAS Proxy', topic: 'backend', pos: [2.2085, 0.8995, -0.1129], note: '天鷹AI助手_GAS.gs；Gemini Proxy，藏 API Key；依 role/vocabLevel 組 system prompt；getConfig/saveConfig' },
@@ -335,7 +335,7 @@ const NODES = [
   { id: 36, title: '車牌辨識 GAS', topic: 'backend', pos: [1.4062, 1.7406, 0.9428], note: '車牌辨識_後端_GAS.gs（獨立部署）；recognizePlate Gemini Vision 辨識＋台灣車牌格式正規化、vehicleReg 寫車輛登記試算表 1K46ZEq…；Key 存指令碼屬性；每日 08:00 自動寄晚班登記摘要 email（SUMMARY_EMAILS）' },
 
   // ── 前端工具（直立雙圈環繞核心） ──
-  { id: 37, title: '物流車輛統計', topic: 'tools', pos: [1.9919, -0.4, -1.15], note: 'tool_logistics.html 獨立檔（iframe src）；三分類(1.9噸/3.5噸/8噸以上)登記＋快捷一鍵送出＋單日查詢＋整月統計；可修改/刪除；全員開放(id18)，快捷管理限 admin' },
+  { id: 37, title: '物流車輛統計', topic: 'tools', pos: [2.5895, -0.52, -1.495], note: 'tool_logistics.html 獨立檔（iframe src）；三分類(1.9噸/3.5噸/8噸以上)登記＋快捷一鍵送出＋單日查詢＋整月統計；可修改/刪除；全員開放(id18)，快捷管理限 admin（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
 
   // ── 東海／後端 GAS ──
   { id: 38, title: '物流統計 GAS', topic: 'backend', pos: [0.7926, 0.6153, 2.252], note: '物流車輛統計_GAS.gs（獨立部署）；add/update/delete/getDay/getMonth/exportMonth＋getShortcuts/addShortcut/updateShortcut/deleteShortcut；時間戳伺服器端蓋、主鍵 max(ID)+1' },
@@ -455,13 +455,13 @@ const NODES = [
   { id: 134, title: '空節點 #134', topic: 'todo', pos: [-2.815, -0.5911, -0.8222], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
 
   // ── 帶班交接事項（2026-07-03）── tools 雙圈 12 格已滿，外加第三圈（半徑2.6，y=0赤道面）
-  { id: 135, title: '帶班交接事項', topic: 'tools', pos: [1.839, 0.0, 1.839], note: 'tool_handover.html 獨立檔（iframe src）；新增/編輯/刪除交接事項，狀態未完成/進行中/已完成；組長以上可見(id19)，工具內 checkRole() 二次把關' },
+  { id: 135, title: '帶班交接事項', topic: 'tools', pos: [2.3907, 0.0, 2.3907], note: 'tool_handover.html 獨立檔（iframe src）；新增/編輯/刪除交接事項，狀態未完成/進行中/已完成；組長以上可見(id19)，工具內 checkRole() 二次把關（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
 
   // ── 互動吉祥物（2026-07-11）── tools 第三圈續填
-  { id: 136, title: '互動吉祥物', topic: 'tools', pos: [-1.839, 0.0, 1.839], note: 'index.html 內嵌 MascotWidget；主控台角落可拖曳，點擊開衣櫥換裝，12款角色：路飛/索隆/娜美/喬巴/香吉士(CSS呼吸搖擺動畫)＋咖波(4段接力)/白爛貓(4段接力)/情侶貓/愛心小狐/奔騰小馬/小呆雞/鯊魚先生(3段接力)(webp動態貼圖循環動畫，去背自LINE貼圖小舖官方預覽，多段場景合併單一webp接力循環)；新使用者預設角色白爛貓(DEFAULT_MASCOT_ID)，角色/位置依empId存localStorage(單機版)；素材縮圖240px上限+15fps+quality78瘦身；海賊王/皮卡丘/三麗鷗等大型商業IP付費動態貼圖版權風險已婉拒使用' },
+  { id: 136, title: '互動吉祥物', topic: 'tools', pos: [-2.3907, 0.0, 2.3907], note: 'index.html 內嵌 MascotWidget；主控台角落可拖曳，點擊開衣櫥換裝，12款角色：路飛/索隆/娜美/喬巴/香吉士(CSS呼吸搖擺動畫)＋咖波(4段接力)/白爛貓(4段接力)/情侶貓/愛心小狐/奔騰小馬/小呆雞/鯊魚先生(3段接力)(webp動態貼圖循環動畫，去背自LINE貼圖小舖官方預覽，多段場景合併單一webp接力循環)；新使用者預設角色白爛貓(DEFAULT_MASCOT_ID)，角色/位置依empId存localStorage(單機版)；素材縮圖240px上限+15fps+quality78瘦身；海賊王/皮卡丘/三麗鷗等大型商業IP付費動態貼圖版權風險已婉拒使用（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
 
   // ── 個人化背景系統（2026-07-12）── tools 第三圈續填
-  { id: 137, title: '個人化背景系統', topic: 'tools', pos: [0.0, -0.35, 2.55], note: 'index.html 帳號分頁「🎨個人化背景」；內建11款預設(純黑預設/3深色靜態/3深色動態/2亮色靜態/2亮色動態)，動態款全CSS動畫+DOM粒子零圖檔；自訂上傳照片canvas縮1280壓JPEG、GIF保留動態限3MB；亮色系自動補償(--card轉深色實底/section-title轉深字/home-greet墊深底)；自訂照片固定蓋深色遮罩不可關；設定存localStorage(hsh_bg_type/hsh_bg_custom)單機版，套用範圍index四分頁；同批改動：工具按鈕改B款緊湊三欄(tool-grid 1fr x3)' },
+  { id: 137, title: '個人化背景系統', topic: 'tools', pos: [0.0, -0.455, 3.315], note: 'index.html 帳號分頁「🎨個人化背景」；內建11款預設(純黑預設/3深色靜態/3深色動態/2亮色靜態/2亮色動態)，動態款全CSS動畫+DOM粒子零圖檔；自訂上傳照片canvas縮1280壓JPEG、GIF保留動態限3MB；亮色系自動補償(--card轉深色實底/section-title轉深字/home-greet墊深底)；自訂照片固定蓋深色遮罩不可關；設定存localStorage(hsh_bg_type/hsh_bg_custom)單機版，套用範圍index四分頁；同批改動：工具按鈕改B款緊湊三欄(tool-grid 1fr x3)（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
 ];
 
 const EDGES = [
