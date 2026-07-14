@@ -3311,6 +3311,12 @@ function snapshotTodayPostScheduled_() {
     var dst = ss.getSheetByName(POST_TODAY_SHEET_NAME);
     if (!src) { console.error('快照今日哨表失敗：找不到分頁 ' + POST_SHEET_NAME); return; }
     if (!dst) { console.error('快照今日哨表失敗：找不到分頁 ' + POST_TODAY_SHEET_NAME + '（請確認試算表分頁存在）'); return; }
+    // dst.clear() 不會拆掉既有合併儲存格——前一天殘留的合併範圍如果跟今天
+    // 來源的合併形狀對不上，會讓 copyTo 貼進去的值被舊合併範圍吃掉或錯位
+    // （2026-07-14 踩坑：晚班表頭「晚班人員：20:00~08:00」複製後變成只剩
+    // 「人員：20:00~08:00」，導致 buildColBlockMap_ 找不到「晚班」文字，
+    // 整個晚班區塊被判定成沒資料）。先拆合併再清空，才能保證是乾淨貼上。
+    dst.getDataRange().breakApart();
     dst.clear();
     var srcRange = src.getDataRange();
     srcRange.copyTo(dst.getRange(1, 1, srcRange.getNumRows(), srcRange.getNumColumns()));
