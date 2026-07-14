@@ -1629,13 +1629,13 @@ function drawLiveUsers(ctx, t) {
 
     // 角色化身：完全到站後變身成所在節點的專屬角色（靜態站姿）。2026-07-06 咖哩需求：
     // 使用者不再是單純圓點，而是「人在哪個工具就是那個工具的角色」
-    // 移動中：改用「即將前往的節點」對應角色播跑步循環（該角色有 RUN_IMG_MAP 幀才會動），
+    // 移動中：延續「起始地」（上一站）對應角色播跑步循環（該角色有 RUN_IMG_MAP 幀才會動），
+    // 到站後才變身成目的地角色。u.displayNode 在到站前維持原值（起始地），到站才更新成
+    // u.node，正好符合「從原本站的角色跑走、抵達才變身」的需求，不能改用 u.node（那是目的地）。
     // 尚未補跑步幀的角色移動中仍代打路飛（2026-07-14 補上 ANIMATED_ROLES 判斷，
-    // 原本寫死一律代打路飛，導致索隆/娜美等11隻已補齊跑步幀的角色移動時卻沒在跑）。
-    // 注意：目的地要用 u.node（queueMoveTo 一入列就設成終點），不是 u.displayNode
-    // （displayNode 要完全到站才會更新，移動中還停在「上一站」，抓錯會變身錯人）
-    const destRole = NODE_CHAR[moving ? u.node : u.displayNode] || '路飛';
-    const role = moving ? (ANIMATED_ROLES.has(destRole) ? destRole : '路飛') : destRole;
+    // 原本寫死一律代打路飛，導致索隆/娜美等11隻已補齊跑步幀的角色移動時卻沒在跑）
+    const curRole = NODE_CHAR[u.displayNode] || '路飛';
+    const role = moving ? (ANIMATED_ROLES.has(curRole) ? curRole : '路飛') : curRole;
     const avImg = (moving && getRunFrame(role)) || CHAR_IMAGES[role] || CHAR_IMAGES['路飛'];
     const avBoxW = 80 * DEFAULT_CHAR_SCALE, avBoxH = 80 * DEFAULT_CHAR_SCALE;
     let avIw = avBoxW, avIh = avBoxH;
