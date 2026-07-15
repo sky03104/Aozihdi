@@ -2881,15 +2881,34 @@ function buildColBlockMap_(values) {
   var maxR = Math.min(values.length, 5);
   var maxC = 0;
   for (var r = 0; r < maxR; r++) if (values[r]) maxC = Math.max(maxC, values[r].length);
-  var map = {};
+  var labelCol = {}; // 只記錄「表頭本身真的寫著早班/晚班」的欄位
   for (var c = 0; c < maxC; c++) {
     for (var r = 0; r < maxR; r++) {
       var row = values[r]; if (!row) continue;
       var v = String(row[c] == null ? '' : row[c]).trim();
       if (!v) continue;
-      if (v.indexOf('晚班') !== -1) { map[c] = 'late'; break; }
-      if (v.indexOf('早班') !== -1) { map[c] = 'early'; break; }
+      if (v.indexOf('晚班') !== -1) { labelCol[c] = 'late'; break; }
+      if (v.indexOf('早班') !== -1) { labelCol[c] = 'early'; break; }
     }
+  }
+  // 2026-07-15 踩坑：表頭合併儲存格若沒蓋滿整個班別的欄位範圍（例如
+  // 「晚班人員」那格只合併了1欄，右邊實際哨位資料的欄位都讀不到「晚班」
+  // 字樣），逐欄比對法會把那些欄位當成「沒有表頭」整批跳過，導致該班別
+  // 資料整批消失（症狀：晚班顯示0人，但原始儲存格裡明明有資料）。
+  // 改成「往右延伸」：從找到表頭字樣的那一欄開始，把同一個班別往右
+  // 填到遇到下一個表頭欄（早/晚班切換）為止，不再要求每一欄自己都要
+  // 能讀到表頭文字——這樣即使表頭合併範圍設定不完整，也不會漏資料。
+  // 安全上限：只往右延伸到「最後一個有表頭字樣的欄位」+6欄為止，避免
+  // 萬一右側還殘留無關的輔助名單（2026-07-13 踩過的坑），被無限往右
+  // 延伸吃進來——正常早/晚班一個區塊頂多5~6欄，+6剛好夠蓋滿又不過頭。
+  var lastLabelCol = -1;
+  for (var lc in labelCol) lastLabelCol = Math.max(lastLabelCol, Number(lc));
+  var fillLimit = (lastLabelCol >= 0) ? Math.min(maxC, lastLabelCol + 6) : maxC;
+  var map = {};
+  var curBlock = null;
+  for (var cc = 0; cc < fillLimit; cc++) {
+    if (labelCol[cc]) curBlock = labelCol[cc];
+    if (curBlock) map[cc] = curBlock;
   }
   return map;
 }
