@@ -1011,7 +1011,9 @@ function applyAutoFill(wtype,inspector){
   if(!ins)return null;
   return {wtype:'員工下班',inspector:getGivenName(ins)}; /* 檢查者僅填名，去除姓氏 */
 }
-/* ── 快速登記：只填了專櫃／樓層／監工姓名，時間與施工項目都沒填 → 自動填入場時間=現在、施工項目=陳列 ── */
+/* ── 快速登記：只填了專櫃／樓層／監工姓名（＋選填進場時間），施工項目與退場
+   時間都沒填 → 自動填入施工項目=陳列；進場時間若使用者已手動填就保留原值，
+   沒填才補現在時刻（2026-07-16 咖哩要求：進場時間不一定是當下，不該綁在一起判斷） ── */
 function nowHHMM(){
   const d=new Date();
   return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
@@ -1019,8 +1021,8 @@ function nowHHMM(){
 function applyQuickEntryFill(wtype){
   const entryV=document.getElementById('entryTime').value;
   const exitV=document.getElementById('exitTime').value;
-  if(wtype||entryV||exitV)return null; /* 已填施工項目或任一時間 → 不自動填 */
-  return {entryTime:nowHHMM(),wtype:'陳列'};
+  if(wtype||exitV)return null; /* 已填施工項目或退場時間 → 不自動填 */
+  return {entryTime:entryV||nowHHMM(),wtype:'陳列'};
 }
 
 // ADD TO QUEUE
