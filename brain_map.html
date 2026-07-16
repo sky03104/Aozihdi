@@ -229,6 +229,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 'use strict';
 
@@ -976,6 +977,10 @@ function getRunFrame(role) {
 // 不用再回頭改 fetchActiveUsers 那段代打邏輯（2026-07-05 咖哩指示）
 const ANIMATED_ROLES = new Set(Object.entries(RUN_IMG_MAP).filter(([, files]) => files.length > 1).map(([role]) => role));
 
+// 2026-07-16 Meshy 3D 試點：有 key 的角色改用真正的 3D 模型＋骨架跑步動畫，
+// 沒有 key 的維持原本 2D 序列幀疊圖，新舊並存、逐步汰換。
+const RUN_MODEL_MAP = { '路飛': 'brain_map_3d/char_luffy_run.glb' };
+
 // 節點地點圖（工具節點專屬場景，取代發光球體；未列在這裡的節點照舊顯示球體）
 const NODE_IMG_MAP = {
   0:  'godenmerry.png',         // 主控台（黃金梅利號本人當地點圖，角色改站路飛）
@@ -997,6 +1002,47 @@ const NODE_IMG_MAP = {
 };
 // 特定地點圖的顯示倍率（預設1，同其他地點圖）：黃金梅利號是主控台門面，該比一般地點圖明顯大一號
 const NODE_IMG_SCALE = { 0: 1.4 };
+// 2026-07-16 Meshy 3D 試點：有 key 的節點改用真正的 3D 模型（brain_map_3d/），
+// 沒有 key 的維持原本 2D 地點圖疊圖，新舊並存、逐步汰換，不用一次做完全部。
+const NODE_MODEL_MAP = { 0: 'brain_map_3d/loc_node0.glb' };
+const NODE_MODEL_SCALE = { 0: 0.9 }; // 依模型實際尺寸微調，預設1
+
+// 載入真正的 3D 模型（GLB），取代 NODE_MODEL_MAP／RUN_MODEL_MAP 裡列出的
+// 節點/角色的 2D 疊圖。跟 2D 系統並存，只影響有 key 的節點/角色，其餘照舊。
+// modelMixers 收集所有需要每幀 update 的骨架動畫（見下方 animate() 迴圈）。
+// 注意：這段必須放在 NODE_MODEL_MAP／RUN_MODEL_MAP 宣告「之後」，放前面會
+// 因為 const 的暫時性死區（TDZ）直接丟例外，導致整個 script 後續（含
+// animate() 呼叫）完全不執行、畫面整個空白（2026-07-16 真的踩過這個坑）。
+const gltfLoader = new THREE.GLTFLoader();
+const modelMixers = [];
+Object.entries(NODE_MODEL_MAP).forEach(([nodeIdStr, path]) => {
+  const nodeId = parseInt(nodeIdStr);
+  const nodeIdx = NODES.findIndex(n => n.id === nodeId);
+  if (nodeIdx < 0) return;
+  gltfLoader.load(path, gltf => {
+    const scale = NODE_MODEL_SCALE[nodeId] || 1;
+    gltf.scene.position.copy(worldPos[nodeIdx]);
+    gltf.scene.scale.setScalar(scale);
+    nodeGroup.add(gltf.scene);
+  }, undefined, err => console.error('地點3D模型載入失敗：' + path, err));
+});
+Object.entries(RUN_MODEL_MAP).forEach(([role, path]) => {
+  // 試點階段先固定站在主控台(node 0)旁播放跑步循環，還沒接上即時移動系統
+  // （即時人物移動邏輯見 updateLiveUsers/updateActionRunners，屬於後續整合範圍）
+  const anchorIdx = NODES.findIndex(n => n.id === 0);
+  if (anchorIdx < 0) return;
+  gltfLoader.load(path, gltf => {
+    gltf.scene.position.copy(worldPos[anchorIdx]);
+    gltf.scene.position.x += 0.5; // 跟node0的地點模型錯開，避免重疊
+    nodeGroup.add(gltf.scene);
+    if (gltf.animations && gltf.animations.length) {
+      const mixer = new THREE.AnimationMixer(gltf.scene);
+      mixer.clipAction(gltf.animations[0]).play();
+      modelMixers.push(mixer);
+    }
+  }, undefined, err => console.error('角色3D模型載入失敗：' + path, err));
+});
+
 const NODE_IMAGES = {};
 Object.entries(NODE_IMG_MAP).forEach(([nodeId, file]) => {
   const img = new Image();
@@ -1164,6 +1210,7 @@ function drawAllCharacters() {
 function drawNodeLocations() {
   Object.entries(NODE_IMG_MAP).forEach(([nodeIdStr, file]) => {
     const nodeId = parseInt(nodeIdStr);
+    if (NODE_MODEL_MAP[nodeId]) return; // 2026-07-16：已經有真正的3D模型頂替，2D地點圖不再疊上去
     const img = NODE_IMAGES[nodeId];
     if (!img || !img.complete || img.naturalWidth === 0) return; // 未載入完成就不畫，底下球體照樣看得到
 
@@ -1852,13 +1899,17 @@ function animate() {
   drawNodeLocations();
   drawAllCharacters();
 
+  // 2026-07-16 Meshy 3D 試點：真正的 3D 模型動畫（跑步骨架動作）逐幀推進，
+  // 沿用既有的 dt 節流（單幀最多 0.05 秒），跟即時人物動畫共用同一套時間基準
+  const dt = Math.min(0.05, t - lastFrameT);
+  modelMixers.forEach(m => m.update(dt));
+
   // 即時航跡人物層（限主管，且分頁在前景才輪詢省額度）
   if (CAN_VIEW_USERS) {
     if (!document.hidden && nowMs - lastActiveFetch > ACTIVE_INTERVAL) {
       lastActiveFetch = nowMs;
       fetchActiveUsers();
     }
-    const dt = Math.min(0.05, t - lastFrameT);
     updateLiveUsers(dt);
     updateActionRunners(dt);
     drawLiveUsers(charCtx, t);

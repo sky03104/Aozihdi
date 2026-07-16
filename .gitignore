@@ -1,0 +1,4 @@
+.env
+brain_map_3d/.env
+__pycache__/
+*.pyc
