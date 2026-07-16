@@ -73,8 +73,10 @@ var SHIFT_INFO_ = {
   '海':   { label: '海班',   time: '22:00-10:00', color: '#22D3EE' },
   'N':    { label: 'N班',    time: '20:00-24:00', color: '#F472B6' },
   'S':    { label: 'S班',    time: '08:00-16:00', color: '#34D399' },
+  'H':    { label: 'H班',    time: '11:00-22:00', color: '#A78BFA' },
   'H2':   { label: 'H2班',   time: '11:00-23:30', color: '#FBBF24' },
   'L':    { label: 'L班',    time: '12:00-20:00', color: '#38BDF8' },
+  'LN':   { label: 'LN班',   time: '12:00-24:00', color: '#E879F9' },
   '南':   { label: '南館班', time: '11:00-23:00', color: '#FB7185' },
   'A':    { label: 'A班',    time: '08:00-20:00', color: '#A78BFA' },
   '休':   { label: '休假',   time: '—', color: '#FB923C' },
@@ -86,6 +88,8 @@ var SHIFT_INFO_ = {
   '離':   { label: '離職',   time: '—', color: '#6B7280' },
   '支':   { label: '支援',   time: '—', color: '#94A3B8' },
   '國例': { label: '國定假日補假', time: '—', color: '#34D399' },
+  '休B':  { label: '停休加班', time: '—', color: '#EADC00' },
+  '休A':  { label: '停休加班', time: '—', color: '#EADC00' },
   '-':    { label: '未排班', time: '—', color: '#6B7280' }
 };
 
