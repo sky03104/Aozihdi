@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>天鷹保全 · 自動排哨工具</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<!-- React 18.3.1（天鷹規範：禁止 19.x） -->
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<!-- SheetJS：產生 xlsx 用（比照 tool_upload.html） -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#0A0C10; --surface:#0D0F14; --card:rgba(255,255,255,.03);
+  --border:rgba(255,255,255,.08); --gold:#D4A800; --gold2:#FFD700;
+  --indigo:#818CF8; --indigo2:#6366F1;
+  --success:#4ADE80; --danger:#F87171; --warn:#FB923C; --text:#F5F5F5; --text-muted:#8A95A8;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;min-height:100vh;}
+.container{max-width:960px;margin:0 auto;padding:16px 14px 60px;}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:10px;flex-wrap:wrap;}
+.back-btn{background:var(--card);border:1px solid var(--border);color:var(--text);padding:13px 16px;border-radius:10px;text-decoration:none;display:flex;align-items:center;gap:6px;font-size:14px;min-height:44px;}
+.title-wrap{text-align:center;flex:1;min-width:200px;}
+.title-main{color:var(--gold);font-size:19px;font-weight:700;letter-spacing:1px;}
+.title-sub{color:var(--text-muted);font-size:14px;letter-spacing:1px;margin-top:2px;}
+.tabs{display:flex;gap:8px;margin-bottom:16px;}
+.tab-btn{flex:1;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text-muted);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;text-align:center;}
+.tab-btn.active{background:linear-gradient(135deg,#D4A800 0%,#FFD700 100%);color:#000;border-color:transparent;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:16px;backdrop-filter:blur(10px);max-width:100%;overflow-x:auto;}
+.card-title{font-size:15px;font-weight:700;color:var(--gold);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-size:14px;color:var(--text-muted);}
+input[type=date],input[type=text],input[type=number],select{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:15px;outline:none;font-family:inherit;}
+input:focus,select:focus{border-color:var(--gold);}
+.chk-row{display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;cursor:pointer;user-select:none;}
+.chk-row input{width:18px;height:18px;accent-color:var(--gold);}
+.chk-row span{font-size:14px;}
+.btn{padding:12px 18px;border-radius:12px;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:linear-gradient(135deg,#D4A800 0%,#FFD700 100%);color:#000;}
+.btn-indigo{background:linear-gradient(135deg,#818CF8 0%,#6366F1 100%);color:#fff;}
+.btn-ghost{background:var(--card);border:1px solid var(--border);color:var(--text);}
+.btn:disabled{opacity:.45;cursor:default;}
+.warn-box{background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.35);border-radius:12px;padding:12px 14px;margin-bottom:14px;}
+.warn-box .wtitle{color:var(--warn);font-weight:700;font-size:13px;margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+.warn-box li{font-size:12.5px;color:var(--text);line-height:1.7;}
+.warn-box.forced{background:rgba(248,113,113,.12);border:2px solid var(--danger);}
+.warn-box.forced .wtitle{color:var(--danger);font-size:14px;}
+.warn-box.forced li{font-size:13.5px;font-weight:600;}
+.prev-table{border-collapse:collapse;font-size:14px;white-space:pre-line;min-width:900px;}
+.prev-table td{border:1px solid rgba(255,255,255,.12);padding:6px 8px;text-align:center;vertical-align:middle;min-width:58px;}
+.prev-table td.has-val{color:var(--success);font-weight:600;}
+.prev-list{display:flex;flex-direction:column;gap:6px;}
+.prev-item{display:flex;justify-content:space-between;gap:10px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:14px;}
+.prev-item-label{color:var(--text-muted);white-space:pre-line;}
+.prev-item-val{white-space:pre-line;text-align:right;font-weight:600;}
+.prev-item-val.has-val{color:var(--success);}
+.emp-list{display:flex;flex-direction:column;gap:6px;}
+.emp-card{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+.emp-name{font-weight:700;font-size:14px;margin-bottom:8px;color:var(--gold2);}
+.post-group{font-size:14px;color:var(--text-muted);margin:8px 0 4px;}
+.post-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;}
+.post-chip{font-size:14px;padding:10px 8px;min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,.25);cursor:pointer;text-align:center;user-select:none;}
+.post-chip.on{background:rgba(212,168,0,.25);border-color:var(--gold);color:var(--gold2);}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:12px 26px;border-radius:50px;font-weight:700;z-index:9999;display:none;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);font-size:14px;}
+.toast.show{display:flex;}
+.toast.ok{background:rgba(20,35,25,.97);color:var(--success);border:1px solid rgba(74,222,128,.5);}
+.toast.err{background:rgba(40,18,18,.97);color:var(--danger);border:1px solid rgba(248,113,113,.5);}
+.empty-note{text-align:center;color:var(--text-muted);font-size:13px;padding:20px;}
+@media (max-width:640px){ .container{padding:12px 8px 50px;} }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const { useState, useEffect, useMemo } = React;
+const h = React.createElement;
+
+/* ══════════════════════ 基礎：工號狀態 ══════════════════════ */
+const params = new URLSearchParams(window.location.search);
+let EMP_ID = params.get('empId') || '';
+if (!EMP_ID) { try { EMP_ID = (JSON.parse(localStorage.getItem('hsh_session_user') || '{}').empId) || ''; } catch (e) {} }
+if (!EMP_ID) EMP_ID = '未登入';
+function backUrl(){ return 'index.html?empId=' + encodeURIComponent(EMP_ID); }
+
+/* ══════════════════════ GAS 連線設定 ══════════════════════ */
+// 部署後把 /exec 網址填在這裡（見 哨表產生_GAS_部署說明.md）
+const GUARD_GEN_GAS_URL = 'https://script.google.com/macros/s/AKfycbzGCuMUEksvU88-WdoJ6DhJ0zOkQi8zC7x7zXIfVOvLW0dOs7s9bCW1sCF1Ij2rGDr63Q/exec';
+// 哨表上傳走既有「哨表上傳_GAS_v6.gs」，沿用 tool_upload.html 已部署好的網址
+const GD_UPLOAD_GAS_URL = 'https://script.google.com/macros/s/AKfycbwl9hcbbuKBHWmleftzbbaiUihhsHVK4H0dKMd-LrCQwRE3aUPpIHlwWLcGZbhqugp_gg/exec';
+
+async function callGuardGas(action, data) {
+  try {
+    const res = await fetch(GUARD_GEN_GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify(Object.assign({ action, empId: EMP_ID }, data || {}))
+    });
+    const txt = await res.text();
+    try { return JSON.parse(txt); } catch (e) { return { status: 'error', msg: '回應格式錯誤：' + txt.slice(0, 120) }; }
+  } catch (e) {
+    return { status: 'error', msg: '連線失敗：' + e.message };
+  }
+}
+
+/* ══════════════════════ 哨點定義（單一資料源）══════════════════════
+   POST_DEFS 同時負責「標籤文字」與「姓名值要寫入的位置」，是唯一的版型座標定義。
+   規律：label 永遠寫在 col-1（同一列往左一欄），value 寫在 col。
+   buildBaseRows() 迴圈這份定義產生固定標籤；buildGuardMatrix() 迴圈它做隨機分配。
+   conditional 的項目（目前只有南側門）標籤不進 buildBaseRows，改成勾選當天才動態補上。
+   MERGE_RANGES（見下方 xlsx 匯出段落）是「合併儲存格範圍」，跟這裡的 row/col 定位用途不同，
+   純粹是視覺上的儲存格合併，不需要跟 POST_DEFS 同步，但改版型時兩邊都要對照確認。
+════════════════════════════════════════════════════════════════════ */
+const POST_DEFS = [
+  { key: '警衛室',       label: '警衛室',           row: 3,  col: 2,  shift: 'early' },
+  { key: '漢來飯店',     label: '漢來\n飯店',       row: 4,  col: 2,  shift: 'early' },
+  { key: 'P3車道',       label: 'P3\n車道',         row: 6,  col: 2,  shift: 'early' },
+  { key: '南側門',       label: '南側門',           row: 7,  col: 2,  shift: 'early', conditional: 'southGate' },
+  { key: 'B1F警衛室',    label: 'B1F\n警衛室',      row: 3,  col: 5,  shift: 'early' },
+  { key: '機動人員1',    label: '機動\n人員1',      row: 4,  col: 5,  shift: 'early' },
+  { key: '物流車道',     label: '物流\n車道',       row: 6,  col: 5,  shift: 'early' },
+  { key: '機動人員2',    label: '機動\n人員2',      row: 7,  col: 5,  shift: 'early' },
+  { key: '晚班警衛室',   label: '警衛室',           row: 3,  col: 9,  shift: 'late' },
+  { key: '晚班B1F警衛室',label: 'B1F\n警衛室',      row: 6,  col: 9,  shift: 'late' },
+  { key: '晚班P3車道',   label: 'P3車道\n(廣場哨)', row: 7,  col: 9,  shift: 'late' },
+  { key: '晚班漢來飯店', label: '漢來\n飯店',       row: 3,  col: 12, shift: 'late' },
+  { key: '晚班機動人員', label: '機動\n人員',       row: 6,  col: 12, shift: 'late' },
+  { key: '海底撈',       label: '海底撈',           row: 7,  col: 12, shift: 'late' },
+  { key: '巡檢1',        label: '巡檢1',            row: 10, col: 2,  shift: 'early' },
+  { key: '巡檢2',        label: '巡檢2',            row: 11, col: 2,  shift: 'early' },
+  { key: '巡檢3',        label: '巡檢3',            row: 12, col: 2,  shift: 'early' },
+  { key: '停巡4',        label: '停巡4',            row: 13, col: 2,  shift: 'early' },
+  { key: '停巡5',        label: '停巡5',            row: 14, col: 2,  shift: 'early' },
+  { key: '停巡6',        label: '停巡6',            row: 15, col: 2,  shift: 'early' },
+  { key: '停巡7',        label: '停巡7\n(廣場哨)',  row: 16, col: 2,  shift: 'early' },
+  { key: '晚班巡檢1',    label: '巡檢1',            row: 10, col: 9,  shift: 'late' },
+  { key: '晚班巡檢2',    label: '巡檢2',            row: 11, col: 9,  shift: 'late' },
+  { key: '晚班巡檢3',    label: '巡檢3',            row: 12, col: 9,  shift: 'late' },
+  { key: '晚班停巡4',    label: '停巡4',            row: 13, col: 9,  shift: 'late' },
+  { key: '晚班停巡5',    label: '停巡5',            row: 14, col: 9,  shift: 'late' },
+  { key: '晚班停巡6',    label: '停巡6',            row: 15, col: 9,  shift: 'late' },
+];
+const POST_KEYS = POST_DEFS.map(p => p.key);
+const POST_GROUPS = [
+  { label: '早班一般崗位', keys: ['警衛室', '漢來飯店', 'P3車道', '南側門'] },
+  { label: '早班特殊崗位', keys: ['B1F警衛室', '機動人員1', '物流車道', '機動人員2'] },
+  { label: '早班巡檢/停巡', keys: ['巡檢1', '巡檢2', '巡檢3', '停巡4', '停巡5', '停巡6', '停巡7'] },
+  { label: '晚班崗位', keys: ['晚班警衛室', '晚班B1F警衛室', '晚班P3車道', '晚班漢來飯店', '晚班機動人員', '海底撈'] },
+  { label: '晚班巡檢/停巡', keys: ['晚班巡檢1', '晚班巡檢2', '晚班巡檢3', '晚班停巡4', '晚班停巡5', '晚班停巡6'] },
+];
+const WEEKDAY_ZH = ['日', '一', '二', '三', '四', '五', '六'];
+const DEFAULT_TIME = { early: '0800-2000', late: '2000-0800' };
+
+/* ══════════════════════ 18×14 固定文字標籤（每次產生都先寫入，動態內容之後再覆蓋值格）══════════════════════ */
+function buildBaseRows() {
+  const rows = [];
+  for (let r = 0; r < 18; r++) rows.push(new Array(14).fill(''));
+  rows[1][0] = '                   姓名\n  哨位';
+  rows[1][2] = '早班人員:   08:00~20:00';
+  rows[1][8] = '晚班人員:  20:00~08:00';
+  rows[2][2] = ' 帶隊幹部 : ';
+  rows[2][8] = '帶隊幹部 : ';
+  rows[3][0] = '外圍';
+  rows[10][0] = '巡檢';
+  // 崗位標籤全部改由 POST_DEFS 驅動（label 永遠寫在 col-1），conditional 的哨位（南側門）不在這裡寫，
+  // 等勾選當天才在 buildGuardMatrix() 動態補上，維持單一資料源。
+  POST_DEFS.forEach(def => {
+    if (def.conditional) return;
+    rows[def.row][def.col - 1] = def.label;
+  });
+  rows[17][1] = '13人/12HR+8HR(0800-1600)\n增派12HR(1100-2300)+8HR(1200-2000)';
+  rows[17][8] = '11人/12HR+8HR(2200-0600)\n               增派4HR(0600-1000)';
+  return rows;
+}
+
+/* ══════════════════════ 核心：18×14 值陣列產生邏輯（純函式，不碰 DOM，可獨立測試） ══════════════════════ */
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+
+function buildGuardMatrix(opts) {
+  const { year, month, day, weekdayIdx, earlyRoster, lateRoster, postConfig,
+    southGate, patrolExtra, parkExtra, stopPatrolExtra, parkNames, leaderEarly, leaderLate } = opts;
+  const rows = buildBaseRows();
+  const warnings = [];
+
+  rows[0][0] = String(year - 1911) + '年';
+  rows[0][3] = String(month);
+  rows[0][5] = String(day);
+  rows[0][7] = WEEKDAY_ZH[weekdayIdx] || '';
+  rows[0][8] = '天鷹保全駐漢神巨蛋商場、外圍每日執勤人員名單';
+
+  // 帶隊幹部（手動輸入，無自動規則）
+  if (leaderEarly) rows[2][4] = leaderEarly + '\n' + DEFAULT_TIME.early;
+  if (leaderLate) rows[2][11] = leaderLate + '\n' + DEFAULT_TIME.late;
+
+  // ── 拆分早班：見習 / L / LN / 一般池 ──
+  const earlyTrainees = earlyRoster.filter(p => (p.code || '').indexOf('見') >= 0);
+  const earlyL = earlyRoster.filter(p => p.code === 'L');
+  const earlyLN = earlyRoster.filter(p => p.code === 'LN');
+  const earlyExclude = new Set(earlyTrainees.concat(earlyL, earlyLN).map(p => p.name));
+  const earlyPoolBase = earlyRoster.filter(p => !earlyExclude.has(p.name));
+
+  // L/LN班的人不會被塞回一般崗位池（維持原意圖：他們的工作是巡檢/停巡增派），
+  // 但沒勾對應增派 checkbox 時人會無聲消失，所以強制跳出醒目警告點名，不能只靠一般警告清單。
+  const forcedWarnings = [];
+  earlyL.forEach(p => {
+    if (!patrolExtra) forcedWarnings.push(p.name + ' 是 L 班，但未勾選「巡檢增派」，此人尚未被排入本次哨表');
+  });
+  earlyLN.forEach(p => {
+    if (!patrolExtra) forcedWarnings.push(p.name + ' 是 LN 班，但未勾選「巡檢增派」，此人的巡檢增派時段尚未排入');
+    if (!stopPatrolExtra) forcedWarnings.push(p.name + ' 是 LN 班，但未勾選「停巡增派」，此人的停巡增派時段尚未排入');
+  });
+
+  // ── 拆分晚班：見習 / 一般池 ──
+  const lateTrainees = lateRoster.filter(p => (p.code || '').indexOf('見') >= 0);
+  const lateExclude = new Set(lateTrainees.map(p => p.name));
+  const latePoolBase = lateRoster.filter(p => !lateExclude.has(p.name));
+
+  // ── 一般崗位／巡檢隨機分配：貪婪分配結果會因為隨機順序不穩定（同一份資料重跑，
+  // 有時排得滿、有時排不滿），改成多輪重試、取「分配失敗人數最少」的一輪，
+  // 不做完整二分圖最大匹配（過度設計），是輕量改善。
+  function tryAssignOnce(order) {
+    const earlyPool = earlyPoolBase.slice();
+    const latePool = latePoolBase.slice();
+    const picks = {};
+    const failedKeys = [];
+    order.forEach(def => {
+      if (def.conditional === 'southGate' && !southGate) return;
+      const pool = def.shift === 'early' ? earlyPool : latePool;
+      const cands = pool.filter(p => (postConfig[p.name] || []).includes(def.key));
+      if (!cands.length) { picks[def.key] = null; failedKeys.push(def.key); return; }
+      const picked = shuffle(cands)[0];
+      pool.splice(pool.indexOf(picked), 1);
+      picks[def.key] = picked;
+    });
+    return { picks, failedKeys, earlyPool, latePool, score: failedKeys.length + earlyPool.length + latePool.length };
+  }
+  let best = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const result = tryAssignOnce(shuffle(POST_DEFS));
+    if (!best || result.score < best.score) best = result;
+    if (best.score === 0) break;
+  }
+  POST_DEFS.forEach(def => {
+    if (def.conditional === 'southGate' && !southGate) return;
+    if (def.conditional) rows[def.row][def.col - 1] = def.label; // 勾選當天才補上條件式標籤（例如南側門）
+    const picked = best.picks[def.key];
+    if (picked) rows[def.row][def.col] = picked.name + '\n' + DEFAULT_TIME[def.shift];
+  });
+  best.failedKeys.forEach(key => warnings.push('崗位「' + key + '」找不到適任人選，需手動填寫'));
+  const earlyPool = best.earlyPool, latePool = best.latePool;
+  if (earlyPool.length) warnings.push('早班有排班但未分配到崗位：' + earlyPool.map(p => p.name).join('、'));
+  if (latePool.length) warnings.push('晚班有排班但未分配到崗位：' + latePool.map(p => p.name).join('、'));
+
+  // ── 巡檢增派（早班 L/LN） ──
+  if (patrolExtra) {
+    const cands = earlyL.concat(earlyLN);
+    rows[10][4] = '巡檢增派';
+    if (cands.length > 1) warnings.push('巡檢增派候選（L/LN班）不只一位：' + cands.map(p => p.name).join('、') + '，僅自動帶入第一位，請確認');
+    if (cands.length) rows[10][5] = cands[0].name + '\n1200-2000';
+    else warnings.push('找不到 L/LN 班人員，巡檢增派需手動填寫');
+  }
+
+  // ── 停巡增派（早班 LN 專屬） ──
+  if (stopPatrolExtra) {
+    rows[13][4] = '停巡增派';
+    if (earlyLN.length > 1) warnings.push('停巡增派候選（LN班）不只一位：' + earlyLN.map(p => p.name).join('、') + '，僅自動帶入第一位，請確認');
+    if (earlyLN.length) rows[13][5] = earlyLN[0].name + '\n2000-2400';
+    else warnings.push('找不到 LN 班人員，停巡增派需手動填寫');
+  }
+
+  // ── 泊車增派（手動輸入2人，固定 1230-2030） ──
+  if (parkExtra) {
+    rows[11][4] = '泊車增派';
+    rows[12][4] = '泊車增派';
+    if (parkNames[0]) rows[11][5] = parkNames[0] + '\n1230-2030';
+    if (parkNames[1]) rows[12][5] = parkNames[1] + '\n1230-2030';
+    if (!parkNames[0] || !parkNames[1]) warnings.push('泊車增派姓名尚未填寫完整（需2位）');
+  }
+
+  // ── 增派時數註記 ──
+  if (southGate || patrolExtra || parkExtra || stopPatrolExtra) {
+    rows[16][4] = '←';
+    rows[16][5] = '1600-2000為增派時數';
+  }
+
+  // ── 見習：早/晚班共用同一套「找第一個空白列」邏輯（跳過已被泊車/停巡增派佔用的列） ──
+  function placeTrainees(trainees, labelCol, nameCol, shiftLabel, timeStr) {
+    let r = 11;
+    trainees.forEach(p => {
+      while (r <= 16 && rows[r][labelCol] !== '') r++;
+      if (r > 16) { warnings.push(shiftLabel + '見習「' + p.name + '」超出可用欄位（11~16列已滿），需手動處理'); return; }
+      rows[r][labelCol] = '見習';
+      rows[r][nameCol] = p.name + '\n' + timeStr;
+      r++;
+    });
+  }
+  placeTrainees(earlyTrainees, 4, 5, '早班', DEFAULT_TIME.early);
+  placeTrainees(lateTrainees, 11, 12, '晚班', DEFAULT_TIME.late);
+
+  return { rows, warnings, forcedWarnings };
+}
+// 供瀏覽器 console / node 測試使用
+try { window.buildGuardMatrix = buildGuardMatrix; window.POST_DEFS = POST_DEFS; } catch (e) {}
+try { if (typeof module !== 'undefined') module.exports = { buildGuardMatrix, POST_DEFS, POST_KEYS, buildBaseRows }; } catch (e) {}
+
+/* ══════════════════════ xlsx 匯出：合併儲存格範圍（固定版型，每天都一樣） ══════════════════════ */
+const MERGE_RANGES = [
+  'A1:C1','I1:N1','A2:B3','C2:G2','I2:N2','C3:D3','E3:G3','I3:K3','L3:M3',
+  'A4:A9','C4:D4','F4:G4','J4:K4','M4:N4','C5:D5','F5:G5','J5:K5','M5:N5',
+  'H2:H9','C6:D6','F6:G6','J6:K6','M6:N6','C7:D7','F7:G7','J7:K7','M7:N7',
+  'C8:D8','F8:G8','J8:K8','M8:N8','C9:D9','F9:G9','J9:K9','M9:N9',
+  'A10:N10',
+  'A11:A18','H11:H18','C11:D11','F11:G11','J11:K11','M11:N11',
+  'C12:D12','F12:G12','J12:K12','M12:N12','C13:D13','F13:G13','J13:K13','M13:N13',
+  'C14:D14','F14:G14','J14:K14','M14:N14','C15:D15','J15:K15','M15:N15',
+  'C16:D16','J16:K16','M16:N16','C17:D17','J17:K17','M17:N17',
+  'B18:G18','I18:N18'
+];
+function decodeCell(addr) {
+  const m = addr.match(/^([A-Z]+)(\d+)$/);
+  const colStr = m[1], rowNum = parseInt(m[2], 10) - 1;
+  let c = 0;
+  for (let i = 0; i < colStr.length; i++) c = c * 26 + (colStr.charCodeAt(i) - 64);
+  return { r: rowNum, c: c - 1 };
+}
+function buildXlsxMerges() {
+  return MERGE_RANGES.map(rangeStr => {
+    const [a, b] = rangeStr.split(':');
+    return { s: decodeCell(a), e: decodeCell(b) };
+  });
+}
+function downloadXlsx(rows, dateStr) {
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!merges'] = buildXlsxMerges();
+  ws['!cols'] = new Array(14).fill({ wch: 12 });
+  ws['!rows'] = new Array(18).fill({ hpt: 32 });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '哨表');
+  XLSX.writeFile(wb, '哨表_' + dateStr.replace(/\//g, '') + '.xlsx');
+}
+
+// 18×14 原始表格在手機上要橫滑900px寬才看得完，字又小，改提供逐格清單檢視
+function flattenPreview(rows) {
+  const items = [];
+  items.push({ label: '早班帶隊幹部', value: rows[2][4] });
+  items.push({ label: '晚班帶隊幹部', value: rows[2][11] });
+  POST_DEFS.forEach(def => { items.push({ label: def.key, value: rows[def.row][def.col] }); });
+  items.push({ label: '巡檢增派', value: rows[10][5] });
+  items.push({ label: '泊車增派①', value: rows[11][5] });
+  items.push({ label: '泊車增派②', value: rows[12][5] });
+  items.push({ label: '停巡增派', value: rows[13][5] });
+  for (let r = 11; r <= 16; r++) {
+    if (rows[r][4] === '見習') items.push({ label: '早班見習', value: rows[r][5] });
+    if (rows[r][11] === '見習') items.push({ label: '晚班見習', value: rows[r][12] });
+  }
+  return items;
+}
+
+/* ══════════════════════ UI 元件 ══════════════════════ */
+function Toast({ msg, type }) {
+  return h('div', { className: 'toast show ' + (type || '') },
+    h('i', { className: 'ti ti-' + (type === 'err' ? 'x' : 'check') }), msg);
+}
+
+function PostConfigTab({ postConfig, setPostConfig, employees, loading, onSave, saving, loadError }) {
+  if (loading) return h('div', { className: 'empty-note' }, '讀取員工名單中…');
+  if (!employees.length) return h('div', { className: 'empty-note' }, '尚未讀到員工名單（來自早/晚班月班表）');
+  function toggle(name, key) {
+    setPostConfig(prev => {
+      const cur = new Set(prev[name] || []);
+      if (cur.has(key)) cur.delete(key); else cur.add(key);
+      return Object.assign({}, prev, { [name]: Array.from(cur) });
+    });
+  }
+  return h('div', null,
+    h('div', { className: 'card' },
+      h('div', { className: 'card-title' }, h('i', { className: 'ti ti-map-pin' }), '哨點設定（每位員工可勝任哪些哨位）'),
+      h('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } }, '員工名單來自早/晚班月班表姓名欄，勾選後按下方「儲存設定」。'),
+      h('div', { className: 'emp-list' },
+        employees.map(name => h('div', { className: 'emp-card', key: name },
+          h('div', { className: 'emp-name' }, name),
+          POST_GROUPS.map(g => h('div', { key: g.label },
+            h('div', { className: 'post-group' }, g.label),
+            h('div', { className: 'post-grid' },
+              g.keys.map(k => h('div', {
+                key: k,
+                className: 'post-chip' + ((postConfig[name] || []).includes(k) ? ' on' : ''),
+                onClick: () => toggle(name, k)
+              }, k))
+            )
+          ))
+        ))
+      )
+    ),
+    h('button', { className: 'btn btn-primary', onClick: onSave, disabled: saving || loadError },
+      h('i', { className: 'ti ti-device-floppy' }), saving ? '儲存中…' : (loadError ? '資料未載入，無法儲存' : '儲存設定'))
+  );
+}
+
+function localDateStr(d) {
+  // 用本地時間組字串，避免 toISOString()（UTC）在台灣凌晨 0:00~7:59 抓成前一天
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function GenerateTab({ postConfig }) {
+  const [dateStr, setDateStr] = useState(localDateStr(new Date()));
+  const [southGate, setSouthGate] = useState(false);
+  const [patrolExtra, setPatrolExtra] = useState(false);
+  const [parkExtra, setParkExtra] = useState(false);
+  const [stopPatrolExtra, setStopPatrolExtra] = useState(false);
+  const [parkNames, setParkNames] = useState(['', '']);
+  const [leaderEarly, setLeaderEarly] = useState('');
+  const [leaderLate, setLeaderLate] = useState('');
+  const [targetSheet, setTargetSheet] = useState('明日哨表');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null); // { rows, warnings, forcedWarnings, dateLabel }
+  const [toast, setToast] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [previewMode, setPreviewMode] = useState('list'); // 'list'（逐格檢視，手機預設）｜'table'（完整18×14表格）
+
+  function showToast(msg, type) {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 2600);
+  }
+
+  async function handleGenerate() {
+    setBusy(true);
+    setResult(null);
+    try {
+      const [y, m, d] = dateStr.split('-').map(n => parseInt(n, 10));
+      const r = await callGuardGas('getMonthlyRoster', { year: y, month: m, day: d });
+      if (r.status !== 'ok') { showToast(r.msg || '讀取月班表失敗', 'err'); setBusy(false); return; }
+      const weekdayIdx = new Date(y, m - 1, d).getDay();
+      const { rows, warnings, forcedWarnings } = buildGuardMatrix({
+        year: y, month: m, day: d, weekdayIdx,
+        earlyRoster: r.data.early || [], lateRoster: r.data.late || [],
+        postConfig, southGate, patrolExtra, parkExtra, stopPatrolExtra,
+        parkNames, leaderEarly, leaderLate
+      });
+      const dateLabel = y + '/' + String(m).padStart(2, '0') + '/' + String(d).padStart(2, '0') + ' 星期' + WEEKDAY_ZH[weekdayIdx];
+      setResult({ rows, warnings, forcedWarnings, dateLabel, year: y, month: m, day: d, weekday: WEEKDAY_ZH[weekdayIdx] });
+      showToast('預覽已產生', 'ok');
+    } catch (e) {
+      showToast('產生失敗：' + e.message, 'err');
+    }
+    setBusy(false);
+  }
+
+  function handleExportXlsx() {
+    if (!result) return;
+    downloadXlsx(result.rows, result.dateLabel.split(' ')[0]);
+    showToast('xlsx 已下載', 'ok');
+  }
+
+  async function handleUpload() {
+    if (!result) return;
+    setUploading(true);
+    const r = await fetch(GD_UPLOAD_GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'guardUpload', empId: EMP_ID,
+        targetSheet, year: result.year, month: result.month, day: result.day, weekday: result.weekday,
+        rows: result.rows
+      })
+    }).then(x => x.json()).catch(e => ({ success: false, error: e.message }));
+    setUploading(false);
+    if (r.success) showToast('已上傳至「' + targetSheet + '」', 'ok');
+    else showToast(r.error || '上傳失敗', 'err');
+  }
+
+  return h('div', null,
+    toast && h(Toast, toast),
+    h('div', { className: 'card' },
+      h('div', { className: 'card-title' }, h('i', { className: 'ti ti-calendar' }), '日期與增派設定'),
+      h('div', { className: 'row' },
+        h('div', { className: 'field' }, h('label', null, '哨表日期'),
+          h('input', { type: 'date', value: dateStr, onChange: e => setDateStr(e.target.value) })),
+        h('div', { className: 'field' }, h('label', null, '早班帶隊幹部（手動）'),
+          h('input', { type: 'text', value: leaderEarly, placeholder: '姓名', onChange: e => setLeaderEarly(e.target.value) })),
+        h('div', { className: 'field' }, h('label', null, '晚班帶隊幹部（手動）'),
+          h('input', { type: 'text', value: leaderLate, placeholder: '姓名', onChange: e => setLeaderLate(e.target.value) }))
+      ),
+      h('div', { className: 'row' },
+        h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: southGate, onChange: e => setSouthGate(e.target.checked) }), h('span', null, '南側門')),
+        h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: patrolExtra, onChange: e => setPatrolExtra(e.target.checked) }), h('span', null, '巡檢增派')),
+        h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: parkExtra, onChange: e => setParkExtra(e.target.checked) }), h('span', null, '泊車增派')),
+        h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: stopPatrolExtra, onChange: e => setStopPatrolExtra(e.target.checked) }), h('span', null, '停巡增派'))
+      ),
+      parkExtra && h('div', { className: 'row' },
+        h('div', { className: 'field' }, h('label', null, '泊車增派人員1'),
+          h('input', { type: 'text', value: parkNames[0], placeholder: '姓名', onChange: e => setParkNames([e.target.value, parkNames[1]]) })),
+        h('div', { className: 'field' }, h('label', null, '泊車增派人員2'),
+          h('input', { type: 'text', value: parkNames[1], placeholder: '姓名', onChange: e => setParkNames([parkNames[0], e.target.value]) }))
+      ),
+      h('button', { className: 'btn btn-primary', onClick: handleGenerate, disabled: busy },
+        h('i', { className: 'ti ti-wand' }), busy ? '產生中…' : '產生預覽')
+    ),
+    result && h('div', { className: 'card' },
+      h('div', { className: 'card-title' }, h('i', { className: 'ti ti-table' }), '預覽：' + result.dateLabel),
+      result.forcedWarnings.length > 0 && h('div', { className: 'warn-box forced' },
+        h('div', { className: 'wtitle' }, h('i', { className: 'ti ti-alert-octagon' }), '一定要看：漏勾增派（' + result.forcedWarnings.length + '）'),
+        h('ul', { style: { margin: 0, paddingLeft: '18px' } }, result.forcedWarnings.map((w, i) => h('li', { key: i }, w)))
+      ),
+      result.warnings.length > 0 && h('div', { className: 'warn-box' },
+        h('div', { className: 'wtitle' }, h('i', { className: 'ti ti-alert-triangle' }), '需要注意（' + result.warnings.length + '）'),
+        h('ul', { style: { margin: 0, paddingLeft: '18px' } }, result.warnings.map((w, i) => h('li', { key: i }, w)))
+      ),
+      h('div', { className: 'row', style: { justifyContent: 'flex-end' } },
+        h('button', {
+          className: 'btn btn-ghost',
+          onClick: () => setPreviewMode(previewMode === 'table' ? 'list' : 'table')
+        }, h('i', { className: 'ti ti-switch-horizontal' }), previewMode === 'table' ? '切換逐格檢視' : '切換完整表格')
+      ),
+      previewMode === 'table'
+        ? h('table', { className: 'prev-table' },
+            h('tbody', null, result.rows.map((row, ri) => h('tr', { key: ri },
+              row.map((cell, ci) => h('td', { key: ci, className: cell ? 'has-val' : '' }, cell))
+            )))
+          )
+        : h('div', { className: 'prev-list' },
+            flattenPreview(result.rows).map((it, i) => h('div', { className: 'prev-item', key: i },
+              h('span', { className: 'prev-item-label' }, it.label),
+              h('span', { className: 'prev-item-val' + (it.value ? ' has-val' : '') }, it.value || '未排')
+            ))
+          ),
+      h('div', { className: 'row', style: { marginTop: '14px' } },
+        h('button', { className: 'btn btn-ghost', onClick: handleExportXlsx }, h('i', { className: 'ti ti-file-spreadsheet' }), '產生 xlsx 下載'),
+        h('div', { className: 'field' }, h('label', null, '上傳目標分頁'),
+          h('select', { value: targetSheet, onChange: e => setTargetSheet(e.target.value) },
+            h('option', { value: '明日哨表' }, '明日哨表'),
+            h('option', { value: '今日哨表' }, '今日哨表'))),
+        h('button', { className: 'btn btn-indigo', onClick: handleUpload, disabled: uploading },
+          h('i', { className: 'ti ti-cloud-upload' }), uploading ? '上傳中…' : '上傳至試算表')
+      )
+    )
+  );
+}
+
+function App() {
+  const [tab, setTab] = useState('gen');
+  const [employees, setEmployees] = useState([]);
+  const [postConfig, setPostConfig] = useState({});
+  const [loadingCfg, setLoadingCfg] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  function showToast(msg, type) { setToast({ msg, type }); setTimeout(() => setToast(null), 2600); }
+
+  useEffect(() => {
+    (async () => {
+      setLoadingCfg(true);
+      const [namesRes, cfgRes] = await Promise.all([
+        callGuardGas('getEmployeeNames', {}),
+        callGuardGas('getGuardPostConfig', {})
+      ]);
+      let ok = true;
+      if (namesRes.status === 'ok') setEmployees(namesRes.data || []); else ok = false;
+      if (cfgRes.status === 'ok') setPostConfig(cfgRes.data || {}); else ok = false;
+      if (!ok) {
+        setLoadError(true);
+        showToast('讀取員工名單或哨點設定失敗，請重新整理再試（暫時無法儲存，避免把既有設定覆蓋成空的）', 'err');
+      }
+      setLoadingCfg(false);
+    })();
+  }, []);
+
+  async function handleSaveConfig() {
+    if (loadError) { showToast('資料載入失敗，無法儲存', 'err'); return; }
+    setSaving(true);
+    const configs = Object.keys(postConfig).map(name => ({ name, posts: postConfig[name] }));
+    const r = await callGuardGas('saveGuardPostConfig', { configs });
+    setSaving(false);
+    showToast(r.status === 'ok' ? '哨點設定已儲存' : (r.msg || '儲存失敗'), r.status === 'ok' ? 'ok' : 'err');
+  }
+
+  return h('div', { className: 'container' },
+    toast && h(Toast, toast),
+    h('div', { className: 'header' },
+      h('a', { className: 'back-btn', href: backUrl() }, h('i', { className: 'ti ti-arrow-left' }), '返回主選單'),
+      h('div', { className: 'title-wrap' },
+        h('div', { className: 'title-main' }, '自動排哨工具'),
+        h('div', { className: 'title-sub' }, 'TIANYING SECURITY · GUARD ROSTER')),
+      h('div', { style: { width: '90px' } })
+    ),
+    h('div', { className: 'tabs' },
+      h('button', { className: 'tab-btn' + (tab === 'gen' ? ' active' : ''), onClick: () => setTab('gen') }, h('i', { className: 'ti ti-table' }), ' 產生哨表'),
+      h('button', { className: 'tab-btn' + (tab === 'cfg' ? ' active' : ''), onClick: () => setTab('cfg') }, h('i', { className: 'ti ti-map-pin' }), ' 哨點設定')
+    ),
+    tab === 'gen' ? h(GenerateTab, { postConfig }) : h(PostConfigTab, {
+      postConfig, setPostConfig, employees, loading: loadingCfg, onSave: handleSaveConfig, saving, loadError
+    })
+  );
+}
+
+ReactDOM.render(h(App), document.getElementById('root'));
+</script>
+</body>
+</html>

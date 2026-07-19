@@ -311,7 +311,7 @@ const NODES = [
 
   // ── 西海／待辦規劃 ──
   { id: 26, title: 'TODO-11 角色 Agents', topic: 'todo', pos: [-1.6891, -1.2961, -0.0], note: '✅ 完成（2026-06-28）：11 Agent + 工作流程檔落地成 .claude/agents/*.md' },
-  { id: 27, title: 'TODO-12 哨表自動化', topic: 'todo', pos: [-1.7295, -0.532, -1.2924], note: '排班自動產表/輪值/衝突檢查' },
+  { id: 27, title: 'TODO-12 哨表自動化', topic: 'todo', pos: [-1.7295, -0.532, -1.2924], note: '✅ 開發完成（2026-07-19）：哨表自動產生工具 tool_guard_gen.html(id138) + 哨表產生_GAS.gs(id44)，待部署與人工驗收' },
   { id: 28, title: 'TODO-13 對話助手', topic: 'todo', pos: [-0.4572, -1.6235, -1.547], note: '✅ 已完成：天鷹 AI 小助手（小天鷹）J.A.R.V.I.S. 風格' },
 
   // ── 前端工具（直立雙圈環繞核心） ──
@@ -353,7 +353,7 @@ const NODES = [
   // ── 東海／後端 GAS ──
   // ↳ 空節點（預留，外圍）
   { id: 43, title: '交接事項 GAS', topic: 'backend', pos: [1.1915, 2.2311, -0.1222], note: '帶班交接_GAS.gs（獨立部署）；add/update/delete/getAll；建立人+建立時間、最後修改人+時間伺服器端蓋章，主鍵 max(ID)+1' },
-  { id: 44, title: '空節點 #44', topic: 'backend', pos: [1.8958, 1.2979, 1.1353], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
+  { id: 44, title: '哨表產生 GAS', topic: 'backend', pos: [1.8958, 1.2979, 1.1353], note: '哨表產生_GAS.gs（獨立部署）；getEmployeeNames/getGuardPostConfig/saveGuardPostConfig/getMonthlyRoster；讀早晚班月班表算當日在職名單、讀寫哨點設定分頁；上傳寫入哨表另沿用哨表上傳_GAS_v6.gs' },
   { id: 45, title: '空節點 #45', topic: 'backend', pos: [0.5772, 2.099, 1.4062], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 46, title: '空節點 #46', topic: 'backend', pos: [1.6916, 1.0127, -1.7242], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 47, title: '空節點 #47', topic: 'backend', pos: [1.8028, 1.916, -0.2784], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
@@ -462,6 +462,9 @@ const NODES = [
 
   // ── 個人化背景系統（2026-07-12）── tools 第三圈續填
   { id: 137, title: '個人化背景系統', topic: 'tools', pos: [0.0, -0.455, 3.315], note: 'index.html 帳號分頁「🎨個人化背景」；內建11款預設(純黑預設/3深色靜態/3深色動態/2亮色靜態/2亮色動態)，動態款全CSS動畫+DOM粒子零圖檔；自訂上傳照片canvas縮1280壓JPEG、GIF保留動態限3MB；亮色系自動補償(--card轉深色實底/section-title轉深字/home-greet墊深底)；自訂照片固定蓋深色遮罩不可關；設定存localStorage(hsh_bg_type/hsh_bg_custom)單機版，套用範圍index四分頁；同批改動：工具按鈕改B款緊湊三欄(tool-grid 1fr x3)（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
+
+  // ── 哨表自動產生（2026-07-19）── tools 第三圈續填
+  { id: 138, title: '自動排哨工具', topic: 'tools', pos: [0.0, 0.455, -3.315], note: 'tool_guard_gen.html 獨立檔；主選單id20/人事管理分類/僅管理員可見；哨點設定(每位員工適任哨點勾選)＋產生哨表(選日期+南側門/巡檢增派/泊車增派/停巡增派勾選→隨機分配崗位、L/LN班自動抓巡檢停巡增派、見習自動歸位→18x14陣列預覽)；產生xlsx(SheetJS帶合併儲存格)或上傳至今日/明日哨表；帶隊幹部無自動規則，手動輸入' },
 ];
 
 const EDGES = [
@@ -505,6 +508,8 @@ const EDGES = [
   [0, 14], [14, 66],
   // 互動吉祥物：內嵌於主控台
   [0, 136],
+  // 哨表自動產生：主控台→工具→GAS(哨點設定/月班表)→哨表試算表；也讀班表資料、上傳沿用哨表試算表
+  [0, 138], [138, 44], [44, 20], [44, 42], [27, 138],
 ];
 
 // === BRAIN_MAP_DATA_END ===
