@@ -145,7 +145,7 @@ function getMonthlyRoster(year, month, day) {
     var colIdx = 2 + day - 1; // data[r][2+day-1]
     for (var r = 0; r < data.length; r++) {
       var name = String(data[r][1] || '').trim();
-      if (!name) continue;
+      if (!name || name === '姓名' || name === '日期') continue; // 跳過表頭列
       var code = String(data[r][colIdx] || '').trim();
       if (!code || OFF_CODES_.indexOf(code) !== -1) continue;
       result[key].push({ name: name, code: code });
