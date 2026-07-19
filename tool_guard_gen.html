@@ -182,7 +182,9 @@ function priorityFor(list, key) {
 }
 // 有標優先序的排前面（數字小優先）、其餘隨機排在後面，同優先序之間也隨機
 function pickByPriority(cands, postConfig, key) {
-  const ranked = cands.filter(p => priorityFor(postConfig[p.name], key) != null)
+  // 排序前先洗牌：Array.sort 是穩定排序，同優先序（含都沒設）的人要靠洗牌過的順序才會真的隨機，
+  // 不然永遠固定選到「原始陣列裡排比較前面」的那個人。
+  const ranked = shuffle(cands.filter(p => priorityFor(postConfig[p.name], key) != null))
     .sort((a, b) => priorityFor(postConfig[a.name], key) - priorityFor(postConfig[b.name], key));
   const unranked = shuffle(cands.filter(p => priorityFor(postConfig[p.name], key) == null));
   return ranked.concat(unranked)[0];
