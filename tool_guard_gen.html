@@ -248,6 +248,7 @@ function buildGuardMatrix(opts) {
   const HANLAI_CODE_TIME = { 'H': '1100-2200', 'H2': '1100-2330' }; // H/H2代號本身就代表早晚班漢來飯店同一人，兩者互斥（同一天只會有其中一種）
   const earlyHanlai = earlyRoster.filter(p => HANLAI_CODE_TIME[p.code]);
   const earlyExclude = new Set(earlyTrainees.concat(earlyL, earlyLN, earlyN, earlySouth, earlyHanlai).map(p => p.name));
+  if (leaderEarly) earlyExclude.add(leaderEarly); // 被排為早班帶班幹部的人，不再進入其他哨點的隨機分配池
   const earlyPoolBase = earlyRoster.filter(p => !earlyExclude.has(p.name));
 
   // L/LN/N/南 班的人不會被塞回一般崗位池（維持原意圖：他們的工作就是巡檢/停巡增派/南側門），
@@ -271,6 +272,7 @@ function buildGuardMatrix(opts) {
   const lateTrainees = lateRoster.filter(p => (p.code || '').indexOf('見') >= 0);
   const lateSea = lateRoster.filter(p => p.code === '海');
   const lateExclude = new Set(lateTrainees.concat(lateSea).map(p => p.name));
+  if (leaderLate) lateExclude.add(leaderLate); // 被排為晚班帶班幹部的人，不再進入其他哨點的隨機分配池
   const latePoolBase = lateRoster.filter(p => !lateExclude.has(p.name));
 
   // ── 一般崗位／巡檢隨機分配：貪婪分配結果會因為隨機順序不穩定（同一份資料重跑，
