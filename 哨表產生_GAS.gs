@@ -114,7 +114,7 @@ function getEmployeeNames() {
     var data = sh.getDataRange().getValues();
     for (var r = 0; r < data.length; r++) {
       var name = String(data[r][1] || '').trim();
-      if (name) names[name] = true;
+      if (name && name !== '姓名' && name !== '日期') names[name] = true; // 跳過表頭列
     }
   });
   var list = Object.keys(names).sort(function (a, b) { return a.localeCompare(b, 'zh-Hant'); });
