@@ -66,6 +66,9 @@ input:focus,select:focus{border-color:var(--gold);}
 .post-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;}
 .post-chip{font-size:14px;padding:10px 8px;min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,.25);cursor:pointer;text-align:center;user-select:none;}
 .post-chip.on{background:rgba(212,168,0,.25);border-color:var(--gold);color:var(--gold2);}
+.priority-editor{display:flex;flex-direction:column;gap:6px;margin:6px 0 4px;padding:8px 10px;background:rgba(129,140,248,.06);border:1px solid rgba(129,140,248,.25);border-radius:8px;}
+.priority-row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);}
+.priority-input{width:64px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,.3);color:var(--text);font-size:14px;text-align:center;}
 .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:12px 26px;border-radius:50px;font-weight:700;z-index:9999;display:none;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);font-size:14px;}
 .toast.show{display:flex;}
 .toast.ok{background:rgba(20,35,25,.97);color:var(--success);border:1px solid rgba(74,222,128,.5);}
@@ -128,7 +131,7 @@ const POST_DEFS = [
   { key: '晚班警衛室',   label: '警衛室',           row: 3,  col: 9,  shift: 'late' },
   { key: '晚班B1F警衛室',label: 'B1F\n警衛室',      row: 6,  col: 9,  shift: 'late' },
   { key: '晚班P3車道',   label: 'P3車道\n(廣場哨)', row: 7,  col: 9,  shift: 'late' },
-  { key: '晚班漢來飯店', label: '漢來\n飯店',       row: 3,  col: 12, shift: 'late' },
+  { key: '晚班漢來飯店', label: '漢來\n飯店',       row: 3,  col: 12, shift: 'late', linked: '漢來飯店' }, // 早/晚班漢來飯店是同一人跨時段駐守，不獨立抽人，見 buildGuardMatrix
   { key: '晚班機動人員', label: '機動\n人員',       row: 6,  col: 12, shift: 'late' },
   { key: '海底撈',       label: '海底撈',           row: 7,  col: 12, shift: 'late' },
   { key: '巡檢1',        label: '巡檢1',            row: 10, col: 2,  shift: 'early' },
@@ -153,11 +156,37 @@ const POST_GROUPS = [
   { label: '早班一般崗位', keys: ['警衛室', '漢來飯店', 'P3車道', '南側門'] },
   { label: '早班特殊崗位', keys: ['B1F警衛室', '機動人員1', '物流車道', '機動人員2'] },
   { label: '早班巡檢/停巡', keys: ['巡檢1', '巡檢2', '巡檢3', '停巡4', '停巡5', '停巡6', '停巡7'] },
-  { label: '晚班崗位', keys: ['晚班警衛室', '晚班B1F警衛室', '晚班P3車道', '晚班漢來飯店', '晚班機動人員', '海底撈'] },
+  // 晚班漢來飯店不在這裡：跟早班漢來飯店是同一人（linked），不獨立設定資格
+  { label: '晚班崗位', keys: ['晚班警衛室', '晚班B1F警衛室', '晚班P3車道', '晚班機動人員', '海底撈'] },
   { label: '晚班巡檢/停巡', keys: ['晚班巡檢1', '晚班巡檢2', '晚班巡檢3', '晚班停巡4', '晚班停巡5', '晚班停巡6'] },
   { label: '帶班幹部（產生哨表時下拉選單用）', keys: [LEADER_KEYS.early, LEADER_KEYS.late] },
 ];
 const WEEKDAY_ZH = ['日', '一', '二', '三', '四', '五', '六'];
+
+/* ══════════════════════ 哨點設定資料格式：'key' 或 'key|優先序數字'（數字越小越優先）══════════════════════
+   儲存與傳輸格式不變（逗號分隔字串），只是每個項目多了可選的 |數字 後綴，GAS端完全不需要改，
+   對它來說仍然是不透明字串。
+════════════════════════════════════════════════════════════════════ */
+function parsePostEntry(s) {
+  const i = s.indexOf('|');
+  if (i === -1) return { key: s, priority: null };
+  const p = parseInt(s.slice(i + 1), 10);
+  return { key: s.slice(0, i), priority: isNaN(p) ? null : p };
+}
+function hasQual(list, key) {
+  return (list || []).some(s => parsePostEntry(s).key === key);
+}
+function priorityFor(list, key) {
+  const e = (list || []).map(parsePostEntry).find(e => e.key === key);
+  return e ? e.priority : null;
+}
+// 有標優先序的排前面（數字小優先）、其餘隨機排在後面，同優先序之間也隨機
+function pickByPriority(cands, postConfig, key) {
+  const ranked = cands.filter(p => priorityFor(postConfig[p.name], key) != null)
+    .sort((a, b) => priorityFor(postConfig[a.name], key) - priorityFor(postConfig[b.name], key));
+  const unranked = shuffle(cands.filter(p => priorityFor(postConfig[p.name], key) == null));
+  return ranked.concat(unranked)[0];
+}
 const DEFAULT_TIME = { early: '0800-2000', late: '2000-0800' };
 
 /* ══════════════════════ 18×14 固定文字標籤（每次產生都先寫入，動態內容之後再覆蓋值格）══════════════════════ */
@@ -241,10 +270,11 @@ function buildGuardMatrix(opts) {
     const failedKeys = [];
     order.forEach(def => {
       if (def.conditional === 'southGate' && !southGate) return;
+      if (def.linked) return; // 跟另一個崗位連動同一人，不獨立抽（見下方 linked 補值邏輯）
       const pool = def.shift === 'early' ? earlyPool : latePool;
-      const cands = pool.filter(p => (postConfig[p.name] || []).includes(def.key));
+      const cands = pool.filter(p => hasQual(postConfig[p.name], def.key));
       if (!cands.length) { picks[def.key] = null; failedKeys.push(def.key); return; }
-      const picked = shuffle(cands)[0];
+      const picked = pickByPriority(cands, postConfig, def.key);
       pool.splice(pool.indexOf(picked), 1);
       picks[def.key] = picked;
     });
@@ -266,6 +296,17 @@ function buildGuardMatrix(opts) {
   const earlyPool = best.earlyPool, latePool = best.latePool;
   if (earlyPool.length) warnings.push('早班有排班但未分配到崗位：' + earlyPool.map(p => p.name).join('、'));
   if (latePool.length) warnings.push('晚班有排班但未分配到崗位：' + latePool.map(p => p.name).join('、'));
+
+  // ── linked 崗位：跟來源崗位是同一人跨時段駐守，直接沿用來源的分配結果，不獨立抽人 ──
+  POST_DEFS.filter(d => d.linked).forEach(def => {
+    const picked = best.picks[def.linked];
+    if (!picked) { warnings.push('「' + def.key + '」跟「' + def.linked + '」是同一人，但早班尚未分配到人，需手動確認'); return; }
+    if (!lateRoster.some(p => p.name === picked.name)) {
+      warnings.push('「' + def.key + '」應與早班「' + def.linked + '」（' + picked.name + '）同一人，但他當天沒有晚班排班紀錄，需手動確認');
+      return;
+    }
+    rows[def.row][def.col] = picked.name + '\n' + DEFAULT_TIME.late;
+  });
 
   // ── 巡檢增派（早班 L/LN） ──
   if (patrolExtra) {
@@ -393,16 +434,24 @@ function PostConfigTab({ postConfig, setPostConfig, employees, loading, onSave, 
   if (!employees.length) return h('div', { className: 'empty-note' }, '尚未讀到員工名單（來自早/晚班月班表）');
   function toggle(name, key) {
     setPostConfig(prev => {
-      const cur = new Set(prev[name] || []);
-      if (cur.has(key)) cur.delete(key); else cur.add(key);
-      return Object.assign({}, prev, { [name]: Array.from(cur) });
+      const list = prev[name] || [];
+      const exists = hasQual(list, key);
+      const next = exists ? list.filter(s => parsePostEntry(s).key !== key) : list.concat([key]);
+      return Object.assign({}, prev, { [name]: next });
+    });
+  }
+  function setPriority(name, key, val) {
+    setPostConfig(prev => {
+      const list = prev[name] || [];
+      const next = list.map(s => parsePostEntry(s).key === key ? (val ? key + '|' + val : key) : s);
+      return Object.assign({}, prev, { [name]: next });
     });
   }
   const filteredEmployees = search.trim() ? employees.filter(n => n.includes(search.trim())) : employees;
   return h('div', null,
     h('div', { className: 'card' },
       h('div', { className: 'card-title' }, h('i', { className: 'ti ti-map-pin' }), '哨點設定（每位員工可勝任哪些哨位）'),
-      h('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } }, '員工名單來自早/晚班月班表姓名欄，勾選後按下方「儲存設定」。'),
+      h('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } }, '員工名單來自早/晚班月班表姓名欄，勾選後按下方「儲存設定」。勾選的哨位下方會出現「優先序」輸入框，數字越小越優先（同一崗位多人可選時，優先序低的人優先派上；留空＝沒有偏好，隨機分配）。'),
       h('div', { className: 'field', style: { marginBottom: '14px' } },
         h('label', null, '搜尋姓名'),
         h('input', {
@@ -413,16 +462,29 @@ function PostConfigTab({ postConfig, setPostConfig, employees, loading, onSave, 
       h('div', { className: 'emp-list' },
         filteredEmployees.map(name => h('div', { className: 'emp-card', key: name },
           h('div', { className: 'emp-name' }, name),
-          POST_GROUPS.map(g => h('div', { key: g.label },
-            h('div', { className: 'post-group' }, g.label),
-            h('div', { className: 'post-grid' },
-              g.keys.map(k => h('div', {
-                key: k,
-                className: 'post-chip' + ((postConfig[name] || []).includes(k) ? ' on' : ''),
-                onClick: () => toggle(name, k)
-              }, k))
-            )
-          ))
+          POST_GROUPS.map(g => {
+            const checkedKeys = g.keys.filter(k => hasQual(postConfig[name], k));
+            return h('div', { key: g.label },
+              h('div', { className: 'post-group' }, g.label),
+              h('div', { className: 'post-grid' },
+                g.keys.map(k => h('div', {
+                  key: k,
+                  className: 'post-chip' + (checkedKeys.includes(k) ? ' on' : ''),
+                  onClick: () => toggle(name, k)
+                }, k))
+              ),
+              checkedKeys.length > 0 && h('div', { className: 'priority-editor' },
+                checkedKeys.map(k => h('div', { className: 'priority-row', key: k },
+                  h('span', null, k + ' 優先序'),
+                  h('input', {
+                    type: 'number', min: 1, className: 'priority-input', placeholder: '不限',
+                    value: priorityFor(postConfig[name], k) || '',
+                    onChange: e => setPriority(name, k, e.target.value)
+                  })
+                ))
+              )
+            );
+          })
         ))
       )
     ),
@@ -446,8 +508,8 @@ function GenerateTab({ postConfig }) {
   const [leaderEarly, setLeaderEarly] = useState('');
   const [leaderLate, setLeaderLate] = useState('');
   // 帶班幹部下拉選單：只列出「哨點設定」裡標記適任早班/晚班帶班的人
-  const earlyLeaderOptions = Object.keys(postConfig).filter(n => (postConfig[n] || []).includes(LEADER_KEYS.early)).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
-  const lateLeaderOptions = Object.keys(postConfig).filter(n => (postConfig[n] || []).includes(LEADER_KEYS.late)).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+  const earlyLeaderOptions = Object.keys(postConfig).filter(n => hasQual(postConfig[n], LEADER_KEYS.early)).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+  const lateLeaderOptions = Object.keys(postConfig).filter(n => hasQual(postConfig[n], LEADER_KEYS.late)).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
   const [targetSheet, setTargetSheet] = useState('明日哨表');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null); // { rows, warnings, forcedWarnings, dateLabel }
