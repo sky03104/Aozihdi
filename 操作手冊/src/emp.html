@@ -8,7 +8,7 @@
   <div class="en">TIANYING SECURITY · DATA SYSTEM</div>
   <div class="doctitle">APP 操作使用手冊</div>
   <div class="badge">員工版</div>
-  <div class="meta">適用對象：第一線保全人員<br>版本 v1.1　·　2026 年 7 月<br>請搭配 APP 實機操作閱讀</div>
+  <div class="meta">適用對象：第一線保全人員<br>版本 v1.2　·　2026 年 7 月<br>請搭配 APP 實機操作閱讀</div>
 </div>
 
 <div class="section">
@@ -62,7 +62,9 @@
 <tr><td>核心工具</td><td>停車場車位數計算</td><td>計算可用車位</td></tr>
 <tr><td>核心工具</td><td>物流車輛統計</td><td>登記物流貨車進出數量（三分類）</td></tr>
 <tr><td>人事管理</td><td>班表查詢 / 請假申請</td><td>查自己的班、線上請假</td></tr>
+<tr><td>人事管理</td><td>帶班交接事項</td><td>換班交接注意事項（<b>組長以上</b>才看得到）</td></tr>
 <tr><td>現場管理</td><td>事故報告填寫</td><td>回報現場事故（含照片）</td></tr>
+<tr><td>資料管理</td><td>施工單查詢</td><td>查詢廠商施工單／動火申請、現場報到換證</td></tr>
 <tr><td>門禁管理</td><td>過夜車輛登記</td><td>登記夜間停放車輛</td></tr>
 <tr><td>緊急應變</td><td>緊急聯絡清單 / 匿名表揚‧反應</td><td>查緊急電話、匿名回報</td></tr>
 </table>
@@ -107,15 +109,30 @@
 </div>
 
 <div class="toolcard"><div class="t">📅 班表查詢</div><div class="c">人事管理</div>
-<p>選月份／自己的工號即可查看班別。班別代號（早班 A/S/L/H…、晚班 B/海/N、休假等）會以顏色區分。</p>
+<ol>
+  <li>選<b>本週班表</b>或<b>本月班表</b>，系統自動帶入你自己的工號（不用手動輸入）。</li>
+  <li>畫面依日期排列，每天顯示<b>班別代號</b>，早班常見 A（08:00-20:00）／S（08:00-16:00）／H（11:00-22:00）／H2（11:00-23:30）／L（12:00-20:00）／LN（12:00-24:00）／南（南館班）；晚班常見 B（20:00-08:00）／海（22:00-10:00）／N（20:00-24:00）；另有休、排休、事假、病假、補休、見習等非上班代號。</li>
+  <li>不同班別代號用不同顏色區分，一眼就能分辨當天是不是上班日。</li>
+  <li>也可以直接用 <b>LINE 機器人</b> 輸入「本月班表」「本週班表」「今日班表」「明日班表」查詢，不用開 APP（見《LINE 機器人操作手冊》）。</li>
+</ol>
+<div class="tip">跨月查詢（例如月底查下個月）暫不支援，請等新月份班表公告後再查。</div>
 </div>
 
 <div class="toolcard"><div class="t">📝 請假申請</div><div class="c">人事管理</div>
-<p>可在 APP 內申請，或用 <b>LINE 機器人</b> 申請（見《LINE 機器人操作手冊》）。選擇請假日期與原因送出，等待主管審核，結果會通知你。</p>
+<ol>
+  <li>可在 APP 內申請，或用 <b>LINE 機器人</b> 申請（見《LINE 機器人操作手冊》），兩邊送出的申請會匯到同一個地方。</li>
+  <li>選擇<b>請假日期</b>與<b>請假原因</b>，確認後送出。</li>
+  <li>送出後狀態為<b>待審</b>，等待帶班以上主管審核。</li>
+  <li>審核結果（<b>核准</b>／<b>駁回</b>）會透過 LINE 通知你，不用自己回來查看。</li>
+</ol>
 </div>
 
 <div class="toolcard"><div class="t">📞 緊急聯絡清單</div><div class="c">緊急應變</div>
-<p>查詢各單位緊急聯絡電話。手機號碼開頭的 0 會正確顯示。</p>
+<ol>
+  <li>依單位／分類找到要找的緊急聯絡電話。</li>
+  <li>手機號碼開頭的 0 會正確顯示，不會被系統誤判成數字而遺失。</li>
+  <li>點電話號碼可直接撥打（手機瀏覽器支援一鍵撥號）。</li>
+</ol>
 </div>
 
 <div class="toolcard"><div class="t">📋 今/明日哨表</div><div class="c">核心工具</div>
@@ -140,12 +157,53 @@
 <figure><img src="img/logistics_form.png" alt="物流車輛統計"><figcaption>▲ 物流車輛統計登記頁（分類＋數量＋快捷登記＋今日累計）</figcaption></figure>
 </div>
 
-<div class="toolcard"><div class="t">☁️ 資料上傳工具　·　🅿️ 停車場車位　·　🚗 過夜車輛登記</div><div class="c">核心 / 門禁</div>
-<ul>
-  <li><b>資料上傳</b>：依畫面選擇檔案（如班表 Excel）上傳。</li>
-  <li><b>停車場車位</b>：輸入數據計算可用車位。</li>
-  <li><b>過夜車輛登記</b>：登記夜間停放車輛車牌與資訊。</li>
-</ul>
+<div class="toolcard"><div class="t">☁️ 資料上傳工具</div><div class="c">核心工具</div>
+<ol>
+  <li>依畫面提示選擇要上傳的檔案（例如班表 Excel、哨表 Excel）。</li>
+  <li>系統會自動判讀檔案內的日期，決定要更新的分頁。</li>
+  <li>上傳完成會顯示成功訊息；資料會直接同步到雲端試算表，全公司帳號查詢時就會看到最新內容。</li>
+</ol>
+<div class="warn">⚠️ 此工具會直接覆蓋線上資料，上傳前請確認檔案內容正確，避免誤傳造成資料被覆蓋。</div>
+</div>
+
+<div class="toolcard"><div class="t">🅿️ 停車場車位數計算</div><div class="c">核心工具</div>
+<ol>
+  <li>分區輸入<b>B1F</b>、<b>B2F</b>、<b>機車格</b>目前的<b>實際佔位數</b>（現場實際停了幾輛）。</li>
+  <li>系統依各區<b>總車位數</b>自動算出<b>剩餘可用車位</b>，即時顯示在畫面上。</li>
+  <li>提供給現場人員或引導車輛的同仁參考，不需要自己心算。</li>
+</ol>
+</div>
+
+<div class="toolcard"><div class="t">🚗 過夜車輛登記</div><div class="c">門禁管理</div>
+<ol>
+  <li>點「拍攝車牌」，用手機鏡頭對準車牌拍照。</li>
+  <li>系統自動用 AI 辨識車牌號碼，<b>3 秒後自動登記</b>；辨識期間可以點車牌文字手動修改。</li>
+  <li>若辨識失敗，畫面會提示「辨識失敗，請手動輸入車牌」，直接用鍵盤輸入即可。</li>
+  <li>登記完成後可在清單查看今天所有過夜車輛紀錄。</li>
+</ol>
+</div>
+
+<div class="toolcard"><div class="t">📋 施工單查詢</div><div class="c">資料管理</div>
+<ol>
+  <li>頂部分頁切換：<span class="kbd">今天</span> / <span class="kbd">明天</span> / <span class="kbd">已申請</span> / <span class="kbd">歷史</span>，另有「施工單查詢」與「動火申請查詢」兩種類別可切換。</li>
+  <li>每張卡片顯示<b>廠商專櫃名稱</b>、<b>施工地點</b>、<b>施工項目</b>、<b>監工</b>、<b>進場／退場時間</b>。</li>
+  <li>上方搜尋框可用<b>廠商、地點、監工</b>關鍵字快速篩選當天記錄。</li>
+  <li>廠商人員現場報到時，點卡片上的「<i class="ti ti-badge-check"></i> 報到換證」按鈕完成報到；已報到的卡片會顯示「已報到換證」。</li>
+</ol>
+<div class="tip">「明天」分頁會同時顯示明日新排的施工單，以及今日通宵（跨夜）尚未退場的記錄，避免漏看夜間仍在場的廠商。</div>
+<figure><img src="img/tool_work.png" alt="施工單查詢"><figcaption>▲ 施工單查詢（分頁切換＋樓層/單位篩選＋報到換證）</figcaption></figure>
+</div>
+
+<div class="toolcard"><div class="t">🔄 帶班交接事項</div><div class="c">人事管理　·　組長以上</div>
+<p>只有<b>組長／副隊長／隊長／主管／管理員</b>才看得到，用於換班時把現場注意事項交接給下一班。</p>
+<ol>
+  <li>頂部輸入框填寫要交接的事項內容（如故障設備、待追蹤事件），按「送出」新增，預設狀態為<b>未完成</b>。</li>
+  <li>分頁切換：<span class="kbd">全部</span> / <span class="kbd">未完成</span> / <span class="kbd">進行中</span> / <span class="kbd">已完成</span>。</li>
+  <li>每筆事項顯示<b>建立人／時間</b>與<b>最後修改人／時間</b>，方便追查交接紀錄。</li>
+  <li>點狀態徽章可切換<b>未完成 → 進行中 → 已完成</b>，或編輯內容、刪除該筆。</li>
+</ol>
+<div class="tip">接班先看「未完成」「進行中」分頁，處理完記得切回「已完成」，讓交接紀錄保持乾淨，方便下一班接手。</div>
+<figure><img src="img/handover_emp.png" alt="帶班交接事項"><figcaption>▲ 帶班交接事項（新增事項＋狀態分頁＋建立人/最後修改人紀錄）</figcaption></figure>
 </div>
 </div>
 
@@ -168,7 +226,7 @@
 <tr><td>每次都要重新登入</td><td>登入時勾「記住我」即可自動登入。</td></tr>
 <tr><td>手機號碼開頭 0 不見</td><td>系統已修正，緊急聯絡清單會正確顯示開頭 0。</td></tr>
 </table>
-<div class="foot">天鷹保全 · TIANYING SECURITY · DATA SYSTEM　|　員工版操作手冊 v1.0　|　內部使用</div>
+<div class="foot">天鷹保全 · TIANYING SECURITY · DATA SYSTEM　|　員工版操作手冊 v1.2　|　內部使用</div>
 </div>
 
 </body></html>
