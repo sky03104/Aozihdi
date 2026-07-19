@@ -388,6 +388,7 @@ function ScrollButtons() {
 }
 
 function PostConfigTab({ postConfig, setPostConfig, employees, loading, onSave, saving, loadError }) {
+  const [search, setSearch] = useState('');
   if (loading) return h('div', { className: 'empty-note' }, '讀取員工名單中…');
   if (!employees.length) return h('div', { className: 'empty-note' }, '尚未讀到員工名單（來自早/晚班月班表）');
   function toggle(name, key) {
@@ -397,12 +398,20 @@ function PostConfigTab({ postConfig, setPostConfig, employees, loading, onSave, 
       return Object.assign({}, prev, { [name]: Array.from(cur) });
     });
   }
+  const filteredEmployees = search.trim() ? employees.filter(n => n.includes(search.trim())) : employees;
   return h('div', null,
     h('div', { className: 'card' },
       h('div', { className: 'card-title' }, h('i', { className: 'ti ti-map-pin' }), '哨點設定（每位員工可勝任哪些哨位）'),
       h('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } }, '員工名單來自早/晚班月班表姓名欄，勾選後按下方「儲存設定」。'),
+      h('div', { className: 'field', style: { marginBottom: '14px' } },
+        h('label', null, '搜尋姓名'),
+        h('input', {
+          type: 'text', value: search, placeholder: '輸入姓名快速找到那個人',
+          onChange: e => setSearch(e.target.value)
+        })),
+      !filteredEmployees.length && h('div', { className: 'empty-note' }, '找不到符合「' + search + '」的員工'),
       h('div', { className: 'emp-list' },
-        employees.map(name => h('div', { className: 'emp-card', key: name },
+        filteredEmployees.map(name => h('div', { className: 'emp-card', key: name },
           h('div', { className: 'emp-name' }, name),
           POST_GROUPS.map(g => h('div', { key: g.label },
             h('div', { className: 'post-group' }, g.label),
