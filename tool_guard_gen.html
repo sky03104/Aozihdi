@@ -123,7 +123,7 @@ const POST_DEFS = [
   { key: '警衛室',       label: '警衛室',           row: 3,  col: 2,  shift: 'early' },
   { key: '漢來飯店',     label: '漢來\n飯店',       row: 4,  col: 2,  shift: 'early' },
   { key: 'P3車道',       label: 'P3\n車道',         row: 6,  col: 2,  shift: 'early' },
-  { key: '南側門',       label: '南側門',           row: 7,  col: 2,  shift: 'early', conditional: 'southGate' },
+  { key: '南側門',       label: '南側門',           row: 7,  col: 2,  shift: 'early', conditional: 'southGate', forcedCode: '南' },
   { key: 'B1F警衛室',    label: 'B1F\n警衛室',      row: 3,  col: 5,  shift: 'early' },
   { key: '機動人員1',    label: '機動\n人員1',      row: 4,  col: 5,  shift: 'early' },
   { key: '物流車道',     label: '物流\n車道',       row: 6,  col: 5,  shift: 'early' },
@@ -133,7 +133,7 @@ const POST_DEFS = [
   { key: '晚班P3車道',   label: 'P3車道\n(廣場哨)', row: 7,  col: 9,  shift: 'late' },
   { key: '晚班漢來飯店', label: '漢來\n飯店',       row: 3,  col: 12, shift: 'late', linked: '漢來飯店' }, // 早/晚班漢來飯店是同一人跨時段駐守，不獨立抽人，見 buildGuardMatrix
   { key: '晚班機動人員', label: '機動\n人員',       row: 6,  col: 12, shift: 'late' },
-  { key: '海底撈',       label: '海底撈',           row: 7,  col: 12, shift: 'late' },
+  { key: '海底撈',       label: '海底撈',           row: 7,  col: 12, shift: 'late', forcedCode: '海' },
   { key: '巡檢1',        label: '巡檢1',            row: 10, col: 2,  shift: 'early' },
   { key: '巡檢2',        label: '巡檢2',            row: 11, col: 2,  shift: 'early' },
   { key: '巡檢3',        label: '巡檢3',            row: 12, col: 2,  shift: 'early' },
@@ -239,15 +239,16 @@ function buildGuardMatrix(opts) {
   if (leaderEarly) rows[2][4] = leaderEarly + '\n' + DEFAULT_TIME.early;
   if (leaderLate) rows[2][11] = leaderLate + '\n' + DEFAULT_TIME.late;
 
-  // ── 拆分早班：見習 / L / LN / 一般池 ──
+  // ── 拆分早班：見習 / L / LN / 南（南側門專職）/ 一般池 ──
   const earlyTrainees = earlyRoster.filter(p => (p.code || '').indexOf('見') >= 0);
   const earlyL = earlyRoster.filter(p => p.code === 'L');
   const earlyLN = earlyRoster.filter(p => p.code === 'LN');
-  const earlyExclude = new Set(earlyTrainees.concat(earlyL, earlyLN).map(p => p.name));
+  const earlySouth = earlyRoster.filter(p => p.code === '南');
+  const earlyExclude = new Set(earlyTrainees.concat(earlyL, earlyLN, earlySouth).map(p => p.name));
   const earlyPoolBase = earlyRoster.filter(p => !earlyExclude.has(p.name));
 
-  // L/LN班的人不會被塞回一般崗位池（維持原意圖：他們的工作是巡檢/停巡增派），
-  // 但沒勾對應增派 checkbox 時人會無聲消失，所以強制跳出醒目警告點名，不能只靠一般警告清單。
+  // L/LN/南 班的人不會被塞回一般崗位池（維持原意圖：他們的工作就是巡檢/停巡增派/南側門），
+  // 但沒勾對應 checkbox 時人會無聲消失，所以強制跳出醒目警告點名，不能只靠一般警告清單。
   const forcedWarnings = [];
   earlyL.forEach(p => {
     if (!patrolExtra) forcedWarnings.push(p.name + ' 是 L 班，但未勾選「巡檢增派」，此人尚未被排入本次哨表');
@@ -256,10 +257,14 @@ function buildGuardMatrix(opts) {
     if (!patrolExtra) forcedWarnings.push(p.name + ' 是 LN 班，但未勾選「巡檢增派」，此人的巡檢增派時段尚未排入');
     if (!stopPatrolExtra) forcedWarnings.push(p.name + ' 是 LN 班，但未勾選「停巡增派」，此人的停巡增派時段尚未排入');
   });
+  earlySouth.forEach(p => {
+    if (!southGate) forcedWarnings.push(p.name + ' 是「南」班，代表當天要開南側門哨，但你沒有勾選「南側門」，此人尚未被排入本次哨表');
+  });
 
-  // ── 拆分晚班：見習 / 一般池 ──
+  // ── 拆分晚班：見習 / 海（海底撈專職）/ 一般池 ──
   const lateTrainees = lateRoster.filter(p => (p.code || '').indexOf('見') >= 0);
-  const lateExclude = new Set(lateTrainees.map(p => p.name));
+  const lateSea = lateRoster.filter(p => p.code === '海');
+  const lateExclude = new Set(lateTrainees.concat(lateSea).map(p => p.name));
   const latePoolBase = lateRoster.filter(p => !lateExclude.has(p.name));
 
   // ── 一般崗位／巡檢隨機分配：貪婪分配結果會因為隨機順序不穩定（同一份資料重跑，
@@ -273,6 +278,12 @@ function buildGuardMatrix(opts) {
     order.forEach(def => {
       if (def.conditional === 'southGate' && !southGate) return;
       if (def.linked) return; // 跟另一個崗位連動同一人，不獨立抽（見下方 linked 補值邏輯）
+      if (def.forcedCode) {
+        // 月班表當天若有人代號剛好吻合（例如南/海），這崗位就是他專職，不跑隨機池
+        // （見下方 forcedCode 補值邏輯）；沒人代號吻合才照舊走隨機分配
+        const roster = def.shift === 'early' ? earlyRoster : lateRoster;
+        if (roster.some(p => p.code === def.forcedCode)) return;
+      }
       const pool = def.shift === 'early' ? earlyPool : latePool;
       const cands = pool.filter(p => hasQual(postConfig[p.name], def.key));
       if (!cands.length) { picks[def.key] = null; failedKeys.push(def.key); return; }
@@ -308,6 +319,17 @@ function buildGuardMatrix(opts) {
       return;
     }
     rows[def.row][def.col] = picked.name + '\n' + DEFAULT_TIME.late;
+  });
+
+  // ── forcedCode 崗位：月班表代號直接指定專職（南=南側門、海=海底撈），優先於一般隨機分配 ──
+  POST_DEFS.filter(d => d.forcedCode).forEach(def => {
+    const roster = def.shift === 'early' ? earlyRoster : lateRoster;
+    const matches = roster.filter(p => p.code === def.forcedCode);
+    if (!matches.length) return; // 沒人代號吻合，維持 best.picks 已經算好的一般隨機分配結果
+    if (def.conditional === 'southGate' && !southGate) return; // 沒勾選，forcedWarnings 已經點名，這裡不寫入
+    if (def.conditional) rows[def.row][def.col - 1] = def.label;
+    if (matches.length > 1) warnings.push('「' + def.key + '」代號吻合（' + def.forcedCode + '班）的候選不只一位：' + matches.map(p => p.name).join('、') + '，僅自動帶入第一位，請確認');
+    rows[def.row][def.col] = matches[0].name + '\n' + DEFAULT_TIME[def.shift];
   });
 
   // ── 巡檢增派（早班 L/LN） ──
