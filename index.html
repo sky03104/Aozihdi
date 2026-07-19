@@ -18041,7 +18041,12 @@ function ok(obj) {
             React.createElement(EagleSVG, { w: Math.round(s * 0.65) })));
     }
     /* ══════════════════ 主元件 ═══════════════════════ */
-    function ScheduleApp({ currentUser: outerUser, externalScheduleData, onExternalApplied }) {
+    /* React.memo：擋掉跟班表無關的父層重新渲染（公告跑馬燈7秒/公告2分鐘輪詢等）。
+       沒有這層，ScheduleApp每次都整個重新執行，內部用 function 巢狀定義的
+       MonthView/HoursView/StaffView/UploadView 會被視為全新元件、整個砍掉重建
+       （症狀：月班表捲動到後面日期，過幾秒就抖一下——2026-07-20 診斷實測證實
+       每7秒重建一次，跟公告跑馬燈interval完全對上）。 */
+    const ScheduleApp = React.memo(function ScheduleApp({ currentUser: outerUser, externalScheduleData, onExternalApplied }) {
         /* ── 角色對應表：主程式 role → 班表工具 role ── */
         const ROLE_MAP = {
             fulltime: 'staff', parttime: 'staff',
@@ -18980,7 +18985,7 @@ function ok(obj) {
                 React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: v.color, flexShrink: 0, display: "inline-block" } }),
                 React.createElement("span", { style: { fontSize: 10, color: v.color, fontWeight: 700 } }, k),
                 React.createElement("span", { style: { fontSize: 9, color: C.textMute } }, v.label))))));
-    }
+    });
     const S = {
         card: { background: C.card, borderRadius: 10, padding: "12px 13px", border: `1px solid ${C.cardBd}`, cursor: "pointer" },
         chip: { padding: "5px 11px", borderRadius: 6, border: "1px solid", fontSize: 12, cursor: "pointer" },
@@ -19387,6 +19392,10 @@ function App() {
         /* 航海日誌：切換工具時回報（brain_map 即時人物移動用） */
         useEffect(() => { if (activeToolId) { try { if (typeof logWorkflow === 'function') logWorkflow(activeToolId, 'open', '使用中'); } catch (e) {} } }, [activeToolId]);
     const [externalScheduleData, setExternalScheduleData] = useState(null);
+        /* 穩定參考傳給 React.memo 過的 ScheduleApp，避免公告跑馬燈(7秒)/輪詢等
+           跟班表無關的父層重新渲染，把這顆 callback 當成「props變了」逼 ScheduleApp 整個重跑，
+           導致其內部 MonthView 等巢狀元件被判定為全新元件、砍掉重建（見月班表捲動抖動的修法說明） */
+        const handleExternalApplied = useCallback(() => setExternalScheduleData(null), []);
     const [showBulletin, setShowBulletin] = useState(false);
     const [bulletinSearch, setBulletinSearch] = useState('');
     const [annReadId, setAnnReadId] = useState(0); // 已讀到的最大公告ID（依工號記錄，用於算未讀數）
@@ -20767,7 +20776,7 @@ function App() {
                     activeToolId === 'aiwork' && '📋 施工單查詢',
                      activeToolId === 'car' && '🅿️ 停車場車位數計算')),
             activeToolId === 'schedule' && (React.createElement("div", { style: { flex: 1, overflow: 'auto' } },
-                React.createElement(ScheduleApp, { currentUser: currentUser, externalScheduleData: externalScheduleData, onExternalApplied: () => setExternalScheduleData(null) }))),
+                React.createElement(ScheduleApp, { currentUser: currentUser, externalScheduleData: externalScheduleData, onExternalApplied: handleExternalApplied }))),
             activeToolId === 'closing' && (React.createElement("iframe", { srcDoc: getToolHtml('tpl-closing'), style: { flex: 1, border: 'none', width: '100%', height: '100%' }, title: "\u6253\u70CA\u5F8C\u9032\u51FA\u5FEB\u901F\u767B\u9304" })),
             activeToolId === 'opening' && (React.createElement("iframe", { src: OPENING_PAGE_URL, style: { flex: 1, border: 'none', width: '100%', height: '100%' }, title: "\u958B\u5E97\u524D\u9032\u51FA\u5FEB\u901F\u767B\u9304" })),
             activeToolId === 'upload' && (React.createElement("iframe", { srcDoc: getToolHtml('tpl-upload'), style: { flex: 1, border: 'none', width: '100%', height: '100%' }, title: "\u8CC7\u6599\u4E0A\u50B3\u5DE5\u5177" })),
