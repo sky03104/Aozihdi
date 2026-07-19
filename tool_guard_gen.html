@@ -71,6 +71,8 @@ input:focus,select:focus{border-color:var(--gold);}
 .toast.ok{background:rgba(20,35,25,.97);color:var(--success);border:1px solid rgba(74,222,128,.5);}
 .toast.err{background:rgba(40,18,18,.97);color:var(--danger);border:1px solid rgba(248,113,113,.5);}
 .empty-note{text-align:center;color:var(--text-muted);font-size:13px;padding:20px;}
+.scroll-fab-group{position:fixed;right:16px;bottom:20px;display:flex;flex-direction:column;gap:10px;z-index:500;}
+.scroll-fab{width:48px;height:48px;border-radius:50%;border:1px solid var(--border);background:linear-gradient(135deg,#D4A800 0%,#FFD700 100%);color:#000;font-size:20px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.4);cursor:pointer;}
 @media (max-width:640px){ .container{padding:12px 8px 50px;} }
 </style>
 </head>
@@ -144,12 +146,16 @@ const POST_DEFS = [
   { key: '晚班停巡6',    label: '停巡6',            row: 15, col: 9,  shift: 'late' },
 ];
 const POST_KEYS = POST_DEFS.map(p => p.key);
+// 帶班幹部不是隨機分配的崗位（不進 POST_DEFS），只是「哨點設定」裡的資格標籤，
+// 用來過濾「產生哨表」畫面的帶班幹部下拉選單選項。
+const LEADER_KEYS = { early: '早班帶班幹部', late: '晚班帶班幹部' };
 const POST_GROUPS = [
   { label: '早班一般崗位', keys: ['警衛室', '漢來飯店', 'P3車道', '南側門'] },
   { label: '早班特殊崗位', keys: ['B1F警衛室', '機動人員1', '物流車道', '機動人員2'] },
   { label: '早班巡檢/停巡', keys: ['巡檢1', '巡檢2', '巡檢3', '停巡4', '停巡5', '停巡6', '停巡7'] },
   { label: '晚班崗位', keys: ['晚班警衛室', '晚班B1F警衛室', '晚班P3車道', '晚班漢來飯店', '晚班機動人員', '海底撈'] },
   { label: '晚班巡檢/停巡', keys: ['晚班巡檢1', '晚班巡檢2', '晚班巡檢3', '晚班停巡4', '晚班停巡5', '晚班停巡6'] },
+  { label: '帶班幹部（產生哨表時下拉選單用）', keys: [LEADER_KEYS.early, LEADER_KEYS.late] },
 ];
 const WEEKDAY_ZH = ['日', '一', '二', '三', '四', '五', '六'];
 const DEFAULT_TIME = { early: '0800-2000', late: '2000-0800' };
@@ -372,6 +378,15 @@ function Toast({ msg, type }) {
     h('i', { className: 'ti ti-' + (type === 'err' ? 'x' : 'check') }), msg);
 }
 
+function ScrollButtons() {
+  return h('div', { className: 'scroll-fab-group' },
+    h('button', { className: 'scroll-fab', title: '滑到最上面', onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+      h('i', { className: 'ti ti-arrow-bar-to-up' })),
+    h('button', { className: 'scroll-fab', title: '滑到最下面', onClick: () => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }) },
+      h('i', { className: 'ti ti-arrow-bar-to-down' }))
+  );
+}
+
 function PostConfigTab({ postConfig, setPostConfig, employees, loading, onSave, saving, loadError }) {
   if (loading) return h('div', { className: 'empty-note' }, '讀取員工名單中…');
   if (!employees.length) return h('div', { className: 'empty-note' }, '尚未讀到員工名單（來自早/晚班月班表）');
@@ -421,6 +436,9 @@ function GenerateTab({ postConfig }) {
   const [parkNames, setParkNames] = useState(['', '']);
   const [leaderEarly, setLeaderEarly] = useState('');
   const [leaderLate, setLeaderLate] = useState('');
+  // 帶班幹部下拉選單：只列出「哨點設定」裡標記適任早班/晚班帶班的人
+  const earlyLeaderOptions = Object.keys(postConfig).filter(n => (postConfig[n] || []).includes(LEADER_KEYS.early)).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+  const lateLeaderOptions = Object.keys(postConfig).filter(n => (postConfig[n] || []).includes(LEADER_KEYS.late)).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
   const [targetSheet, setTargetSheet] = useState('明日哨表');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null); // { rows, warnings, forcedWarnings, dateLabel }
@@ -486,10 +504,14 @@ function GenerateTab({ postConfig }) {
       h('div', { className: 'row' },
         h('div', { className: 'field' }, h('label', null, '哨表日期'),
           h('input', { type: 'date', value: dateStr, onChange: e => setDateStr(e.target.value) })),
-        h('div', { className: 'field' }, h('label', null, '早班帶隊幹部（手動）'),
-          h('input', { type: 'text', value: leaderEarly, placeholder: '姓名', onChange: e => setLeaderEarly(e.target.value) })),
-        h('div', { className: 'field' }, h('label', null, '晚班帶隊幹部（手動）'),
-          h('input', { type: 'text', value: leaderLate, placeholder: '姓名', onChange: e => setLeaderLate(e.target.value) }))
+        h('div', { className: 'field' }, h('label', null, '早班帶隊幹部'),
+          h('select', { value: leaderEarly, onChange: e => setLeaderEarly(e.target.value) },
+            h('option', { value: '' }, earlyLeaderOptions.length ? '請選擇' : '（哨點設定尚未標記任何人）'),
+            earlyLeaderOptions.map(n => h('option', { key: n, value: n }, n)))),
+        h('div', { className: 'field' }, h('label', null, '晚班帶隊幹部'),
+          h('select', { value: leaderLate, onChange: e => setLeaderLate(e.target.value) },
+            h('option', { value: '' }, lateLeaderOptions.length ? '請選擇' : '（哨點設定尚未標記任何人）'),
+            lateLeaderOptions.map(n => h('option', { key: n, value: n }, n))))
       ),
       h('div', { className: 'row' },
         h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: southGate, onChange: e => setSouthGate(e.target.checked) }), h('span', null, '南側門')),
@@ -587,6 +609,7 @@ function App() {
 
   return h('div', { className: 'container' },
     toast && h(Toast, toast),
+    h(ScrollButtons),
     h('div', { className: 'header' },
       h('a', { className: 'back-btn', href: backUrl() }, h('i', { className: 'ti ti-arrow-left' }), '返回主選單'),
       h('div', { className: 'title-wrap' },
