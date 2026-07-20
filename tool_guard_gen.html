@@ -56,9 +56,9 @@ input:focus,select:focus{border-color:var(--gold);}
 .prev-table{border-collapse:collapse;font-size:14px;white-space:pre-line;min-width:900px;}
 .prev-table td{border:1px solid rgba(255,255,255,.12);padding:6px 8px;text-align:center;vertical-align:middle;min-width:58px;}
 .prev-table td.has-val{color:var(--success);font-weight:600;}
-.prev-table td.swap-cell{cursor:grab;touch-action:none;}
-.prev-table td.swap-dragging{opacity:.35;background:rgba(212,168,0,.15);}
-.prev-table td.swap-target{outline:2px solid var(--gold2,#F0C040);outline-offset:-2px;background:rgba(212,168,0,.12);}
+.prev-table td.swap-cell{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+.prev-table td.swap-dragging{opacity:.9;background:rgba(212,168,0,.28);box-shadow:0 8px 18px rgba(0,0,0,.4);transform:scale(1.08) translateY(-3px);cursor:grabbing;position:relative;z-index:5;}
+.prev-table td.swap-target{outline:2px dashed var(--gold2,#F0C040);outline-offset:-2px;background:rgba(212,168,0,.12);}
 .swap-hint{font-size:12px;color:var(--text-muted);margin:8px 0 2px;display:flex;align-items:center;gap:6px;}
 .prev-list{display:flex;flex-direction:column;gap:6px;}
 .prev-item{display:flex;justify-content:space-between;gap:10px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:14px;}
@@ -691,6 +691,10 @@ function GenerateTab({ postConfig }) {
   }
   function handleSwapPointerDown(ri, ci, e) {
     e.preventDefault();
+    // setPointerCapture：手機長按拖曳時，瀏覽器預設行為是「進入文字選取模式」，
+    // 抓住pointer後續的move/up事件固定會回報到這個格子（不受手指實際移到哪個DOM元素影響），
+    // 同時也是向瀏覽器表明「這是一個拖曳手勢」，避免被系統的長按選取手勢搶走。
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
     setDragState({ from: { ri, ci }, overKey: null });
   }
   function handleSwapPointerMove(e) {
