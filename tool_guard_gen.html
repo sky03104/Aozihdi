@@ -337,7 +337,22 @@ function buildGuardMatrix(opts) {
     const picked = (def.shift === 'early' ? earlyResult.postMatch : lateResult.postMatch)[def.key];
     if (picked) rows[def.row][def.col] = picked.name + '\n' + DEFAULT_TIME[def.shift];
   });
-  earlyResult.failedKeys.concat(lateResult.failedKeys).forEach(key => warnings.push('崗位「' + key + '」找不到適任人選，需手動填寫'));
+  // 找不到人的崗位分兩種講法：today完全沒有任何在職人員適任(哨點設定沒人勾這個崗位，
+  // 或勾的人今天都沒上班) vs 有人適任但都被其他崗位卡走了(人力調度衝突，最大匹配演算法
+  // 保證只要數學上有解就找得到，所以走到這裡代表真的是總人力不夠，不是演算法沒找到)
+  [
+    { key: 'early', failedKeys: earlyResult.failedKeys, roster: earlyRoster },
+    { key: 'late', failedKeys: lateResult.failedKeys, roster: lateRoster }
+  ].forEach(({ failedKeys, roster }) => {
+    failedKeys.forEach(defKey => {
+      const anyQualifiedToday = roster.some(p => hasQual(postConfig[p.name], defKey));
+      if (!anyQualifiedToday) {
+        warnings.push('崗位「' + defKey + '」今天沒有任何在職人員適任，需手動安排（哨點設定裡沒有人勾這個崗位，或勾的人今天沒上班）');
+      } else {
+        warnings.push('崗位「' + defKey + '」有適任人選，但人力調度衝突排不進去（適任的人都被其他崗位排走了），需手動調整');
+      }
+    });
+  });
   const earlyPool = earlyResult.leftover, latePool = lateResult.leftover;
   if (earlyPool.length) warnings.push('早班有排班但未分配到崗位：' + earlyPool.map(p => p.name).join('、'));
   if (latePool.length) warnings.push('晚班有排班但未分配到崗位：' + latePool.map(p => p.name).join('、'));
