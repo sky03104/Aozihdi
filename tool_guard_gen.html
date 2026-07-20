@@ -455,10 +455,11 @@ const MERGE_RANGES = [
   'A10:N10',
   'A11:A18','H11:H18','C11:D11','F11:G11','J11:K11','M11:N11',
   'C12:D12','F12:G12','J12:K12','M12:N12','C13:D13','F13:G13','J13:K13','M13:N13',
-  'C14:D14','F14:G14','J14:K14','M14:N14','C15:D15','J15:K15','M15:N15',
-  'C16:D16','J16:K16','M16:N16','C17:D17','J17:K17','M17:N17',
+  'C14:D14','F14:G14','J14:K14','M14:N14','C15:D15','F15:G15','J15:K15','M15:N15',
+  'C16:D16','F16:G16','J16:K16','M16:N16','C17:D17','F17:G17','J17:K17','M17:N17',
   'B18:G18','I18:N18'
-];
+]; // 2026-07-20：跟咖哩提供的真實原始xlsx逐格比對過，F15:G15/F16:G16/F17:G17這三個
+   // 原本漏合併（68個合併範圍，改前只有65個）
 function decodeCell(addr) {
   const m = addr.match(/^([A-Z]+)(\d+)$/);
   const colStr = m[1], rowNum = parseInt(m[2], 10) - 1;
@@ -512,6 +513,8 @@ async function downloadXlsx(rows, dateStr) {
       const hasNewline = typeof cell.value === 'string' && cell.value.indexOf('\n') >= 0;
       cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
       cell.alignment = { horizontal: isRight ? 'right' : 'center', vertical: 'middle', wrapText: hasNewline };
+      // 跟真實範本逐格比對：整份是微軟正黑體，第1列(標題日期列)14號字，其餘12號字
+      cell.font = { name: '微軟正黑體', size: r === 1 ? 14 : 12 };
     }
   }
   const buf = await wb.xlsx.writeBuffer();
