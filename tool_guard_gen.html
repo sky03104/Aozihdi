@@ -183,6 +183,13 @@ function priorityFor(list, key) {
   return e ? e.priority : null;
 }
 const DEFAULT_TIME = { early: '0800-2000', late: '2000-0800' };
+// S班（0800-1600）月班表代號本身就代表實際上班時段跟一般早班08:00~20:00不同，
+// 2026-07-20咖哩用真實資料抓到：李怡蒨是S班卻被寫成0800-2000。
+// 目前只處理S這一種代號覆寫，其他代號（如有）之後遇到再加。
+const CODE_TIME_OVERRIDE = { 'S': '0800-1600' };
+function timeForPerson(person, shift) {
+  return (person && CODE_TIME_OVERRIDE[person.code]) || DEFAULT_TIME[shift];
+}
 
 /* ══════════════════════ 18×14 固定文字標籤（每次產生都先寫入，動態內容之後再覆蓋值格）══════════════════════ */
 function buildBaseRows() {
@@ -235,14 +242,16 @@ function buildGuardMatrix(opts) {
   // 這裡補查：選定的人當天若不在早/晚班在職名單裡，還是照填，但要跳出強制警告，
   // 不能讓幹部誤選到當天沒上班的人卻毫無提示）
   if (leaderEarly) {
-    rows[2][4] = leaderEarly + '\n' + DEFAULT_TIME.early;
-    if (!earlyRoster.some(p => p.name === leaderEarly)) {
+    const leaderEarlyPerson = earlyRoster.find(p => p.name === leaderEarly);
+    rows[2][4] = leaderEarly + '\n' + timeForPerson(leaderEarlyPerson, 'early');
+    if (!leaderEarlyPerson) {
       forcedWarnings.push('早班帶隊幹部「' + leaderEarly + '」當天不在早班在職名單裡，請確認是否選錯人');
     }
   }
   if (leaderLate) {
-    rows[2][11] = leaderLate + '\n' + DEFAULT_TIME.late;
-    if (!lateRoster.some(p => p.name === leaderLate)) {
+    const leaderLatePerson = lateRoster.find(p => p.name === leaderLate);
+    rows[2][11] = leaderLate + '\n' + timeForPerson(leaderLatePerson, 'late');
+    if (!leaderLatePerson) {
       forcedWarnings.push('晚班帶隊幹部「' + leaderLate + '」當天不在晚班在職名單裡，請確認是否選錯人');
     }
   }
@@ -339,7 +348,7 @@ function buildGuardMatrix(opts) {
     if (def.conditional === 'southGate' && !southGate) return;
     if (def.conditional) rows[def.row][def.col - 1] = def.label; // 勾選當天才補上條件式標籤（例如南側門）
     const picked = (def.shift === 'early' ? earlyResult.postMatch : lateResult.postMatch)[def.key];
-    if (picked) rows[def.row][def.col] = picked.name + '\n' + DEFAULT_TIME[def.shift];
+    if (picked) rows[def.row][def.col] = picked.name + '\n' + timeForPerson(picked, def.shift);
   });
   // 找不到人的崗位分兩種講法：today完全沒有任何在職人員適任(哨點設定沒人勾這個崗位，
   // 或勾的人今天都沒上班) vs 有人適任但都被其他崗位卡走了(人力調度衝突，最大匹配演算法
