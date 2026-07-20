@@ -766,8 +766,15 @@ function GenerateTab({ postConfig }) {
               row.map((cell, ci) => {
                 if (mergeGrid.covered.has(ri + ',' + ci)) return null; // 被合併範圍蓋住的格子不重複渲染
                 const span = mergeGrid.anchors[ri + ',' + ci];
+                // 跟「產生xlsx」用同一份對齊/框線規則，畫面看到的就是檔案會長的樣子，
+                // 不用每次都下載打開才知道對不對（2026-07-20咖哩要求）
+                const addr = String.fromCharCode(65 + ci) + (ri + 1);
+                const align = RIGHT_ALIGN_CELLS.indexOf(addr) >= 0 ? 'right'
+                  : LEFT_ALIGN_CELLS.indexOf(addr) >= 0 ? 'left' : 'center';
+                const style = { textAlign: align };
+                if (ri === 0) { style.borderTop = 'none'; style.borderLeft = 'none'; style.borderRight = 'none'; }
                 return h('td', {
-                  key: ci, className: cell ? 'has-val' : '',
+                  key: ci, className: cell ? 'has-val' : '', style,
                   rowSpan: span ? span.rowSpan : 1, colSpan: span ? span.colSpan : 1
                 }, cell);
               })
