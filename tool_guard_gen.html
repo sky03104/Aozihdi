@@ -228,6 +228,7 @@ function buildGuardMatrix(opts) {
     southGate, patrolExtra, parkExtra, stopPatrolExtra, parkNames, leaderEarly, leaderLate } = opts;
   const rows = buildBaseRows();
   const warnings = [];
+  const forcedWarnings = [];
 
   rows[0][0] = String(year - 1911) + '年';
   rows[0][3] = String(month);
@@ -235,9 +236,21 @@ function buildGuardMatrix(opts) {
   rows[0][7] = WEEKDAY_ZH[weekdayIdx] || '';
   rows[0][8] = '天鷹保全駐漢神巨蛋商場、外圍每日執勤人員名單';
 
-  // 帶隊幹部（手動輸入，無自動規則）
-  if (leaderEarly) rows[2][4] = leaderEarly + '\n' + DEFAULT_TIME.early;
-  if (leaderLate) rows[2][11] = leaderLate + '\n' + DEFAULT_TIME.late;
+  // 帶隊幹部（下拉選單挑人，但選單只依哨點設定資格列人，沒對照當天月班表——
+  // 這裡補查：選定的人當天若不在早/晚班在職名單裡，還是照填，但要跳出強制警告，
+  // 不能讓幹部誤選到當天沒上班的人卻毫無提示）
+  if (leaderEarly) {
+    rows[2][4] = leaderEarly + '\n' + DEFAULT_TIME.early;
+    if (!earlyRoster.some(p => p.name === leaderEarly)) {
+      forcedWarnings.push('早班帶隊幹部「' + leaderEarly + '」當天不在早班在職名單裡，請確認是否選錯人');
+    }
+  }
+  if (leaderLate) {
+    rows[2][11] = leaderLate + '\n' + DEFAULT_TIME.late;
+    if (!lateRoster.some(p => p.name === leaderLate)) {
+      forcedWarnings.push('晚班帶隊幹部「' + leaderLate + '」當天不在晚班在職名單裡，請確認是否選錯人');
+    }
+  }
 
   // ── 拆分早班：見習 / L / LN / N / 南（南側門專職）/ H・H2（漢來飯店專職）/ 一般池 ──
   const earlyTrainees = earlyRoster.filter(p => (p.code || '').indexOf('見') >= 0);
@@ -253,7 +266,6 @@ function buildGuardMatrix(opts) {
 
   // L/LN/N/南 班的人不會被塞回一般崗位池（維持原意圖：他們的工作就是巡檢/停巡增派/南側門），
   // 但沒勾對應 checkbox 時人會無聲消失，所以強制跳出醒目警告點名，不能只靠一般警告清單。
-  const forcedWarnings = [];
   earlyL.forEach(p => {
     if (!patrolExtra) forcedWarnings.push(p.name + ' 是 L 班，但未勾選「巡檢增派」，此人尚未被排入本次哨表');
   });
