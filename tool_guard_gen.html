@@ -10,8 +10,10 @@
 <!-- React 18.3.1（天鷹規範：禁止 19.x） -->
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
-<!-- SheetJS：產生 xlsx 用（比照 tool_upload.html） -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- ExcelJS：產生 xlsx 用。原本用 SheetJS，但它的免費版不支援「寫入」框線/對齊/自動換行
+     這類儲存格樣式（只能讀），2026-07-20 咖哩比對真實範本截圖才發現下載的檔案完全沒格式，
+     實測確認 ExcelJS 免費版就能正確寫入這些樣式，換掉。 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <style>
 :root{
   --bg:#0A0C10; --surface:#0D0F14; --card:rgba(255,255,255,.03);
@@ -223,7 +225,9 @@ function buildGuardMatrix(opts) {
 
   rows[0][0] = String(year - 1911) + '年';
   rows[0][3] = String(month);
+  rows[0][4] = '月'; // 原本漏寫，2026-07-20咖哩比對真實範本才發現E1「月」跟G1「日 星期」不見了
   rows[0][5] = String(day);
+  rows[0][6] = '日  星期';
   rows[0][7] = WEEKDAY_ZH[weekdayIdx] || '';
   rows[0][8] = '天鷹保全駐漢神巨蛋商場、外圍每日執勤人員名單';
 
@@ -462,12 +466,6 @@ function decodeCell(addr) {
   for (let i = 0; i < colStr.length; i++) c = c * 26 + (colStr.charCodeAt(i) - 64);
   return { r: rowNum, c: c - 1 };
 }
-function buildXlsxMerges() {
-  return MERGE_RANGES.map(rangeStr => {
-    const [a, b] = rangeStr.split(':');
-    return { s: decodeCell(a), e: decodeCell(b) };
-  });
-}
 // 給畫面上「切換完整表格」預覽用：把 MERGE_RANGES 轉成 <td> 的 rowSpan/colSpan，
 // 讓螢幕上的表格跟真實 Excel 範本一樣有合併儲存格，不然每格都拆開會跟咖哩熟悉的
 // 紙本/試算表版面對不起來（2026-07-20 咖哩回報）。anchors：合併範圍左上角那格要
@@ -490,15 +488,44 @@ function buildMergeGrid() {
 }
 const mergeGrid = buildMergeGrid(); // 靜態版型不會變，算一次全程重複用
 try { if (typeof module !== 'undefined') Object.assign(module.exports, { buildMergeGrid, MERGE_RANGES }); } catch (e) {}
-function downloadXlsx(rows, dateStr) {
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!merges'] = buildXlsxMerges();
-  ws['!cols'] = new Array(14).fill({ wch: 12 });
-  ws['!rows'] = new Array(18).fill({ hpt: 32 });
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '哨表');
-  XLSX.writeFile(wb, '哨表_' + dateStr.replace(/\//g, '') + '.xlsx');
+// xlsx 匯出改用 ExcelJS（原本用 SheetJS 的 aoa_to_sheet，但它的免費版只支援「讀」樣式、
+// 不支援「寫」框線/對齊/自動換行，2026-07-20咖哩比對真實範本截圖才發現下載的檔案完全
+// 沒格式，實測確認換成 ExcelJS 免費版就能正確寫入這些樣式）。
+// 全部儲存格套細框線＋置中對齊（含垂直置中）＋內容有\n的自動換行；月/日兩個數字儲存格
+// 改靠右對齊（Excel數字慣例，比照真實範本手動輸入數字時的預設對齊）。
+const RIGHT_ALIGN_CELLS = ['D1', 'F1']; // 月、日
+async function downloadXlsx(rows, dateStr) {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('哨表');
+  rows.forEach((row, r) => {
+    row.forEach((val, c) => { ws.getCell(r + 1, c + 1).value = val; });
+  });
+  MERGE_RANGES.forEach(range => ws.mergeCells(range));
+  for (let c = 1; c <= 14; c++) ws.getColumn(c).width = 12;
+  for (let r = 1; r <= 18; r++) ws.getRow(r).height = 32;
+  const thinBorder = { style: 'thin' };
+  for (let r = 1; r <= 18; r++) {
+    for (let c = 1; c <= 14; c++) {
+      const cell = ws.getCell(r, c);
+      const addr = String.fromCharCode(64 + c) + r; // 只用在 A~N(14欄以內)，跟 RIGHT_ALIGN_CELLS 對照足夠
+      const isRight = RIGHT_ALIGN_CELLS.indexOf(addr) >= 0;
+      const hasNewline = typeof cell.value === 'string' && cell.value.indexOf('\n') >= 0;
+      cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+      cell.alignment = { horizontal: isRight ? 'right' : 'center', vertical: 'middle', wrapText: hasNewline };
+    }
+  }
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '哨表_' + dateStr.replace(/\//g, '') + '.xlsx';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
+try { if (typeof module !== 'undefined') Object.assign(module.exports, { downloadXlsx }); } catch (e) {}
 
 // 18×14 原始表格在手機上要橫滑900px寬才看得完，字又小，改提供逐格清單檢視
 function flattenPreview(rows) {
@@ -649,10 +676,14 @@ function GenerateTab({ postConfig }) {
     setBusy(false);
   }
 
-  function handleExportXlsx() {
+  async function handleExportXlsx() {
     if (!result) return;
-    downloadXlsx(result.rows, result.dateLabel.split(' ')[0]);
-    showToast('xlsx 已下載', 'ok');
+    try {
+      await downloadXlsx(result.rows, result.dateLabel.split(' ')[0]);
+      showToast('xlsx 已下載', 'ok');
+    } catch (e) {
+      showToast('產生xlsx失敗：' + e.message, 'err');
+    }
   }
 
   async function handleUpload() {
