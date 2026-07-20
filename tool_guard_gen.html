@@ -56,6 +56,10 @@ input:focus,select:focus{border-color:var(--gold);}
 .prev-table{border-collapse:collapse;font-size:14px;white-space:pre-line;min-width:900px;}
 .prev-table td{border:1px solid rgba(255,255,255,.12);padding:6px 8px;text-align:center;vertical-align:middle;min-width:58px;}
 .prev-table td.has-val{color:var(--success);font-weight:600;}
+.prev-table td.swap-cell{cursor:grab;touch-action:none;}
+.prev-table td.swap-dragging{opacity:.35;background:rgba(212,168,0,.15);}
+.prev-table td.swap-target{outline:2px solid var(--gold2,#F0C040);outline-offset:-2px;background:rgba(212,168,0,.12);}
+.swap-hint{font-size:12px;color:var(--text-muted);margin:8px 0 2px;display:flex;align-items:center;gap:6px;}
 .prev-list{display:flex;flex-direction:column;gap:6px;}
 .prev-item{display:flex;justify-content:space-between;gap:10px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:14px;}
 .prev-item-label{color:var(--text-muted);white-space:pre-line;}
@@ -665,11 +669,54 @@ function GenerateTab({ postConfig }) {
   const [result, setResult] = useState(null); // { rows, warnings, forcedWarnings, dateLabel }
   const [toast, setToast] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [previewMode, setPreviewMode] = useState('list'); // 'list'（逐格檢視，手機預設）｜'table'（完整18×14表格）
+  const [previewMode, setPreviewMode] = useState('table'); // 'list'（逐格檢視）｜'table'（完整18×14表格，2026-07-20咖哩要求改為預設）
+  const [dragState, setDragState] = useState(null); // { from: {ri,ci}, overKey: 'ri,ci'|null }（按住拖曳互換用）
 
   function showToast(msg, type) {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 2600);
+  }
+
+  // ── 表格預覽：按住姓名格拖曳到另一格互換（2026-07-20咖哩要求的手動微調功能）──
+  // 只有「姓名\n時段」格式的格子才能拖，標題/標籤格排除，用是否以時段結尾判斷。
+  // 用Pointer Events（不是HTML5原生drag-and-drop）是因為原生DnD在手機觸控基本不動作，
+  // 天鷹是手機優先的專案，Pointer Events滑鼠/觸控都通用，不用額外加套件。
+  function isAssignedCell(cell) {
+    return typeof cell === 'string' && /\n\d{4}-\d{4}$/.test(cell);
+  }
+  function cellKeyFromPoint(x, y) {
+    const el = document.elementFromPoint(x, y);
+    const td = el && el.closest ? el.closest('td[data-key]') : null;
+    return td ? td.getAttribute('data-key') : null;
+  }
+  function handleSwapPointerDown(ri, ci, e) {
+    e.preventDefault();
+    setDragState({ from: { ri, ci }, overKey: null });
+  }
+  function handleSwapPointerMove(e) {
+    if (!dragState) return;
+    const key = cellKeyFromPoint(e.clientX, e.clientY);
+    const valid = key && isAssignedCell(result.rows[Number(key.split(',')[0])][Number(key.split(',')[1])]);
+    setDragState(prev => prev && prev.overKey !== (valid ? key : null) ? { ...prev, overKey: valid ? key : null } : prev);
+  }
+  function handleSwapPointerUp(e) {
+    if (!dragState) return;
+    const key = cellKeyFromPoint(e.clientX, e.clientY);
+    if (key) {
+      const [tri, tci] = key.split(',').map(Number);
+      const { ri: fri, ci: fci } = dragState.from;
+      if ((tri !== fri || tci !== fci) && isAssignedCell(result.rows[tri][tci])) {
+        const fromName = result.rows[fri][fci].split('\n')[0];
+        const toName = result.rows[tri][tci].split('\n')[0];
+        const newRows = result.rows.map(r => r.slice());
+        const tmp = newRows[fri][fci];
+        newRows[fri][fci] = newRows[tri][tci];
+        newRows[tri][tci] = tmp;
+        setResult(Object.assign({}, result, { rows: newRows }));
+        showToast('已互換：' + fromName + ' ⇄ ' + toName, 'ok');
+      }
+    }
+    setDragState(null);
   }
 
   async function handleGenerate() {
@@ -770,24 +817,41 @@ function GenerateTab({ postConfig }) {
         }, h('i', { className: 'ti ti-switch-horizontal' }), previewMode === 'table' ? '切換逐格檢視' : '切換完整表格')
       ),
       previewMode === 'table'
-        ? h('table', { className: 'prev-table' },
-            h('tbody', null, result.rows.map((row, ri) => h('tr', { key: ri },
-              row.map((cell, ci) => {
-                if (mergeGrid.covered.has(ri + ',' + ci)) return null; // 被合併範圍蓋住的格子不重複渲染
-                const span = mergeGrid.anchors[ri + ',' + ci];
-                // 跟「產生xlsx」用同一份對齊/框線規則，畫面看到的就是檔案會長的樣子，
-                // 不用每次都下載打開才知道對不對（2026-07-20咖哩要求）
-                const addr = String.fromCharCode(65 + ci) + (ri + 1);
-                const align = RIGHT_ALIGN_CELLS.indexOf(addr) >= 0 ? 'right'
-                  : LEFT_ALIGN_CELLS.indexOf(addr) >= 0 ? 'left' : 'center';
-                const style = { textAlign: align };
-                if (ri === 0) { style.borderTop = 'none'; style.borderLeft = 'none'; style.borderRight = 'none'; }
-                return h('td', {
-                  key: ci, className: cell ? 'has-val' : '', style,
-                  rowSpan: span ? span.rowSpan : 1, colSpan: span ? span.colSpan : 1
-                }, cell);
-              })
-            )))
+        ? h('div', null,
+            h('div', { className: 'swap-hint' }, h('i', { className: 'ti ti-arrows-move' }), '按住姓名格拖到另一格可互換兩人'),
+            h('table', {
+              className: 'prev-table',
+              onPointerMove: handleSwapPointerMove,
+              onPointerUp: handleSwapPointerUp,
+              onPointerCancel: () => setDragState(null)
+            },
+              h('tbody', null, result.rows.map((row, ri) => h('tr', { key: ri },
+                row.map((cell, ci) => {
+                  if (mergeGrid.covered.has(ri + ',' + ci)) return null; // 被合併範圍蓋住的格子不重複渲染
+                  const span = mergeGrid.anchors[ri + ',' + ci];
+                  // 跟「產生xlsx」用同一份對齊/框線規則，畫面看到的就是檔案會長的樣子，
+                  // 不用每次都下載打開才知道對不對（2026-07-20咖哩要求）
+                  const addr = String.fromCharCode(65 + ci) + (ri + 1);
+                  const align = RIGHT_ALIGN_CELLS.indexOf(addr) >= 0 ? 'right'
+                    : LEFT_ALIGN_CELLS.indexOf(addr) >= 0 ? 'left' : 'center';
+                  const style = { textAlign: align };
+                  if (ri === 0) { style.borderTop = 'none'; style.borderLeft = 'none'; style.borderRight = 'none'; }
+                  const key = ri + ',' + ci;
+                  const draggable = isAssignedCell(cell);
+                  const isDragging = dragState && dragState.from.ri === ri && dragState.from.ci === ci;
+                  const isTarget = dragState && dragState.overKey === key;
+                  let cls = cell ? 'has-val' : '';
+                  if (draggable) cls += ' swap-cell';
+                  if (isDragging) cls += ' swap-dragging';
+                  if (isTarget) cls += ' swap-target';
+                  return h('td', {
+                    key: ci, className: cls, style, 'data-key': key,
+                    rowSpan: span ? span.rowSpan : 1, colSpan: span ? span.colSpan : 1,
+                    onPointerDown: draggable ? (e => handleSwapPointerDown(ri, ci, e)) : undefined
+                  }, cell);
+                })
+              )))
+            )
           )
         : h('div', { className: 'prev-list' },
             flattenPreview(result.rows).map((it, i) => h('div', { className: 'prev-item', key: i },
