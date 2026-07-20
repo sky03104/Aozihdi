@@ -180,15 +180,6 @@ function priorityFor(list, key) {
   const e = (list || []).map(parsePostEntry).find(e => e.key === key);
   return e ? e.priority : null;
 }
-// 有標優先序的排前面（數字小優先）、其餘隨機排在後面，同優先序之間也隨機
-function pickByPriority(cands, postConfig, key) {
-  // 排序前先洗牌：Array.sort 是穩定排序，同優先序（含都沒設）的人要靠洗牌過的順序才會真的隨機，
-  // 不然永遠固定選到「原始陣列裡排比較前面」的那個人。
-  const ranked = shuffle(cands.filter(p => priorityFor(postConfig[p.name], key) != null))
-    .sort((a, b) => priorityFor(postConfig[a.name], key) - priorityFor(postConfig[b.name], key));
-  const unranked = shuffle(cands.filter(p => priorityFor(postConfig[p.name], key) == null));
-  return ranked.concat(unranked)[0];
-}
 const DEFAULT_TIME = { early: '0800-2000', late: '2000-0800' };
 
 /* ══════════════════════ 18×14 固定文字標籤（每次產生都先寫入，動態內容之後再覆蓋值格）══════════════════════ */
@@ -287,51 +278,67 @@ function buildGuardMatrix(opts) {
   if (leaderLate) lateExclude.add(leaderLate); // 被排為晚班帶班幹部的人，不再進入其他哨點的隨機分配池
   const latePoolBase = lateRoster.filter(p => !lateExclude.has(p.name));
 
-  // ── 一般崗位／巡檢隨機分配：貪婪分配結果會因為隨機順序不穩定（同一份資料重跑，
-  // 有時排得滿、有時排不滿），改成多輪重試、取「分配失敗人數最少」的一輪，
-  // 不做完整二分圖最大匹配（過度設計），是輕量改善。
-  function tryAssignOnce(order) {
-    const earlyPool = earlyPoolBase.slice();
-    const latePool = latePoolBase.slice();
-    const picks = {};
-    const failedKeys = [];
-    order.forEach(def => {
-      if (def.conditional === 'southGate' && !southGate) return;
-      if (def.linked) return; // 跟另一個崗位連動同一人，不獨立抽（見下方 linked 補值邏輯）
-      if (def.forcedCode) {
-        // 月班表當天若有人代號剛好吻合（例如南/海），這崗位就是他專職，不跑隨機池
-        // （見下方 forcedCode 補值邏輯）；沒人代號吻合才照舊走隨機分配
-        const roster = def.shift === 'early' ? earlyRoster : lateRoster;
-        if (roster.some(p => p.code === def.forcedCode)) return;
-      }
-      if (def.forcedCodes) {
-        // 同上，但一個崗位對應多種可能代號（例如漢來飯店的 H/H2），見下方 H/H2 補值邏輯
-        const roster = def.shift === 'early' ? earlyRoster : lateRoster;
-        if (roster.some(p => def.forcedCodes[p.code])) return;
-      }
-      const pool = def.shift === 'early' ? earlyPool : latePool;
+  // ── 一般崗位／巡檢分配：用二分圖最大匹配（Kuhn's algorithm / augmenting path）──
+  // 舊版是「隨機分配，重試5次取分配失敗人數最少的一輪」，實測用真實資料跑30次，
+  // 約20%機率會出現「明明人力數學上夠、卻有崗位空著、同時有合格的人沒被排到」
+  // （例如某人只適任兩個熱門崗位，剛好都被別人先搶走，他就變孤兒——不是運氣問題，
+  // 是隨機重試法本身不保證找得到滿排解法）。改用 augmenting path：只要某崗位選中的
+  // 候選人「原本的崗位可以換給別人頂替」，就整條路徑往下遞迴改派，這樣只要人力
+  // 數學上足夠涵蓋所有崗位，一定找得到完整解，不會因為隨機順序運氣不好而漏排。
+  function assignByMaxMatching(defs, pool) {
+    const personMatch = {}; // 姓名 -> 目前分配到的崗位key
+    const postMatch = {};   // 崗位key -> 目前分配到的人
+    function candidatesFor(def) {
       const cands = pool.filter(p => hasQual(postConfig[p.name], def.key));
-      if (!cands.length) { picks[def.key] = null; failedKeys.push(def.key); return; }
-      const picked = pickByPriority(cands, postConfig, def.key);
-      pool.splice(pool.indexOf(picked), 1);
-      picks[def.key] = picked;
+      const ranked = shuffle(cands.filter(p => priorityFor(postConfig[p.name], def.key) != null))
+        .sort((a, b) => priorityFor(postConfig[a.name], def.key) - priorityFor(postConfig[b.name], def.key));
+      const unranked = shuffle(cands.filter(p => priorityFor(postConfig[p.name], def.key) == null));
+      return ranked.concat(unranked);
+    }
+    function tryAssign(def, visited) {
+      for (const cand of candidatesFor(def)) {
+        if (visited.has(cand.name)) continue;
+        visited.add(cand.name);
+        const curPostKey = personMatch[cand.name];
+        const curDef = curPostKey ? defs.find(d => d.key === curPostKey) : null;
+        // 注意：curPostKey 成功改派時，tryAssign(curDef, visited) 內部的遞迴呼叫已經把
+        // postMatch[curPostKey] 更新成新的人選了，這裡絕對不能再刪一次，
+        // 不然會把遞迴剛設好的新結果整個清掉（這是2026-07-20實測抓到的bug：
+        // 明明13個人都配對成功(personMatch有13筆)，postMatch卻只剩5筆，
+        // 就是這裡多刪了8次別人已經接手的崗位）。
+        if (!curPostKey || tryAssign(curDef, visited)) {
+          personMatch[cand.name] = def.key;
+          postMatch[def.key] = cand;
+          return true;
+        }
+      }
+      return false;
+    }
+    const failedKeys = [];
+    shuffle(defs).forEach(def => {
+      if (!tryAssign(def, new Set())) failedKeys.push(def.key);
     });
-    return { picks, failedKeys, earlyPool, latePool, score: failedKeys.length + earlyPool.length + latePool.length };
+    const usedNames = new Set(Object.keys(personMatch));
+    const leftover = pool.filter(p => !usedNames.has(p.name));
+    return { postMatch, failedKeys, leftover };
   }
-  let best = null;
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const result = tryAssignOnce(shuffle(POST_DEFS));
-    if (!best || result.score < best.score) best = result;
-    if (best.score === 0) break;
-  }
+  const activeEarlyDefs = POST_DEFS.filter(def => def.shift === 'early' && !def.linked
+    && !(def.conditional === 'southGate' && !southGate)
+    && !(def.forcedCode && earlyRoster.some(p => p.code === def.forcedCode))
+    && !(def.forcedCodes && earlyRoster.some(p => def.forcedCodes[p.code])));
+  const activeLateDefs = POST_DEFS.filter(def => def.shift === 'late' && !def.linked
+    && !(def.forcedCode && lateRoster.some(p => p.code === def.forcedCode))
+    && !(def.forcedCodes && lateRoster.some(p => def.forcedCodes[p.code])));
+  const earlyResult = assignByMaxMatching(activeEarlyDefs, earlyPoolBase);
+  const lateResult = assignByMaxMatching(activeLateDefs, latePoolBase);
   POST_DEFS.forEach(def => {
     if (def.conditional === 'southGate' && !southGate) return;
     if (def.conditional) rows[def.row][def.col - 1] = def.label; // 勾選當天才補上條件式標籤（例如南側門）
-    const picked = best.picks[def.key];
+    const picked = (def.shift === 'early' ? earlyResult.postMatch : lateResult.postMatch)[def.key];
     if (picked) rows[def.row][def.col] = picked.name + '\n' + DEFAULT_TIME[def.shift];
   });
-  best.failedKeys.forEach(key => warnings.push('崗位「' + key + '」找不到適任人選，需手動填寫'));
-  const earlyPool = best.earlyPool, latePool = best.latePool;
+  earlyResult.failedKeys.concat(lateResult.failedKeys).forEach(key => warnings.push('崗位「' + key + '」找不到適任人選，需手動填寫'));
+  const earlyPool = earlyResult.leftover, latePool = lateResult.leftover;
   if (earlyPool.length) warnings.push('早班有排班但未分配到崗位：' + earlyPool.map(p => p.name).join('、'));
   if (latePool.length) warnings.push('晚班有排班但未分配到崗位：' + latePool.map(p => p.name).join('、'));
 
@@ -347,7 +354,7 @@ function buildGuardMatrix(opts) {
   // ── linked 崗位：跟來源崗位是同一人跨時段駐守，直接沿用來源的分配結果，不獨立抽人 ──
   POST_DEFS.filter(d => d.linked).forEach(def => {
     if (def.linked === '漢來飯店' && hanlaiForced) return; // 已經用 H/H2 代號直接指定，不用這裡的一般連動邏輯
-    const picked = best.picks[def.linked];
+    const picked = earlyResult.postMatch[def.linked];
     if (!picked) { warnings.push('「' + def.key + '」跟「' + def.linked + '」是同一人，但早班尚未分配到人，需手動確認'); return; }
     if (!lateRoster.some(p => p.name === picked.name)) {
       warnings.push('「' + def.key + '」應與早班「' + def.linked + '」（' + picked.name + '）同一人，但他當天沒有晚班排班紀錄，需手動確認');
@@ -360,7 +367,7 @@ function buildGuardMatrix(opts) {
   POST_DEFS.filter(d => d.forcedCode).forEach(def => {
     const roster = def.shift === 'early' ? earlyRoster : lateRoster;
     const matches = roster.filter(p => p.code === def.forcedCode);
-    if (!matches.length) return; // 沒人代號吻合，維持 best.picks 已經算好的一般隨機分配結果
+    if (!matches.length) return; // 沒人代號吻合，維持最大匹配已經算好的一般隨機分配結果
     if (def.conditional === 'southGate' && !southGate) return; // 沒勾選，forcedWarnings 已經點名，這裡不寫入
     if (def.conditional) rows[def.row][def.col - 1] = def.label;
     if (matches.length > 1) warnings.push('「' + def.key + '」代號吻合（' + def.forcedCode + '班）的候選不只一位：' + matches.map(p => p.name).join('、') + '，僅自動帶入第一位，請確認');
