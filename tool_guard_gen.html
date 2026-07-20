@@ -669,7 +669,7 @@ function GenerateTab({ postConfig }) {
   const [result, setResult] = useState(null); // { rows, warnings, forcedWarnings, dateLabel }
   const [toast, setToast] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [previewMode, setPreviewMode] = useState('list'); // 'list'（逐格檢視，手機預設）｜'table'（完整18×14表格）
+  const [previewMode, setPreviewMode] = useState('table'); // 'list'（逐格檢視）｜'table'（完整18×14表格，2026-07-20咖哩要求改為預設）
   const [dragState, setDragState] = useState(null); // { from: {ri,ci}, overKey: 'ri,ci'|null }（按住拖曳互換用）
 
   function showToast(msg, type) {
