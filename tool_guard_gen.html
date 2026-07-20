@@ -468,6 +468,28 @@ function buildXlsxMerges() {
     return { s: decodeCell(a), e: decodeCell(b) };
   });
 }
+// 給畫面上「切換完整表格」預覽用：把 MERGE_RANGES 轉成 <td> 的 rowSpan/colSpan，
+// 讓螢幕上的表格跟真實 Excel 範本一樣有合併儲存格，不然每格都拆開會跟咖哩熟悉的
+// 紙本/試算表版面對不起來（2026-07-20 咖哩回報）。anchors：合併範圍左上角那格要
+// 帶 rowSpan/colSpan；covered：合併範圍內其餘格子要整格跳過，不能重複渲染。
+function buildMergeGrid() {
+  const anchors = {}; // 'r,c' -> { rowSpan, colSpan }
+  const covered = new Set(); // 'r,c'，會跳過渲染的格子（不含anchor本身）
+  MERGE_RANGES.forEach(rangeStr => {
+    const [a, b] = rangeStr.split(':');
+    const s = decodeCell(a), e = decodeCell(b);
+    anchors[s.r + ',' + s.c] = { rowSpan: e.r - s.r + 1, colSpan: e.c - s.c + 1 };
+    for (let r = s.r; r <= e.r; r++) {
+      for (let c = s.c; c <= e.c; c++) {
+        if (r === s.r && c === s.c) continue;
+        covered.add(r + ',' + c);
+      }
+    }
+  });
+  return { anchors, covered };
+}
+const mergeGrid = buildMergeGrid(); // 靜態版型不會變，算一次全程重複用
+try { if (typeof module !== 'undefined') Object.assign(module.exports, { buildMergeGrid, MERGE_RANGES }); } catch (e) {}
 function downloadXlsx(rows, dateStr) {
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!merges'] = buildXlsxMerges();
@@ -700,7 +722,14 @@ function GenerateTab({ postConfig }) {
       previewMode === 'table'
         ? h('table', { className: 'prev-table' },
             h('tbody', null, result.rows.map((row, ri) => h('tr', { key: ri },
-              row.map((cell, ci) => h('td', { key: ci, className: cell ? 'has-val' : '' }, cell))
+              row.map((cell, ci) => {
+                if (mergeGrid.covered.has(ri + ',' + ci)) return null; // 被合併範圍蓋住的格子不重複渲染
+                const span = mergeGrid.anchors[ri + ',' + ci];
+                return h('td', {
+                  key: ci, className: cell ? 'has-val' : '',
+                  rowSpan: span ? span.rowSpan : 1, colSpan: span ? span.colSpan : 1
+                }, cell);
+              })
             )))
           )
         : h('div', { className: 'prev-list' },
