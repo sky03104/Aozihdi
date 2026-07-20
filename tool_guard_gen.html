@@ -448,7 +448,7 @@ try { if (typeof module !== 'undefined') module.exports = { buildGuardMatrix, PO
 
 /* ══════════════════════ xlsx 匯出：合併儲存格範圍（固定版型，每天都一樣） ══════════════════════ */
 const MERGE_RANGES = [
-  'A1:C1','I1:N1','A2:B3','C2:G2','I2:N2','C3:D3','E3:G3','I3:K3','L3:M3',
+  'A1:C1','I1:N1','A2:B3','C2:G2','I2:N2','C3:D3','E3:G3','I3:K3','L3:N3',
   'A4:A9','C4:D4','F4:G4','J4:K4','M4:N4','C5:D5','F5:G5','J5:K5','M5:N5',
   'H2:H9','C6:D6','F6:G6','J6:K6','M6:N6','C7:D7','F7:G7','J7:K7','M7:N7',
   'C8:D8','F8:G8','J8:K8','M8:N8','C9:D9','F9:G9','J9:K9','M9:N9',
@@ -492,31 +492,38 @@ try { if (typeof module !== 'undefined') Object.assign(module.exports, { buildMe
 // xlsx 匯出改用 ExcelJS（原本用 SheetJS 的 aoa_to_sheet，但它的免費版只支援「讀」樣式、
 // 不支援「寫」框線/對齊/自動換行，2026-07-20咖哩比對真實範本截圖才發現下載的檔案完全
 // 沒格式，實測確認換成 ExcelJS 免費版就能正確寫入這些樣式）。
-// 全部儲存格套細框線＋置中對齊（含垂直置中）＋內容有\n的自動換行；月/日兩個數字儲存格
-// 改靠右對齊（Excel數字慣例，比照真實範本手動輸入數字時的預設對齊）。
-const RIGHT_ALIGN_CELLS = ['D1', 'F1']; // 月、日
+// 全部儲存格套細框線＋置中對齊（含垂直置中）＋內容有\n的自動換行；少數儲存格照咖哩
+// 跟真實範本逐格比對後的結果覆寫成靠右/靠左對齊，第1列(標題日期列)只留下框線。
+const RIGHT_ALIGN_CELLS = ['D1', 'F1', 'A1', 'C3', 'I3']; // 月、日、115年、帶隊幹部標籤(早)、帶隊幹部標籤(晚)
+const LEFT_ALIGN_CELLS = ['I1', 'E3', 'L3']; // 標題文字、早班帶隊幹部值、晚班帶隊幹部值
 async function downloadXlsx(rows, dateStr) {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('哨表');
   rows.forEach((row, r) => {
     row.forEach((val, c) => { ws.getCell(r + 1, c + 1).value = val; });
   });
-  MERGE_RANGES.forEach(range => ws.mergeCells(range));
   for (let c = 1; c <= 14; c++) ws.getColumn(c).width = 12;
   for (let r = 1; r <= 18; r++) ws.getRow(r).height = 32;
   const thinBorder = { style: 'thin' };
   for (let r = 1; r <= 18; r++) {
     for (let c = 1; c <= 14; c++) {
       const cell = ws.getCell(r, c);
-      const addr = String.fromCharCode(64 + c) + r; // 只用在 A~N(14欄以內)，跟 RIGHT_ALIGN_CELLS 對照足夠
+      const addr = String.fromCharCode(64 + c) + r; // 只用在 A~N(14欄以內)，跟對齊清單對照足夠
       const isRight = RIGHT_ALIGN_CELLS.indexOf(addr) >= 0;
+      const isLeft = LEFT_ALIGN_CELLS.indexOf(addr) >= 0;
       const hasNewline = typeof cell.value === 'string' && cell.value.indexOf('\n') >= 0;
-      cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
-      cell.alignment = { horizontal: isRight ? 'right' : 'center', vertical: 'middle', wrapText: hasNewline };
+      // 第1列（標題日期列）只留下框線，其餘列維持四邊細框線
+      cell.border = r === 1 ? { bottom: thinBorder } : { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+      cell.alignment = { horizontal: isRight ? 'right' : (isLeft ? 'left' : 'center'), vertical: 'middle', wrapText: hasNewline };
       // 跟真實範本逐格比對：整份是微軟正黑體，第1列(標題日期列)14號字，其餘12號字
       cell.font = { name: '微軟正黑體', size: r === 1 ? 14 : 12 };
     }
   }
+  // 合併一定要放在設定樣式「之後」：ExcelJS合併時會讓範圍內的儲存格共用同一個樣式物件，
+  // 如果先合併再逐格設定，範圍內後面的格子（例如A1:C1的B1、C1）會把前面（A1）設好的
+  // 對齊蓋掉，變成整個合併範圍都套用「最後一格」的樣式，不是anchor那格的樣式
+  // （2026-07-20實測抓到：A1本來要靠右對齊，結果被B1/C1的置中設定蓋掉）。
+  MERGE_RANGES.forEach(range => ws.mergeCells(range));
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
@@ -759,8 +766,15 @@ function GenerateTab({ postConfig }) {
               row.map((cell, ci) => {
                 if (mergeGrid.covered.has(ri + ',' + ci)) return null; // 被合併範圍蓋住的格子不重複渲染
                 const span = mergeGrid.anchors[ri + ',' + ci];
+                // 跟「產生xlsx」用同一份對齊/框線規則，畫面看到的就是檔案會長的樣子，
+                // 不用每次都下載打開才知道對不對（2026-07-20咖哩要求）
+                const addr = String.fromCharCode(65 + ci) + (ri + 1);
+                const align = RIGHT_ALIGN_CELLS.indexOf(addr) >= 0 ? 'right'
+                  : LEFT_ALIGN_CELLS.indexOf(addr) >= 0 ? 'left' : 'center';
+                const style = { textAlign: align };
+                if (ri === 0) { style.borderTop = 'none'; style.borderLeft = 'none'; style.borderRight = 'none'; }
                 return h('td', {
-                  key: ci, className: cell ? 'has-val' : '',
+                  key: ci, className: cell ? 'has-val' : '', style,
                   rowSpan: span ? span.rowSpan : 1, colSpan: span ? span.colSpan : 1
                 }, cell);
               })
