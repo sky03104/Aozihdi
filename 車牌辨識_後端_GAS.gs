@@ -133,8 +133,11 @@ function doPost(e) {
             // 模型被下架/找不到（Google 常包成 HTTP 200 + 文字訊息，沒有標準錯誤碼）
             // → 這個模型對所有金鑰都沒用，直接跳下一個模型，不要整組中止
             if (/no longer available|not found|not supported/i.test(msg)) break;
-            // 其他錯誤（請求格式等）換金鑰/模型也沒用，直接回報
-            return jsonOut({ success: false, error: lastError });
+            // 2026-07-22：其他未分類的 400（例如 invalid argument）曾發生在單一模型上，
+            // 但備援模型用同一組請求格式卻能正常辨識——代表問題常常是「這個模型版本」
+            // 的問題，不是請求本身壞掉。改成跳下一個模型再試，撞到才是真的沒救；
+            // 不要一遇到沒分類的錯誤就整個放棄，浪費掉備援模型的機會。
+            break;
           }
 
           if (result.candidates && result.candidates[0] && result.candidates[0].content) {
