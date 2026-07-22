@@ -153,8 +153,11 @@ function doPost(e) {
               // 之前ETC/OR8/AHX-這類明顯不是車牌的文字全被當成功登記進試算表。
               var plate = extractPlate_(raw);
               if (plate) return jsonOut({ success: true, plate: plate, raw: raw, model: MODELS[mi] });
+              // 套不出格式：把AI原始看到的文字一起附上，讓保全知道AI誤判了什麼
+              // （例如ETC貼紙、半截車牌），方便判斷要重拍還是直接手動輸入。
+              return jsonOut({ success: false, error: "辨識失敗：AI看到的文字對不上車牌格式（AI回應：" + raw.slice(0, 50) + "），請重拍或手動輸入", raw: raw });
             }
-            // 模型有回但判定沒車牌（NONE/空白）＝照片問題，換模型/金鑰也認不出來，直接回報
+            // 模型判定完全沒看到車牌（回NONE或空白）＝照片問題，換模型/金鑰也認不出來，直接回報
             return jsonOut({ success: false, error: "辨識失敗：請確保照片清晰且包含車牌" });
           }
           // 沒有 candidates 也沒有 error（罕見），當暫時性問題繼續換
