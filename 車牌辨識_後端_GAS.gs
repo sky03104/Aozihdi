@@ -146,9 +146,12 @@ function doPost(e) {
           if (result.candidates && result.candidates[0] && result.candidates[0].content) {
             var raw = result.candidates[0].content.parts[0].text.trim().toUpperCase();
             if (raw !== "" && !raw.includes("NONE")) {
-              // 先嘗試套台灣車牌格式正規化（補連字號、O→0、I→1）；
-              // 套不出格式就照原樣回傳（與已驗證版本行為一致，絕不比它更嚴格）
-              var plate = extractPlate_(raw) || raw.replace(/[^A-Z0-9\-]/g, '');
+              // 只接受套得出合法台灣車牌格式的結果；套不出格式（代表AI看到的
+              // 是ETC貼紙、停車證等雜訊，或只看到半截車牌）一律當辨識失敗，
+              // 不要把原始文字硬塞進去——寧可手動輸入，不要塞錯資料進登記紀錄。
+              // 2026-07-23：拿掉「套不出格式就照原樣回傳」的舊 fallback後才發現，
+              // 之前ETC/OR8/AHX-這類明顯不是車牌的文字全被當成功登記進試算表。
+              var plate = extractPlate_(raw);
               if (plate) return jsonOut({ success: true, plate: plate, raw: raw, model: MODELS[mi] });
             }
             // 模型有回但判定沒車牌（NONE/空白）＝照片問題，換模型/金鑰也認不出來，直接回報
