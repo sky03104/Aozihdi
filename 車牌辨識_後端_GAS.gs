@@ -76,8 +76,7 @@ function doPost(e) {
         }],
         "generationConfig": {
           "temperature": 0,
-          "maxOutputTokens": 200,
-          "thinkingConfig": { "thinkingBudget": 0 }
+          "maxOutputTokens": 200
         },
         "safetySettings": [
           { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE" },
@@ -109,6 +108,10 @@ function doPost(e) {
       // 開始對這個型號回傳一樣的「no longer available」404，比官方公告的10月關閉日提前
       // 快3個月——寫死版本號的模型隨時可能被提前收回。鏈上只留兩個帶 -latest 的別名
       // （Google 保證這類別名永遠指向目前還活著的最新版本，不會有這個問題）。
+      // 2026-07-22：兩個 -latest 別名同時回「Request contains an invalid argument」，
+      // 代表問題不是特定模型，而是兩者都吃的共同參數壞掉——已移除 generationConfig 裡的
+      // thinkingConfig（那是給支援「思考」的模型用的欄位，-latest 別名現在指到的版本
+      // 顯然不吃這個欄位）。
       var MODELS = [
         'gemini-flash-latest',      // 主力（現指 3.5-flash，最準）
         'gemini-flash-lite-latest'  // 備援（額度較高，換速度換準度）
