@@ -110,6 +110,8 @@ function doPost(e) {
     if (action === 'reviewApplication')  return reviewApplication(e);
     if (action === 'submitLeave')        return submitLeave(e);
     if (action === 'updateLeaveStatus')  return updateLeaveStatus(e);
+    if (action === 'updateLeaveRequest') return updateLeaveRequest(e);
+    if (action === 'deleteLeaveRequest') return deleteLeaveRequest(e);
 
     if (action === 'addUser')            return addUser(e);
     if (action === 'updateUser')         return updateUser(e);
@@ -459,6 +461,92 @@ function updateLeaveStatus(e) {
         };
         notifyLeaveResult_(leaveInfo, decision);
 
+        return jsonRes({status:'ok'});
+      }
+    }
+    return jsonRes({status:'err', msg:'找不到對應的請假申請 id=' + id});
+  } catch(err) {
+    return jsonRes({status:'err', msg:err.toString()});
+  }
+}
+
+// 請假編輯/刪除限管理職才能做（帶班以上）——跟前端 CAN_MANAGE_ROLES 同一份名單。
+// 2026-07-23：這兩個是會直接改動/刪除試算表資料的破壞性操作，比原本
+// updateLeaveStatus（只改狀態、可逆）風險高一級，前端 isManager 只是畫面
+// 擋，後端網址本身是明碼公開的，一定要在後端也驗證身分，不能只信前端。
+var LEAVE_MANAGE_ROLES_ = ['leader', 'vicecaptain', 'captain', 'executive', 'admin'];
+function isLeaveManager_(empId) {
+  try {
+    var sh = getUserDbSheet_();
+    var data = sh.getDataRange().getValues();
+    for (var r = 1; r < data.length; r++) {
+      if (String(data[r][0]) === String(empId)) {
+        return LEAVE_MANAGE_ROLES_.indexOf(String(data[r][3])) !== -1;
+      }
+    }
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
+// 修改已存在的請假申請（管理員用，不管目前是待審/已核准/已拒絕都能改）
+// 只改內容（假別/日期/原因），不動「狀態」欄——改完狀態維持原樣，
+// 因為會用到這功能的都是已有核准權限的管理員，不強制打回待審重審。
+function updateLeaveRequest(e) {
+  try {
+    if (!isLeaveManager_(e.parameter.operatorEmpId)) return jsonRes({status:'err', msg:'無權限：僅限帶班以上人員操作'});
+    var id = String(e.parameter.id);
+    var type = String(e.parameter.type || '');
+    if (!type) return jsonRes({status:'err', msg:'假別不可為空'});
+    var reason = String(e.parameter.reason || '');
+    var dates = JSON.parse(e.parameter.dates || '[]');
+    if (!dates.length) return jsonRes({status:'err', msg:'日期不可為空'});
+    dates = Array.from(new Set(dates)).sort(); // 去重＋排序，不信任前端有沒有防重
+
+    var sh = getLeaveSheet();
+    var data = sh.getDataRange().getValues();
+    for (var r = 1; r < data.length; r++) {
+      if (String(data[r][0]) === id) {
+        sh.getRange(r + 1, 5).setValue(type);
+        sh.getRange(r + 1, 6).setValue("'" + dates.join(","));
+        sh.getRange(r + 1, 7).setValue("'" + dates[0]);
+        sh.getRange(r + 1, 8).setValue("'" + dates[dates.length - 1]);
+        sh.getRange(r + 1, 9).setValue(dates.length);
+        sh.getRange(r + 1, 10).setValue(reason);
+
+        try {
+          var lineUserId = getLineUserIdByEmpId_(String(data[r][1]));
+          if (lineUserId) {
+            pushLineMessage_(lineUserId,
+              '📋 您的請假申請已被管理員修改\n假別：' + type +
+              '\n日期：' + dates.join('、') +
+              (reason ? '\n原因：' + reason : ''));
+          }
+        } catch (notifyErr) {
+          console.error('updateLeaveRequest 通知失敗：' + notifyErr.toString());
+        }
+
+        return jsonRes({status:'ok'});
+      }
+    }
+    return jsonRes({status:'err', msg:'找不到對應的請假申請 id=' + id});
+  } catch(err) {
+    return jsonRes({status:'err', msg:err.toString()});
+  }
+}
+
+// 刪除請假申請（管理員用）——原本前端的刪除按鈕只改畫面沒有真的刪試算表，
+// 這個才是真正會動到試算表資料的版本
+function deleteLeaveRequest(e) {
+  try {
+    if (!isLeaveManager_(e.parameter.operatorEmpId)) return jsonRes({status:'err', msg:'無權限：僅限帶班以上人員操作'});
+    var id = String(e.parameter.id);
+    var sh = getLeaveSheet();
+    var data = sh.getDataRange().getValues();
+    for (var r = 1; r < data.length; r++) {
+      if (String(data[r][0]) === id) {
+        sh.deleteRow(r + 1);
         return jsonRes({status:'ok'});
       }
     }
