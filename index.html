@@ -21101,6 +21101,7 @@ function App() {
                                                     const body = new FormData();
                                                     body.append('action', 'deleteLeaveRequest');
                                                     body.append('id', req.id);
+                                                    body.append('operatorEmpId', currentUser?.empId || '');
                                                     const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
                                                     const d = await res.json();
                                                     if (d.status === 'ok') {
@@ -21216,6 +21217,7 @@ function App() {
                                 body.append('type', editingLeave.type);
                                 body.append('dates', JSON.stringify(editingLeave.dates));
                                 body.append('reason', editingLeave.reason);
+                                body.append('operatorEmpId', currentUser?.empId || '');
                                 const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
                                 const d = await res.json();
                                 if (d.status === 'ok') {

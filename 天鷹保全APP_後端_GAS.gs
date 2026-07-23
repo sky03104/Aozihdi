@@ -470,17 +470,39 @@ function updateLeaveStatus(e) {
   }
 }
 
+// 請假編輯/刪除限管理職才能做（帶班以上）——跟前端 CAN_MANAGE_ROLES 同一份名單。
+// 2026-07-23：這兩個是會直接改動/刪除試算表資料的破壞性操作，比原本
+// updateLeaveStatus（只改狀態、可逆）風險高一級，前端 isManager 只是畫面
+// 擋，後端網址本身是明碼公開的，一定要在後端也驗證身分，不能只信前端。
+var LEAVE_MANAGE_ROLES_ = ['leader', 'vicecaptain', 'captain', 'executive', 'admin'];
+function isLeaveManager_(empId) {
+  try {
+    var sh = getUserDbSheet_();
+    var data = sh.getDataRange().getValues();
+    for (var r = 1; r < data.length; r++) {
+      if (String(data[r][0]) === String(empId)) {
+        return LEAVE_MANAGE_ROLES_.indexOf(String(data[r][3])) !== -1;
+      }
+    }
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
 // 修改已存在的請假申請（管理員用，不管目前是待審/已核准/已拒絕都能改）
 // 只改內容（假別/日期/原因），不動「狀態」欄——改完狀態維持原樣，
 // 因為會用到這功能的都是已有核准權限的管理員，不強制打回待審重審。
 function updateLeaveRequest(e) {
   try {
+    if (!isLeaveManager_(e.parameter.operatorEmpId)) return jsonRes({status:'err', msg:'無權限：僅限帶班以上人員操作'});
     var id = String(e.parameter.id);
     var type = String(e.parameter.type || '');
+    if (!type) return jsonRes({status:'err', msg:'假別不可為空'});
     var reason = String(e.parameter.reason || '');
     var dates = JSON.parse(e.parameter.dates || '[]');
     if (!dates.length) return jsonRes({status:'err', msg:'日期不可為空'});
-    dates = dates.slice().sort();
+    dates = Array.from(new Set(dates)).sort(); // 去重＋排序，不信任前端有沒有防重
 
     var sh = getLeaveSheet();
     var data = sh.getDataRange().getValues();
@@ -518,6 +540,7 @@ function updateLeaveRequest(e) {
 // 這個才是真正會動到試算表資料的版本
 function deleteLeaveRequest(e) {
   try {
+    if (!isLeaveManager_(e.parameter.operatorEmpId)) return jsonRes({status:'err', msg:'無權限：僅限帶班以上人員操作'});
     var id = String(e.parameter.id);
     var sh = getLeaveSheet();
     var data = sh.getDataRange().getValues();
