@@ -19423,6 +19423,7 @@ function App() {
     const [editingDirective, setEditingDirective] = useState(null);
     const [showLeave, setShowLeave] = useState(false);
     const [leaveRequests, setLeaveRequests] = useState([]);
+    const [editingLeave, setEditingLeave] = useState(null); // 管理員編輯請假申請中的暫存內容：{id,type,dates,reason}
     const [expandedLeaveNames, setExpandedLeaveNames] = useState(() => new Set()); // 請假紀錄依人摺疊：已展開的工號集合
     const [pendingReports, setPendingReports] = useState([]);   // 事故報告清單（主管待審卡片）
     const [pendingFeedback, setPendingFeedback] = useState([]); // 匿名表揚/檢舉清單（主管待審卡片）
@@ -21087,15 +21088,35 @@ function App() {
                                             padding: 9, fontSize: 13, fontWeight: 700, color: '#F87171',
                                             cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif" } }, "\u274C \u62D2\u7D55"))),
                                 React.createElement("button", { onClick: () => {
-                                        if (window.confirm(`確定刪除 ${req.name} 的${req.type}申請（${req.startDate}）嗎？`)) {
-                                            setLeaveRequests(prev => prev.filter(r => r.id !== req.id));
-                                            showToast(`🗑️ 已刪除 ${req.name} 的申請`);
+                                        setEditingLeave({ id: req.id, type: req.type, dates: [...req.dates], reason: req.reason || '', newDate: '' });
+                                    }, style: { flex: req.status === 'pending' ? '0 0 auto' : 1, minWidth: 60,
+                                        background: 'rgba(129,140,248,.15)',
+                                        border: '1px solid rgba(129,140,248,.35)', borderRadius: 8,
+                                        padding: '9px 12px', fontSize: 12, fontWeight: 700, color: '#818CF8',
+                                        cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif" } }, "✏️ 編輯"),
+                                React.createElement("button", { onClick: () => {
+                                        if (window.confirm(`確定刪除 ${req.name} 的${req.type}申請（${req.startDate}）嗎？這會直接從雲端試算表移除，無法復原。`)) {
+                                            (async () => {
+                                                try {
+                                                    const body = new FormData();
+                                                    body.append('action', 'deleteLeaveRequest');
+                                                    body.append('id', req.id);
+                                                    const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
+                                                    const d = await res.json();
+                                                    if (d.status === 'ok') {
+                                                        setLeaveRequests(prev => prev.filter(r => r.id !== req.id));
+                                                        showToast(`🗑️ 已刪除 ${req.name} 的申請`);
+                                                    } else {
+                                                        showToast('⚠️ 雲端刪除失敗：' + (d.msg || ''), 'err');
+                                                    }
+                                                } catch (e) { showToast('⚠️ 雲端刪除失敗，請檢查網路', 'err'); }
+                                            })();
                                         }
                                     }, style: { flex: req.status === 'pending' ? '0 0 auto' : 1, minWidth: 60,
                                         background: 'rgba(107,114,128,.15)',
                                         border: '1px solid rgba(107,114,128,.35)', borderRadius: 8,
                                         padding: '9px 12px', fontSize: 12, fontWeight: 700, color: 'var(--muted)',
-                                        cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif" } }, "\uD83D\uDDD1\uFE0F \u522A\u9664")))));
+                                        cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif" } }, "🗑️ 刪除")))));
 
                     if (!isManager) {
                         return (React.createElement("div", null,
@@ -21147,6 +21168,76 @@ function App() {
                                 expanded && React.createElement("div", { style: { marginTop: 8 } }, g.items.map(renderReqCard)));
                         })));
                 })()))),
+        editingLeave && (React.createElement("div", { style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 400,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }, onClick: () => setEditingLeave(null) },
+            React.createElement("div", { style: { background: 'rgba(13,15,20,.97)', backdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(129,140,248,.3)', borderRadius: 14, padding: 20,
+                    width: '100%', maxWidth: 380, maxHeight: '85vh', overflowY: 'auto' }, onClick: e => e.stopPropagation() },
+                React.createElement("div", { style: { fontSize: 15, fontWeight: 900, marginBottom: 14 } }, '✏️ 編輯請假申請'),
+                React.createElement("div", { style: { fontSize: 12, color: 'var(--muted)', marginBottom: 6, fontWeight: 700 } }, '假別'),
+                React.createElement("div", { style: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 } },
+                    ['排休', '病假', '事假', '婚假', '喪假', '公假'].map(t => (
+                        React.createElement("button", { key: t, onClick: () => setEditingLeave(prev => ({ ...prev, type: t })),
+                                style: { padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                                    fontFamily: "'Microsoft JhengHei',sans-serif",
+                                    background: editingLeave.type === t ? 'rgba(129,140,248,.25)' : 'rgba(255,255,255,.05)',
+                                    border: editingLeave.type === t ? '1px solid #818CF8' : '1px solid rgba(255,255,255,.12)',
+                                    color: editingLeave.type === t ? '#818CF8' : 'var(--muted)' } }, t)))),
+                React.createElement("div", { style: { fontSize: 12, color: 'var(--muted)', marginBottom: 6, fontWeight: 700 } }, '請假日期'),
+                React.createElement("div", { style: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 } },
+                    editingLeave.dates.slice().sort().map(dt => (
+                        React.createElement("span", { key: dt, style: { display: 'flex', alignItems: 'center', gap: 4,
+                                background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)',
+                                borderRadius: 6, padding: '3px 4px 3px 8px', fontSize: 12 } },
+                            dt,
+                            React.createElement("span", { onClick: () => setEditingLeave(prev => ({ ...prev, dates: prev.dates.filter(d => d !== dt) })),
+                                    style: { cursor: 'pointer', color: '#F87171', fontWeight: 900, padding: '0 4px' } }, '×'))))),
+                React.createElement("div", { style: { display: 'flex', gap: 6, marginBottom: 14 } },
+                    React.createElement("input", { type: 'date', value: editingLeave.newDate || '',
+                            onChange: e => setEditingLeave(prev => ({ ...prev, newDate: e.target.value })),
+                            className: "inp", style: { flex: 1, fontSize: 13 } }),
+                    React.createElement("button", { onClick: () => {
+                            if (!editingLeave.newDate) return;
+                            setEditingLeave(prev => prev.dates.includes(prev.newDate) ? prev : { ...prev, dates: [...prev.dates, prev.newDate], newDate: '' });
+                        }, style: { padding: '0 14px', borderRadius: 8, border: '1px solid rgba(129,140,248,.35)',
+                            background: 'rgba(129,140,248,.15)', color: '#818CF8', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                            fontFamily: "'Microsoft JhengHei',sans-serif" } }, '+ 新增')),
+                React.createElement("div", { style: { fontSize: 12, color: 'var(--muted)', marginBottom: 6, fontWeight: 700 } }, '原因（選填）'),
+                React.createElement("textarea", { value: editingLeave.reason,
+                        onChange: e => setEditingLeave(prev => ({ ...prev, reason: e.target.value })),
+                        className: "inp", rows: 2, style: { width: '100%', marginBottom: 16, fontFamily: "'Microsoft JhengHei',sans-serif", resize: 'vertical' } }),
+                React.createElement("div", { style: { display: 'flex', gap: 8 } },
+                    React.createElement("button", { onClick: async () => {
+                            if (!editingLeave.dates.length) { showToast('⚠️ 至少要有一個日期', 'err'); return; }
+                            try {
+                                const body = new FormData();
+                                body.append('action', 'updateLeaveRequest');
+                                body.append('id', editingLeave.id);
+                                body.append('type', editingLeave.type);
+                                body.append('dates', JSON.stringify(editingLeave.dates));
+                                body.append('reason', editingLeave.reason);
+                                const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
+                                const d = await res.json();
+                                if (d.status === 'ok') {
+                                    const sortedDates = [...editingLeave.dates].sort();
+                                    setLeaveRequests(prev => prev.map(r => r.id === editingLeave.id ? {
+                                        ...r, type: editingLeave.type, dates: sortedDates,
+                                        startDate: sortedDates[0], endDate: sortedDates[sortedDates.length - 1],
+                                        days: sortedDates.length, reason: editingLeave.reason
+                                    } : r));
+                                    showToast('✅ 已更新請假申請');
+                                    setEditingLeave(null);
+                                } else {
+                                    showToast('⚠️ 更新失敗：' + (d.msg || ''), 'err');
+                                }
+                            } catch (e) { showToast('⚠️ 更新失敗，請檢查網路', 'err'); }
+                        }, style: { flex: 1, background: 'linear-gradient(135deg,#818CF8,#6366F1)', border: 'none',
+                            borderRadius: 8, padding: 11, fontSize: 13, fontWeight: 700, color: '#0A0C10',
+                            cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif" } }, '儲存變更'),
+                    React.createElement("button", { onClick: () => setEditingLeave(null),
+                            style: { flex: 1, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)',
+                                borderRadius: 8, padding: 11, fontSize: 13, fontWeight: 700, color: 'var(--muted)',
+                                cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif" } }, '取消'))))),
         showBulletin && (React.createElement("div", { style: { position: 'fixed', inset: 0, zIndex: 300, background: '#0A0C10',
                 display: 'flex', flexDirection: 'column', fontFamily: "'Microsoft JhengHei',sans-serif" } },
             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px',

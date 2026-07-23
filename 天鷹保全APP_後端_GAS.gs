@@ -110,6 +110,8 @@ function doPost(e) {
     if (action === 'reviewApplication')  return reviewApplication(e);
     if (action === 'submitLeave')        return submitLeave(e);
     if (action === 'updateLeaveStatus')  return updateLeaveStatus(e);
+    if (action === 'updateLeaveRequest') return updateLeaveRequest(e);
+    if (action === 'deleteLeaveRequest') return deleteLeaveRequest(e);
 
     if (action === 'addUser')            return addUser(e);
     if (action === 'updateUser')         return updateUser(e);
@@ -459,6 +461,69 @@ function updateLeaveStatus(e) {
         };
         notifyLeaveResult_(leaveInfo, decision);
 
+        return jsonRes({status:'ok'});
+      }
+    }
+    return jsonRes({status:'err', msg:'找不到對應的請假申請 id=' + id});
+  } catch(err) {
+    return jsonRes({status:'err', msg:err.toString()});
+  }
+}
+
+// 修改已存在的請假申請（管理員用，不管目前是待審/已核准/已拒絕都能改）
+// 只改內容（假別/日期/原因），不動「狀態」欄——改完狀態維持原樣，
+// 因為會用到這功能的都是已有核准權限的管理員，不強制打回待審重審。
+function updateLeaveRequest(e) {
+  try {
+    var id = String(e.parameter.id);
+    var type = String(e.parameter.type || '');
+    var reason = String(e.parameter.reason || '');
+    var dates = JSON.parse(e.parameter.dates || '[]');
+    if (!dates.length) return jsonRes({status:'err', msg:'日期不可為空'});
+    dates = dates.slice().sort();
+
+    var sh = getLeaveSheet();
+    var data = sh.getDataRange().getValues();
+    for (var r = 1; r < data.length; r++) {
+      if (String(data[r][0]) === id) {
+        sh.getRange(r + 1, 5).setValue(type);
+        sh.getRange(r + 1, 6).setValue("'" + dates.join(","));
+        sh.getRange(r + 1, 7).setValue("'" + dates[0]);
+        sh.getRange(r + 1, 8).setValue("'" + dates[dates.length - 1]);
+        sh.getRange(r + 1, 9).setValue(dates.length);
+        sh.getRange(r + 1, 10).setValue(reason);
+
+        try {
+          var lineUserId = getLineUserIdByEmpId_(String(data[r][1]));
+          if (lineUserId) {
+            pushLineMessage_(lineUserId,
+              '📋 您的請假申請已被管理員修改\n假別：' + type +
+              '\n日期：' + dates.join('、') +
+              (reason ? '\n原因：' + reason : ''));
+          }
+        } catch (notifyErr) {
+          console.error('updateLeaveRequest 通知失敗：' + notifyErr.toString());
+        }
+
+        return jsonRes({status:'ok'});
+      }
+    }
+    return jsonRes({status:'err', msg:'找不到對應的請假申請 id=' + id});
+  } catch(err) {
+    return jsonRes({status:'err', msg:err.toString()});
+  }
+}
+
+// 刪除請假申請（管理員用）——原本前端的刪除按鈕只改畫面沒有真的刪試算表，
+// 這個才是真正會動到試算表資料的版本
+function deleteLeaveRequest(e) {
+  try {
+    var id = String(e.parameter.id);
+    var sh = getLeaveSheet();
+    var data = sh.getDataRange().getValues();
+    for (var r = 1; r < data.length; r++) {
+      if (String(data[r][0]) === id) {
+        sh.deleteRow(r + 1);
         return jsonRes({status:'ok'});
       }
     }
