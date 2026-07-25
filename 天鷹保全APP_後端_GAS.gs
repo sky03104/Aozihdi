@@ -232,7 +232,9 @@ function getApplications() {
           name: String(data[r][2]),
           dept: String(data[r][3]),
           role: String(data[r][4]),
-          pw: String(data[r][5]),
+          // 2026-07-26：不再把申請人填的密碼回傳給前端。
+          // 核准時後端會自己從申請表把密碼寫進帳號表，前端不需要知道密碼。
+          isDefaultPw: (String(data[r][5]) === DEFAULT_PW_),
           appliedAt: String(data[r][6])
         });
       }
@@ -294,7 +296,8 @@ function getApprovedUsers() {
         name: String(data[r][1]),
         dept: String(data[r][4]),
         role: String(data[r][3]),
-        pw: String(data[r][2]),
+        // 2026-07-26：不再回傳密碼（本 action 前端已改用 getUserDB，保留僅為相容）
+        isDefaultPw: (String(data[r][2]) === DEFAULT_PW_),
         status: 'active',
         shift: shift
       };
@@ -565,56 +568,12 @@ function deleteLeaveRequest(e) {
 // 【帳號管理】── 員工帳號主資料庫
 // ════════════════════════════════════════════════════════════
 
-var SEED_USER_DB_ = [
-  ["sky03104", "咖哩",   "qaz03104", "admin",       "高雄辦事處", "active"],
-  ["011340",   "王丞銘", "123",      "captain",     "漢神巨蛋",   "active"],
-  ["011341",   "羅聖凱", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011342",   "王麒森", "123",      "vicecaptain", "漢神巨蛋",   "active"],
-  ["011362",   "陳國榮", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011395",   "鄭宜慶", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011375",   "許承訓", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011364",   "張瀚升", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011365",   "吳銘哲", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011363",   "黃春福", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011369",   "陳惠景", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011377",   "張宏偉", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011824",   "葉茂榮", "123",      "leader",      "漢神巨蛋",   "active"],
-  ["013536",   "謝孟芸", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["013025",   "蔡明昌", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["013643",   "侯佳良", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["013720",   "吳國賢", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["013884",   "吳騰紘", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["014418",   "王政雄", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["015340",   "蔡東記", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["015638",   "鄭竣丞", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["015645",   "張晉銘", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["015774",   "嚴永珅", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["015783",   "石易晉", "123",      "leader",      "漢神巨蛋",   "active"],
-  ["015792",   "陳龍輝", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["015732",   "謝志遠", "123",      "vicecaptain", "漢神巨蛋",   "active"],
-  ["015970",   "李怡蒨", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["016187",   "謝伯維", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["016242",   "潘伯威", "123",      "leader",      "漢神巨蛋",   "active"],
-  ["016485",   "陳智玄", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["016490",   "陳楷文", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["016507",   "羅世峰", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["016640",   "龔晨嘉", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["016874",   "吳俊明", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["017264",   "吳文珍", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["017801",   "林日典", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["018112",   "吳品學", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["018149",   "盧姣嫚", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["018150",   "蔡和洋", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["012859",   "張馨遠", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["011389",   "胡文彬", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["011378",   "陳建志", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["011435",   "鄭志民", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["014396",   "林政修", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["015053",   "黃銘杰", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["016146",   "梁春蔓", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["017751",   "黃志堅", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["016696",   "王佩瑊", "123",      "parttime",    "漢神巨蛋",   "active"]
-];
+// 2026-07-26：原本這裡有一份 48 筆的員工帳號密碼種子資料，用於第一次自動建立
+//「帳號管理」分頁。但這個 .gs 檔案存放在公開的 GitHub repo 裡，等於密碼公開，
+// 因此清空。「帳號管理」分頁早已建立且持續使用中，資料以該分頁為準。
+// 若日後真的需要重建分頁，請直接在試算表手動建立標題列並填入資料，
+// 不要把任何真實帳號密碼寫回這個檔案。
+var SEED_USER_DB_ = [];
 
 function getUserDbSheet_() {
   var ss = ss_();
@@ -679,9 +638,12 @@ function getUserDB() {
         var sv = String(data[r][shiftIdx] || '').trim();
         shift = (sv === '早班') ? '早班' : '晚班';
       }
+      // 2026-07-26：不再把密碼回傳給前端。
+      // 前端唯一需要密碼的用途是管理員畫面的「誰還沒改密碼」統計，
+      // 改由後端算好一個布林值給它，前端不必也不該拿到密碼本身。
       users[empId] = {
         name: String(data[r][1]),
-        pw: String(data[r][2]),
+        isDefaultPw: (String(data[r][2]) === DEFAULT_PW_),
         role: String(data[r][3]),
         dept: String(data[r][4]),
         status: String(data[r][5] || 'active'),
@@ -712,6 +674,7 @@ function getUserDB() {
 // ════════════════════════════════════════════════════════════
 
 var SESSION_TTL_DAYS_ = 30;   // 通行證有效天數，過期要重新登入
+var DEFAULT_PW_ = '123';      // 新帳號的預設密碼；用來判斷「這個人還沒改過密碼」
 
 /**
  * 取得簽章用的密鑰。第一次呼叫時自動產生並存進 Script Properties。
