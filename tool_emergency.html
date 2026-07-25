@@ -343,50 +343,11 @@ function logWorkflow(tool,actionType,status){
 var BUILT_IN_GAS_URL='https://script.google.com/macros/s/AKfycbz3lq9XquhuUPGR96JN77JoyV9M2ibqGiqIeqUyfxG1X-KuS06RllwA73n7VLbwObKA/exec';
 
 /* ── 預設聯絡人資料 ── */
-const INIT_CONTACTS=[
-  {id:1,shift:'早班',name:'王丞銘',role:'隊長',phone:'0938192569',ecName:'劉彩月',ecRel:'母子',ecPhone:'0922692539'},
-  {id:2,shift:'早班',name:'王麒森',role:'副隊長',phone:'0955981823',ecName:'劉彩月',ecRel:'母子',ecPhone:'0922692539'},
-  {id:3,shift:'早班',name:'葉茂榮',role:'組長',phone:'0921577113',ecName:'李欣美',ecRel:'岳母',ecPhone:'07-7663192'},
-  {id:4,shift:'早班',name:'羅聖凱',role:'正職',phone:'0925067895',ecName:'王怡珺',ecRel:'夫妻',ecPhone:'0927015558'},
-  {id:5,shift:'早班',name:'侯佳良',role:'正職',phone:'0907812116',ecName:'沙安莉',ecRel:'母子',ecPhone:'0981808009'},
-  {id:6,shift:'早班',name:'鄭宜慶',role:'正職',phone:'0983080417',ecName:'鄭富毓',ecRel:'父子',ecPhone:'0981614126'},
-  {id:7,shift:'早班',name:'蔡東記',role:'正職',phone:'0973134142',ecName:'蔡美玲',ecRel:'嬸嬸',ecPhone:'0989817658'},
-  {id:8,shift:'早班',name:'嚴永珅',role:'正職',phone:'0983294421',ecName:'嚴子家',ecRel:'姊弟',ecPhone:'0922313452'},
-  {id:9,shift:'早班',name:'李怡蒨',role:'正職',phone:'0968855616',ecName:'陳芝美',ecRel:'母女',ecPhone:'0937638616'},
-  {id:10,shift:'早班',name:'白恩菽',role:'正職',phone:'0915531583',ecName:'粘金媛',ecRel:'母女',ecPhone:'0932741183'},
-  {id:11,shift:'早班',name:'謝孟芸',role:'正職',phone:'0983052158',ecName:'楊麗芬',ecRel:'母女',ecPhone:'0976033380'},
-  {id:12,shift:'早班',name:'王政雄',role:'正職',phone:'0953556771',ecName:'陳韻如',ecRel:'夫妻',ecPhone:'0917636120'},
-  {id:13,shift:'早班',name:'張瀚升',role:'正職',phone:'0911010659',ecName:'張馨云',ecRel:'父女',ecPhone:'0988923700'},
-  {id:14,shift:'早班',name:'陳龍輝',role:'正職',phone:'0906162659',ecName:'陳美珍',ecRel:'母子',ecPhone:'0921412071'},
-  {id:15,shift:'早班',name:'張晉銘',role:'正職',phone:'0971720026',ecName:'張峮瑋',ecRel:'父女',ecPhone:'0975697673'},
-  {id:16,shift:'早班',name:'張馨遠',role:'正職',phone:'0988979777',ecName:'陳莉文',ecRel:'夫妻',ecPhone:'0988316801'},
-  {id:17,shift:'早班',name:'陳國榮',role:'正職',phone:'0987253683',ecName:'李秀惠',ecRel:'母子',ecPhone:'0908968578'},
-  {id:18,shift:'早班',name:'吳銘哲',role:'正職',phone:'0975078109',ecName:'吳芯芯',ecRel:'姊弟',ecPhone:'0908320857'},
-  {id:19,shift:'早班',name:'吳騰紘',role:'正職',phone:'0913155780',ecName:'黃慈崢',ecRel:'夫妻',ecPhone:'0989988612'},
-  {id:20,shift:'早班',name:'黃春福',role:'正職',phone:'0970759978',ecName:'黃和居',ecRel:'父子',ecPhone:'0926335703'},
-  {id:21,shift:'早班',name:'蔡明昌',role:'正職',phone:'0985273348',ecName:'蔡郭品',ecRel:'母子',ecPhone:'07-7115259'},
-  {id:22,shift:'早班',name:'朱智崇',role:'正職',phone:'0918901026',ecName:'劉清照',ecRel:'夫妻',ecPhone:'0903071013'},
-  {id:23,shift:'早班',name:'王景洋',role:'正職',phone:'0955755660',ecName:'',ecRel:'',ecPhone:''},
-  {id:24,shift:'早班',name:'陳建志',role:'兼職',phone:'0936131011',ecName:'王月念',ecRel:'母子',ecPhone:'0906589937'},
-  {id:25,shift:'早班',name:'胡文彬',role:'兼職',phone:'0938023007',ecName:'蔡玉惠',ecRel:'夫妻',ecPhone:'0915736077'},
-  {id:26,shift:'晚班',name:'謝志遠',role:'副隊長',phone:'0926266621',ecName:'盧麗慧',ecRel:'母子',ecPhone:'0921530822'},
-  {id:27,shift:'晚班',name:'石易晉',role:'組長',phone:'0958750101',ecName:'羅佩文',ecRel:'夫妻',ecPhone:'0919142880'},
-  {id:28,shift:'晚班',name:'張宏偉',role:'正職',phone:'0986154717',ecName:'張敏夫',ecRel:'父子',ecPhone:'0975336529'},
-  {id:29,shift:'晚班',name:'陳惠景',role:'正職',phone:'0926893637',ecName:'陳美華',ecRel:'阿姨',ecPhone:'0920022373'},
-  {id:30,shift:'晚班',name:'鄭竣丞',role:'正職',phone:'0930523353',ecName:'黃素玲',ecRel:'母子',ecPhone:'0985087100'},
-  {id:31,shift:'晚班',name:'許承訓',role:'正職',phone:'0958486447',ecName:'許承恩',ecRel:'兄弟',ecPhone:'0970712686'},
-  {id:32,shift:'晚班',name:'吳國賢',role:'正職',phone:'0976153560',ecName:'張蕙瑜',ecRel:'母子',ecPhone:'0958868563'},
-  {id:33,shift:'晚班',name:'潘伯威',role:'正職',phone:'0908178701',ecName:'潘恆華',ecRel:'父子',ecPhone:'0987383566'},
-  {id:34,shift:'晚班',name:'謝伯維',role:'正職',phone:'0981700339',ecName:'許碧純',ecRel:'母子',ecPhone:'0989544285'},
-  {id:35,shift:'晚班',name:'陳楷文',role:'正職',phone:'0970692100',ecName:'曹海倫',ecRel:'母子',ecPhone:'0937639509'},
-  {id:36,shift:'晚班',name:'羅世峰',role:'正職',phone:'0930902886',ecName:'關茹云',ecRel:'夫妻',ecPhone:'0962026836'},
-  {id:37,shift:'晚班',name:'王佩瑊',role:'兼職',phone:'0983605204',ecName:'張麗玲',ecRel:'母女',ecPhone:'0960803301'},
-  {id:38,shift:'晚班',name:'吳俊明',role:'正職',phone:'0916103880',ecName:'左裕卉',ecRel:'夫妻',ecPhone:'0968690130'},
-  {id:39,shift:'晚班',name:'吳文珍',role:'正職',phone:'0976892189',ecName:'吳文鈴',ecRel:'姊妹',ecPhone:'0926525625'},
-  {id:40,shift:'晚班',name:'黃志堅',role:'兼職',phone:'0939504548',ecName:'黃慧雯',ecRel:'姊姊',ecPhone:'0916968638'},
-  {id:41,shift:'晚班',name:'賴俐蓉',role:'正職',phone:'0988615680',ecName:'林欣平',ecRel:'朋友',ecPhone:'07-3908780'},
-  {id:42,shift:'晚班',name:'龔晨嘉',role:'正職',phone:'0915017001',ecName:'劉畇湘',ecRel:'母子',ecPhone:'0906669156'},
-];
+/* 2026-07-26：原本這裡有 43 筆同仁的手機號碼，以及緊急聯絡人的姓名、
+   關係與電話（共 80 組號碼）。本檔案會整份下載到使用者手機、且部署在
+   公開的 GitHub Pages 上，等於把同仁與其家屬的電話公開，因此清空。
+   資料改以雲端試算表為唯一來源，開啟工具時透過 getContacts 取得。 */
+const INIT_CONTACTS=[];
 
 /* ── 職務顏色對照 ── */
 const RS={
@@ -404,6 +365,9 @@ const ROLE_MAP={leader:'組長',vicecaptain:'副隊長',captain:'隊長',executi
 
 /* ── 全域狀態 ── */
 var contacts=[],nextId=100,tab='all',rf='',editId=null,delId=null,canEdit=false,isAdmin=false;
+/* 雲端載入狀態：'loading' 載入中｜'ok' 已載入｜'fail' 連線失敗｜'empty' 雲端無資料。
+   聯絡人資料全部來自雲端，空清單時要靠這個判斷該顯示什麼訊息。 */
+var loadState='loading';
 
 /* ── 取得當前有效的 GAS URL（管理員可覆寫，否則用內建） ── */
 function getGasUrl(){
@@ -511,7 +475,21 @@ function render(){
   stats();
 
   if(!list.length){
-    box.innerHTML='<div class="empty"><i class="ti ti-address-book-off"></i><p>找不到符合條件的聯絡人</p></div>';
+    /* 2026-07-26：聯絡人資料改為全部來自雲端（前端不再內建），
+       所以「清單是空的」可能是還在載入或載入失敗，不一定是篩選條件的問題。
+       這裡照實說明目前狀況，不要一律顯示「找不到符合條件」誤導使用者。 */
+    var msg, icon='ti-address-book-off';
+    if(!contacts.length && loadState==='loading'){
+      msg='正在從雲端載入聯絡人…'; icon='ti-cloud-download';
+    }else if(!contacts.length && loadState==='fail'){
+      msg='連不上雲端，暫時無法顯示聯絡人<br><span style="font-size:12px;opacity:.7">請確認網路後，點右上角重新整理</span>';
+      icon='ti-cloud-off';
+    }else if(!contacts.length){
+      msg='雲端目前沒有聯絡人資料';
+    }else{
+      msg='找不到符合條件的聯絡人';
+    }
+    box.innerHTML='<div class="empty"><i class="ti '+icon+'"></i><p>'+msg+'</p></div>';
     return;
   }
 
@@ -697,17 +675,22 @@ async function pullFromGAS(silent){
     if(d.status==='ok'&&d.contacts&&d.contacts.length){
       contacts=d.contacts.map(function(c){c.phone=normalizePhone(c.phone);c.ecPhone=normalizePhone(c.ecPhone);return c;});
       nextId=Math.max.apply(null,contacts.map(function(c){return c.id;}).concat([99]))+1;
+      loadState='ok';
       save();render();
       var now=new Date();
       var timeStr=(now.getHours()<10?'0':'')+now.getHours()+':'+(now.getMinutes()<10?'0':'')+now.getMinutes();
       setSyncStatus('✓ '+timeStr+' 已同步','ok');
       if(!silent) toast('✅ 已同步 '+contacts.length+' 筆','ok');
     }else{
+      loadState='empty';
       setSyncStatus('—','');
+      render();
       if(!silent) toast('雲端暫無資料','');
     }
   }catch(e){
+    loadState='fail';
     setSyncStatus('連線失敗','err');
+    render();
     if(!silent) toast('❌ 連線失敗','err');
   }
 }
