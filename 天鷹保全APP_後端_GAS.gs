@@ -106,6 +106,11 @@ function doPost(e) {
 
     var action = e.parameter.action || '';
 
+    // ── 登入驗證（2026-07-26 新增，密碼比對從前端搬到後端）──
+    if (action === 'login')              return login(e);
+    if (action === 'verifySession')      return verifySession(e);
+    if (action === 'changePassword')     return changePassword(e);
+
     if (action === 'submitApplication')  return submitApplication(e);
     if (action === 'reviewApplication')  return reviewApplication(e);
     if (action === 'submitLeave')        return submitLeave(e);
@@ -227,7 +232,9 @@ function getApplications() {
           name: String(data[r][2]),
           dept: String(data[r][3]),
           role: String(data[r][4]),
-          pw: String(data[r][5]),
+          // 2026-07-26：不再把申請人填的密碼回傳給前端。
+          // 核准時後端會自己從申請表把密碼寫進帳號表，前端不需要知道密碼。
+          isDefaultPw: (String(data[r][5]) === DEFAULT_PW_),
           appliedAt: String(data[r][6])
         });
       }
@@ -289,7 +296,8 @@ function getApprovedUsers() {
         name: String(data[r][1]),
         dept: String(data[r][4]),
         role: String(data[r][3]),
-        pw: String(data[r][2]),
+        // 2026-07-26：不再回傳密碼（本 action 前端已改用 getUserDB，保留僅為相容）
+        isDefaultPw: (String(data[r][2]) === DEFAULT_PW_),
         status: 'active',
         shift: shift
       };
@@ -560,56 +568,12 @@ function deleteLeaveRequest(e) {
 // 【帳號管理】── 員工帳號主資料庫
 // ════════════════════════════════════════════════════════════
 
-var SEED_USER_DB_ = [
-  ["sky03104", "咖哩",   "qaz03104", "admin",       "高雄辦事處", "active"],
-  ["011340",   "王丞銘", "123",      "captain",     "漢神巨蛋",   "active"],
-  ["011341",   "羅聖凱", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011342",   "王麒森", "123",      "vicecaptain", "漢神巨蛋",   "active"],
-  ["011362",   "陳國榮", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011395",   "鄭宜慶", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011375",   "許承訓", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011364",   "張瀚升", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011365",   "吳銘哲", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011363",   "黃春福", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011369",   "陳惠景", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011377",   "張宏偉", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["011824",   "葉茂榮", "123",      "leader",      "漢神巨蛋",   "active"],
-  ["013536",   "謝孟芸", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["013025",   "蔡明昌", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["013643",   "侯佳良", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["013720",   "吳國賢", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["013884",   "吳騰紘", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["014418",   "王政雄", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["015340",   "蔡東記", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["015638",   "鄭竣丞", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["015645",   "張晉銘", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["015774",   "嚴永珅", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["015783",   "石易晉", "123",      "leader",      "漢神巨蛋",   "active"],
-  ["015792",   "陳龍輝", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["015732",   "謝志遠", "123",      "vicecaptain", "漢神巨蛋",   "active"],
-  ["015970",   "李怡蒨", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["016187",   "謝伯維", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["016242",   "潘伯威", "123",      "leader",      "漢神巨蛋",   "active"],
-  ["016485",   "陳智玄", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["016490",   "陳楷文", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["016507",   "羅世峰", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["016640",   "龔晨嘉", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["016874",   "吳俊明", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["017264",   "吳文珍", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["017801",   "林日典", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["018112",   "吳品學", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["018149",   "盧姣嫚", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["018150",   "蔡和洋", "123",      "fulltime",    "漢神巨蛋",   "active"],
-  ["012859",   "張馨遠", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["011389",   "胡文彬", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["011378",   "陳建志", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["011435",   "鄭志民", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["014396",   "林政修", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["015053",   "黃銘杰", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["016146",   "梁春蔓", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["017751",   "黃志堅", "123",      "parttime",    "漢神巨蛋",   "active"],
-  ["016696",   "王佩瑊", "123",      "parttime",    "漢神巨蛋",   "active"]
-];
+// 2026-07-26：原本這裡有一份 48 筆的員工帳號密碼種子資料，用於第一次自動建立
+//「帳號管理」分頁。但這個 .gs 檔案存放在公開的 GitHub repo 裡，等於密碼公開，
+// 因此清空。「帳號管理」分頁早已建立且持續使用中，資料以該分頁為準。
+// 若日後真的需要重建分頁，請直接在試算表手動建立標題列並填入資料，
+// 不要把任何真實帳號密碼寫回這個檔案。
+var SEED_USER_DB_ = [];
 
 function getUserDbSheet_() {
   var ss = ss_();
@@ -674,9 +638,12 @@ function getUserDB() {
         var sv = String(data[r][shiftIdx] || '').trim();
         shift = (sv === '早班') ? '早班' : '晚班';
       }
+      // 2026-07-26：不再把密碼回傳給前端。
+      // 前端唯一需要密碼的用途是管理員畫面的「誰還沒改密碼」統計，
+      // 改由後端算好一個布林值給它，前端不必也不該拿到密碼本身。
       users[empId] = {
         name: String(data[r][1]),
-        pw: String(data[r][2]),
+        isDefaultPw: (String(data[r][2]) === DEFAULT_PW_),
         role: String(data[r][3]),
         dept: String(data[r][4]),
         status: String(data[r][5] || 'active'),
@@ -685,6 +652,249 @@ function getUserDB() {
     }
     return jsonRes({status:'ok', users:users});
   } catch(err) {
+    return jsonRes({status:'err', msg:err.toString()});
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 【登入驗證】2026-07-26 新增
+//
+// 目的：把「比對帳號密碼」這件事從前端搬到後端。
+//       原本前端 index.html 自己帶著全公司的帳號密碼做比對，
+//       而前端檔案是會整份下載到使用者手機上的 → 等於密碼公開。
+//       改成後端比對之後，前端不需要、也拿不到任何人的密碼。
+//
+// 設計：登入成功後發一張「通行證」(token) 給前端。
+//       通行證用簽章做成，內容是「工號＋到期時間＋防偽簽章」。
+//       驗證時後端重算一次簽章比對，因此不需要另外開一張表來存，
+//       也不會愈長愈大、不用定期清理。
+//
+// ★ 本區塊全部是「新增」，沒有修改任何既有函式。
+//   → 可以先單獨部署，舊版前端完全不受影響、照常運作。
+// ════════════════════════════════════════════════════════════
+
+var SESSION_TTL_DAYS_ = 30;   // 通行證有效天數，過期要重新登入
+var DEFAULT_PW_ = '123';      // 新帳號的預設密碼；用來判斷「這個人還沒改過密碼」
+
+/**
+ * 取得簽章用的密鑰。第一次呼叫時自動產生並存進 Script Properties。
+ * 密鑰不寫在程式碼裡（程式碼在公開的 GitHub 上），沿用本專案既有的
+ * PropertiesService 慣例（LINE 權杖也是這樣存的）。
+ */
+function getSessionSecret_() {
+  var props = PropertiesService.getScriptProperties();
+  var s = props.getProperty('SESSION_SECRET');
+  if (!s) {
+    s = Utilities.getUuid() + Utilities.getUuid();
+    props.setProperty('SESSION_SECRET', s);
+  }
+  return s;
+}
+
+/** 位元組陣列轉 16 進位字串（GAS 的簽章結果是帶正負號的位元組） */
+function bytesToHex_(bytes) {
+  var out = '';
+  for (var i = 0; i < bytes.length; i++) {
+    var v = (bytes[i] < 0 ? bytes[i] + 256 : bytes[i]).toString(16);
+    out += (v.length === 1 ? '0' + v : v);
+  }
+  return out;
+}
+
+/** 依「工號＋到期時間」算出防偽簽章 */
+function signPayload_(payload) {
+  return bytesToHex_(
+    Utilities.computeHmacSha256Signature(payload, getSessionSecret_())
+  );
+}
+
+/** 發一張通行證給指定工號 */
+function issueToken_(empId) {
+  var expireMs = new Date().getTime() + SESSION_TTL_DAYS_ * 24 * 60 * 60 * 1000;
+  var payload  = String(empId) + '|' + expireMs;
+  return Utilities.base64EncodeWebSafe(payload) + '.' + signPayload_(payload);
+}
+
+/**
+ * 驗證通行證。
+ * 通過 → 回傳 { empId, name, role, dept, status, shift }
+ * 不通過（偽造／過期／查無此人／帳號停用）→ 回傳 null
+ *
+ * 之後其他 action 要確認「這個請求真的是這個人發的」，呼叫這個函式即可，
+ * 不要再相信前端自己傳過來的工號。
+ */
+function verifyToken_(token) {
+  try {
+    if (!token) return null;
+    var parts = String(token).split('.');
+    if (parts.length !== 2) return null;
+
+    var payload = Utilities.newBlob(
+      Utilities.base64DecodeWebSafe(parts[0])
+    ).getDataAsString();
+
+    // 簽章對不上 → 通行證被竄改過
+    if (signPayload_(payload) !== parts[1]) return null;
+
+    var seg = payload.split('|');
+    if (seg.length !== 2) return null;
+    var empId    = seg[0];
+    var expireMs = Number(seg[1]);
+    if (!empId || !expireMs) return null;
+
+    // 過期
+    if (new Date().getTime() > expireMs) return null;
+
+    // 帳號本身還要是存在且啟用中的（停用後舊通行證要立刻失效）
+    var rec = findUserRecord_(empId);
+    if (!rec) return null;
+    if (rec.status === 'inactive') return null;
+
+    return {
+      empId:  empId,
+      name:   rec.name,
+      role:   rec.role,
+      dept:   rec.dept,
+      status: rec.status,
+      shift:  rec.shift
+    };
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * 從「帳號管理」表查單一使用者。
+ * 回傳含 pw（僅供後端內部比對用），呼叫端務必不要把 pw 傳回前端。
+ */
+function findUserRecord_(empId) {
+  var sh = getUserDbSheet_();
+  var shiftIdx = colIndexByName_(sh, '班別');
+  var data = sh.getDataRange().getValues();
+  var target = String(empId).trim();
+
+  for (var r = 1; r < data.length; r++) {
+    if (String(data[r][0]).trim() !== target) continue;
+    var shift = '晚班';
+    if (shiftIdx >= 0) {
+      var sv = String(data[r][shiftIdx] || '').trim();
+      shift = (sv === '早班') ? '早班' : '晚班';
+    }
+    return {
+      empId:  target,
+      name:   String(data[r][1]),
+      pw:     String(data[r][2]),
+      role:   String(data[r][3]),
+      dept:   String(data[r][4]),
+      status: String(data[r][5] || 'active'),
+      shift:  shift,
+      row:    r + 1   // 試算表實際列號，改密碼時要用
+    };
+  }
+  return null;
+}
+
+/**
+ * 【action: login】登入驗證
+ * 收：{ empId, pw }
+ * 回：成功 { status:'ok', user:{...}, token:'...' }（不含密碼）
+ *     失敗 { status:'err', msg:'...' }
+ */
+function login(e) {
+  try {
+    var d = JSON.parse(e.parameter.data || '{}');
+    var empId = String(d.empId || '').trim();
+    var pw    = String(d.pw || '');
+
+    if (!empId || !pw) {
+      return jsonRes({status:'err', msg:'請填寫工號與密碼'});
+    }
+
+    var rec = findUserRecord_(empId);
+    if (!rec) {
+      return jsonRes({status:'err', msg:'工號不存在'});
+    }
+    if (rec.pw !== pw) {
+      return jsonRes({status:'err', msg:'密碼錯誤'});
+    }
+    if (rec.status === 'inactive') {
+      return jsonRes({status:'err', msg:'此帳號已被停用，請聯絡管理員'});
+    }
+
+    return jsonRes({
+      status: 'ok',
+      token:  issueToken_(empId),
+      user: {
+        empId:  rec.empId,
+        name:   rec.name,
+        role:   rec.role,
+        dept:   rec.dept,
+        status: rec.status,
+        shift:  rec.shift
+      }
+    });
+  } catch (err) {
+    return jsonRes({status:'err', msg:err.toString()});
+  }
+}
+
+/**
+ * 【action: verifySession】用通行證換回登入者資料
+ * 給「記住我」自動登入用：前端只存通行證、不存密碼。
+ * 收：{ token }
+ */
+function verifySession(e) {
+  try {
+    var d = JSON.parse(e.parameter.data || '{}');
+    var u = verifyToken_(d.token);
+    if (!u) return jsonRes({status:'err', msg:'登入已失效，請重新登入'});
+    return jsonRes({status:'ok', user:u});
+  } catch (err) {
+    return jsonRes({status:'err', msg:err.toString()});
+  }
+}
+
+/**
+ * 【action: changePassword】修改自己的密碼
+ * 收：{ token, oldPw, newPw }
+ * 身分由通行證決定，不是由前端說了算 → 不能拿來改別人的密碼。
+ */
+function changePassword(e) {
+  try {
+    var d = JSON.parse(e.parameter.data || '{}');
+    var u = verifyToken_(d.token);
+    if (!u) return jsonRes({status:'err', msg:'登入已失效，請重新登入'});
+
+    var oldPw = String(d.oldPw || '');
+    var newPw = String(d.newPw || '');
+    if (!newPw)            return jsonRes({status:'err', msg:'請輸入新密碼'});
+    if (newPw.length < 3)  return jsonRes({status:'err', msg:'新密碼至少 3 個字'});
+
+    var rec = findUserRecord_(u.empId);
+    if (!rec)              return jsonRes({status:'err', msg:'查無此帳號'});
+    if (rec.pw !== oldPw)  return jsonRes({status:'err', msg:'原密碼錯誤'});
+
+    var lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      var sh = getUserDbSheet_();
+      sh.getRange(rec.row, 3).setValue(newPw);
+      sh.getRange(rec.row, 7).setValue(
+        Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy/M/d HH:mm:ss')
+      );
+      SpreadsheetApp.flush();
+    } finally {
+      lock.releaseLock();
+    }
+
+    // 寫入後重新讀一次確認真的寫進去了，不做「送出就當成功」
+    var after = findUserRecord_(u.empId);
+    if (!after || after.pw !== newPw) {
+      return jsonRes({status:'err', msg:'密碼寫入失敗，請再試一次'});
+    }
+
+    return jsonRes({status:'ok', msg:'密碼已更新'});
+  } catch (err) {
     return jsonRes({status:'err', msg:err.toString()});
   }
 }
