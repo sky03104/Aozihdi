@@ -17327,6 +17327,30 @@ async function syncUserPwToCloud(empId, pw) {
         return !!(d && d.status === 'ok');
     } catch (e) { return false; }
 }
+/* ── 後端登入驗證（2026-07-26）───────────────────────────────
+   原本密碼比對是在前端做的，代表全公司的密碼必須跟著這個檔案一起
+   下載到每個人的手機上 ── 等於公開。現在改成把帳號密碼送去後端比對，
+   後端只回「這個人是誰」和一張通行證，前端從此不持有任何密碼。
+
+   通行證（token）＝ 證明「我已經登入過」的憑據，取代原本把密碼
+   明文存在瀏覽器裡的「記住我」做法。 */
+const AUTH_TOKEN_KEY = 'hsh_auth_token';
+async function callAuthApi(action, payload) {
+    const body = new FormData();
+    body.append('action', action);
+    body.append('data', JSON.stringify(payload || {}));
+    const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
+    return await res.json();
+}
+function getAuthToken() {
+    try { return localStorage.getItem(AUTH_TOKEN_KEY) || ''; } catch (e) { return ''; }
+}
+function setAuthToken(token) {
+    try {
+        if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
+        else localStorage.removeItem(AUTH_TOKEN_KEY);
+    } catch (e) {}
+}
 const DEFAULT_PERMS = {
     fulltime: [1, 2, 3, 7, 5, 6, 9, 12, 13, 18, 99],
     parttime: [1, 2, 3, 7, 5, 6, 9, 12, 13, 18, 99],
@@ -19361,6 +19385,8 @@ function App() {
     const [workAllowedIds, setWorkAllowedIds] = useState(null); // 施工單查詢(id 9) 正職/兼職個別白名單；null=不限制(全員可用，現狀)
     const [selectedUser, setSelectedUser] = useState(null);
     const [loginForm, setLoginForm] = useState({ id: "", pw: "", remember: false });
+    const [loggingIn, setLoggingIn] = useState(false);   // 登入中（同時擋連點重送）
+    const [changingPw, setChangingPw] = useState(false); // 改密碼送出中（同時擋連點重送）
     const [regForm, setRegForm] = useState({ name: "", id: "", dept: "", role: "fulltime", pw: "", pw2: "" });
     const [searchQuery, setSearchQuery] = useState("");
     /* ── 工具名稱/圖示/分類：管理員後台編輯後要跨裝置持久化，
@@ -19661,80 +19687,104 @@ function App() {
         } catch (e) { }
     }, []);
     // 記住我：頁面載入時自動登入
+    // 2026-07-26 改版：原本是拿存在瀏覽器裡的明文密碼跟前端的 USER_DB 比對，
+    //   現在改成拿後端發的通行證去後端換身分，前端不再需要保存密碼。
     useEffect(() => {
-        try {
-            let sessionUser = null;
-            // 1) 優先用「記住我」自動登入
-            const saved = localStorage.getItem('hsh_remember_user');
-            if (saved) {
-                const rem = JSON.parse(saved);
-                if (rem && rem.empId && rem.pw) {
-                    const rec = USER_DB[rem.empId];
-                    if (rec && rec.pw === rem.pw) {
-                        sessionUser = { name: rec.name, role: rec.role, dept: rec.dept, empId: rem.empId };
-                    } else {
-                        localStorage.removeItem('hsh_remember_user');
+        let cancelled = false;
+        (async () => {
+            try {
+                let sessionUser = null;
+
+                // 1) 優先用「記住我」的通行證，向後端換回目前身分
+                //    （順便確認帳號還在、還沒被停用 —— 後端會一起檢查）
+                const token = getAuthToken();
+                if (token) {
+                    try {
+                        const d = await callAuthApi('verifySession', { token: token });
+                        if (d && d.status === 'ok' && d.user) {
+                            const u = d.user;
+                            sessionUser = { name: u.name, role: u.role, dept: u.dept, empId: u.empId };
+                        } else {
+                            // 通行證過期或帳號已停用 → 清掉，讓使用者重新登入
+                            setAuthToken('');
+                            try { localStorage.removeItem('hsh_session_user'); } catch (e) {}
+                            return;
+                        }
+                    } catch (e) {
+                        // 純粹連不上網路：不要把人踢出去，改走下面既有的登入態
                     }
                 }
-            }
-            // 2) 沒記住我時，沿用現有登入態（從工具頁返回主選單不需重登）
-            if (!sessionUser) {
-                const sess = JSON.parse(localStorage.getItem('hsh_session_user') || 'null');
-                if (sess && sess.empId && sess.role) sessionUser = sess;
-            }
-            if (!sessionUser) return;
-            /* 帳號已被停用 → 不自動登入，並清除登入態（停用只在雲端設定，靠 getUserDB 同步回本機） */
-            const dbRec = userDb[sessionUser.empId];
-            if (dbRec && dbRec.status === 'inactive') {
-                localStorage.removeItem('hsh_remember_user');
-                localStorage.removeItem('hsh_session_user');
-                return;
-            }
-            setCurrentUser(sessionUser);
-            localStorage.setItem('hsh_session_user', JSON.stringify(sessionUser));
-                try { if (typeof logWorkflow === 'function') logWorkflow('app', 'login', '上線'); } catch (e) {}
-            setLoginForm(prev => ({ ...prev, id: sessionUser.empId }));
-            const favKey = 'hsh_favs_' + sessionUser.empId;
-            const savedFavs = localStorage.getItem(favKey);
-            if (savedFavs) { try { setFavorites(JSON.parse(savedFavs)); } catch(e){} }
-            loadLoginBootstrap();
-            if (['executive', 'admin'].includes(sessionUser.role)) loadReviewCounts();
-            setPage("main");
-        } catch(e) {}
+
+                // 2) 沒有通行證時，沿用現有登入態（從工具頁返回主選單不需重登）
+                if (!sessionUser) {
+                    const sess = JSON.parse(localStorage.getItem('hsh_session_user') || 'null');
+                    if (sess && sess.empId && sess.role) sessionUser = sess;
+                }
+                if (!sessionUser || cancelled) return;
+
+                /* 帳號已被停用 → 不自動登入，並清除登入態
+                   （走路徑 1 時後端已檢查過，這裡是為了路徑 2 的情況補一道） */
+                const dbRec = userDb[sessionUser.empId];
+                if (dbRec && dbRec.status === 'inactive') {
+                    setAuthToken('');
+                    localStorage.removeItem('hsh_remember_user');
+                    localStorage.removeItem('hsh_session_user');
+                    return;
+                }
+                setCurrentUser(sessionUser);
+                localStorage.setItem('hsh_session_user', JSON.stringify(sessionUser));
+                    try { if (typeof logWorkflow === 'function') logWorkflow('app', 'login', '上線'); } catch (e) {}
+                setLoginForm(prev => ({ ...prev, id: sessionUser.empId }));
+                const favKey = 'hsh_favs_' + sessionUser.empId;
+                const savedFavs = localStorage.getItem(favKey);
+                if (savedFavs) { try { setFavorites(JSON.parse(savedFavs)); } catch(e){} }
+                loadLoginBootstrap();
+                if (['executive', 'admin'].includes(sessionUser.role)) loadReviewCounts();
+                setPage("main");
+            } catch(e) {}
+        })();
+        return () => { cancelled = true; };
     }, []);
     const showToast = (msg, type = 'ok') => {
         setToast({ msg, type });
         setTimeout(() => setToast(null), 2200);
     };
-    const handleLogin = () => {
+    /* 登入改由後端驗證（2026-07-26）：前端不再持有密碼，也不再自己比對。
+       loggingIn 同時兼作防連點，避免網路慢的時候按兩下送出兩次。 */
+    const handleLogin = async () => {
+        if (loggingIn) return;
         if (!loginForm.id || !loginForm.pw) {
             showToast("⚠️ 請填寫帳號與密碼");
             return;
         }
-        const rec = userDb[loginForm.id.trim()];
-        if (!rec) {
-            showToast("❌ 工號不存在");
+        setLoggingIn(true);
+        let d;
+        try {
+            d = await callAuthApi('login', { empId: loginForm.id.trim(), pw: loginForm.pw });
+        } catch (e) {
+            setLoggingIn(false);
+            showToast("⚠️ 連不上伺服器，請檢查網路後再試一次", "err");
             return;
         }
-        if (rec.pw !== loginForm.pw) {
-            showToast("❌ 密碼錯誤");
+        setLoggingIn(false);
+        if (!d || d.status !== 'ok' || !d.user) {
+            showToast("❌ " + ((d && d.msg) || '登入失敗，請再試一次'), "err");
             return;
         }
-        if (rec.status === 'inactive') {
-            showToast("❌ 此帳號已被停用，請聯絡管理員");
-            return;
-        }
-        const sessionUser = { name: rec.name, role: rec.role, dept: rec.dept, empId: loginForm.id.trim() };
+        const rec = d.user;
+        const sessionUser = { name: rec.name, role: rec.role, dept: rec.dept, empId: rec.empId };
         setCurrentUser(sessionUser);
         /* 寫入 localStorage 讓 iframe 工具（緊急聯絡清單等）能讀到目前登入者角色 */
         localStorage.setItem('hsh_session_user', JSON.stringify(sessionUser));
                 try { if (typeof logWorkflow === 'function') logWorkflow('app', 'login', '上線'); } catch (e) {}
-        /* 記住我：儲存或清除 */
+        /* 記住我：存後端發的通行證（不再存密碼）。不勾選就登出即失效。 */
         if (loginForm.remember) {
-            localStorage.setItem('hsh_remember_user', JSON.stringify({ empId: loginForm.id.trim(), pw: loginForm.pw }));
+            setAuthToken(d.token);
         } else {
-            localStorage.removeItem('hsh_remember_user');
+            setAuthToken('');
         }
+        /* 清掉舊版遺留的「記住我」資料（裡面存的是明文密碼） */
+        try { localStorage.removeItem('hsh_remember_user'); } catch (e) {}
         /* 讀取個人收藏 */
         const favKey = 'hsh_favs_' + loginForm.id.trim();
         const savedFavs = localStorage.getItem(favKey);
@@ -19744,14 +19794,15 @@ function App() {
         setPage("main");
         showToast("✅ 登入成功，歡迎回來！");
     };
-    const handleChangePw = () => {
+    /* 改密碼改由後端處理（2026-07-26）。
+       做法：先拿「舊密碼」向後端登入一次 —— 登入通過就等於舊密碼正確，
+       同時換到一張通行證，再用它請後端改密碼。
+       後端寫入後會重新讀取確認才回成功，所以這裡看到成功就是真的成功，
+       不再有「畫面說改好了、其實沒寫進去」的情況。 */
+    const handleChangePw = async () => {
+        if (changingPw) return;
         if (!pwForm.old || !pwForm.new1 || !pwForm.new2) {
             showToast("⚠️ 請填寫所有欄位");
-            return;
-        }
-        const rec = userDb[currentUser.empId];
-        if (!rec || rec.pw !== pwForm.old) {
-            showToast("❌ 舊密碼錯誤");
             return;
         }
         if (pwForm.new1 !== pwForm.new2) {
@@ -19762,11 +19813,33 @@ function App() {
             showToast("⚠️ 新密碼至少3碼");
             return;
         }
-        setUserDb(prev => ({ ...prev, [currentUser.empId]: { ...prev[currentUser.empId], pw: pwForm.new1 } }));
-        syncUserPwToCloud(currentUser.empId, pwForm.new1).then(ok => { if (!ok) showToast('⚠️ 雲端同步失敗，新密碼僅本機生效'); });
-        setChangePwModal(false);
-        setPwForm({ old: '', new1: '', new2: '' });
-        showToast("✅ 密碼已成功更新！");
+        setChangingPw(true);
+        try {
+            // 1) 用舊密碼登入 → 通過代表舊密碼正確，並取得通行證
+            const auth = await callAuthApi('login', { empId: currentUser.empId, pw: pwForm.old });
+            if (!auth || auth.status !== 'ok' || !auth.token) {
+                setChangingPw(false);
+                showToast("❌ 舊密碼錯誤", "err");
+                return;
+            }
+            // 2) 用通行證請後端改密碼
+            const d = await callAuthApi('changePassword', {
+                token: auth.token, oldPw: pwForm.old, newPw: pwForm.new1
+            });
+            setChangingPw(false);
+            if (!d || d.status !== 'ok') {
+                showToast("❌ " + ((d && d.msg) || '密碼更新失敗，請再試一次'), "err");
+                return;
+            }
+            // 3) 舊通行證仍指向同一個人，換成這次拿到的新的即可
+            if (getAuthToken()) setAuthToken(auth.token);
+            setChangePwModal(false);
+            setPwForm({ old: '', new1: '', new2: '' });
+            showToast("✅ 密碼已成功更新！");
+        } catch (e) {
+            setChangingPw(false);
+            showToast("⚠️ 連不上伺服器，密碼未更動，請稍後再試", "err");
+        }
     };
     /* ── 從雲端載入請假申請清單（管理/組長以上登入後自動載入；可手動重新整理） ── */
     const loadLeaveFromCloud = async (silent) => {
@@ -20045,6 +20118,7 @@ function App() {
         const rec = userDb[currentUser.empId];
         if (rec && rec.status === 'inactive') {
             try {
+                setAuthToken('');   // 通行證一併作廢，否則下次開啟又被自動登入
                 localStorage.removeItem('hsh_remember_user');
                 localStorage.removeItem('hsh_session_user');
             } catch (e) { }
@@ -20239,7 +20313,7 @@ function App() {
                                     cursor: "pointer", flexShrink: 0, transition: "all .2s" } },
                                 loginForm.remember && React.createElement("span", { style: { color: "#0A0C10", fontSize: 13, fontWeight: 900 } }, "✓")),
                             React.createElement("span", { style: { fontSize: 13, color: "var(--muted)" }, onClick: () => setLoginForm(p => ({ ...p, remember: !p.remember })) }, "記住我（7天內免登入）"))),
-                    React.createElement("button", { className: "btn-gold", onClick: handleLogin }, "\u767B\u5165\u7CFB\u7D71"),
+                    React.createElement("button", { className: "btn-gold", onClick: handleLogin, disabled: loggingIn, style: loggingIn ? { opacity: .6, cursor: 'wait' } : null }, loggingIn ? "\u767B\u5165\u4E2D\u2026" : "\u767B\u5165\u7CFB\u7D71"),
                     React.createElement("div", { className: "divider" },
                         React.createElement("div", { className: "divider-line" }),
                         React.createElement("span", { className: "divider-text" }, "\u6216"),
@@ -20702,7 +20776,7 @@ function App() {
                     color: '#fff', cursor: 'pointer', marginBottom: 10,
                     fontFamily: "'Microsoft JhengHei',sans-serif",
                     boxShadow: '0 3px 14px rgba(6,199,85,.3)' } }, "\uD83D\uDCF1 \u7DA1\u5B9A LINE \u901A\u77E5"),
-            React.createElement("button", { className: "logout-btn", onClick: () => { try { if (typeof logWorkflow === 'function') logWorkflow('app', 'logout', '離線'); } catch (e) {} setPage("login"); setCurrentUser(null); localStorage.removeItem('hsh_session_user'); showToast("已登出"); } }, "\u767B\u51FA\u5E33\u865F")));
+            React.createElement("button", { className: "logout-btn", onClick: () => { try { if (typeof logWorkflow === 'function') logWorkflow('app', 'logout', '離線'); } catch (e) {} setPage("login"); setCurrentUser(null); localStorage.removeItem('hsh_session_user'); setAuthToken(''); try { localStorage.removeItem('hsh_remember_user'); } catch (e) {} showToast("已登出"); } }, "\u767B\u51FA\u5E33\u865F")));
     };
     const NAV = [
         { id: "home", icon: "🏠", label: "首頁" },
@@ -21571,7 +21645,7 @@ function App() {
                     React.createElement("div", { className: "input-wrap" },
                         React.createElement("span", { className: "input-icon" }, f.icon),
                         React.createElement("input", { className: "inp", type: "password", placeholder: f.ph, value: pwForm[f.key], onChange: e => setPwForm(prev => ({ ...prev, [f.key]: e.target.value })) }))))),
-                React.createElement("button", { className: "save-btn", onClick: handleChangePw }, "\uD83D\uDCBE \u78BA\u8A8D\u66F4\u65B0\u5BC6\u78BC")))),
+                React.createElement("button", { className: "save-btn", onClick: handleChangePw, disabled: changingPw, style: changingPw ? { opacity: .6, cursor: 'wait' } : null }, changingPw ? "\u66F4\u65B0\u4E2D\u2026" : "\uD83D\uDCBE \u78BA\u8A8D\u66F4\u65B0\u5BC6\u78BC")))),
         lineBindModal && (React.createElement("div", { className: "modal-overlay", onClick: () => setLineBindModal(false) },
             React.createElement("div", { className: "modal", onClick: e => e.stopPropagation() },
                 React.createElement("button", { className: "modal-close", onClick: () => setLineBindModal(false) }, "\u2715"),
