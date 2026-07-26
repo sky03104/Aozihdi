@@ -98,6 +98,11 @@
         function getSessionRole(){
             try { return (JSON.parse(localStorage.getItem('hsh_session_user') || '{}').role) || ''; } catch(e){ return ''; }
         }
+        // 主 App 登入通行證，跟 index.html 共用同一份 localStorage key。
+        // getReports/updateStatus/deleteRow 後端現在會驗證這個，沒有就讀不到、也改不動。
+        function getAuthToken(){
+            try { return localStorage.getItem('hsh_auth_token') || ''; } catch(e){ return ''; }
+        }
         const STATUS_COLORS = { '未讀': '#F87171', '待處理': '#FB923C', '已知悉再觀察': '#818CF8', '持續追蹤': '#FBBF24', '已讀': '#D4A800', '處理中': '#FB923C', '已處理': '#4ADE80' };
         const ADMIN_GAS_URL = "https://script.google.com/macros/s/AKfycbwHXlwTMmJyA79Cuzdh2IPRnBLUWm2YPEqXn5XJj4GVEUlCnNIv8hgRTJ7Xr198hZxG/exec";
         const WORKFLOW_GAS_URL = "https://script.google.com/macros/s/AKfycbzxjedGAbxj3G85zkybqoFoB-P7uQ9ycqdJZ7mzQ2Ax-vaxKgOTG60120PlGPbcNJpR/exec";
@@ -277,7 +282,7 @@
             const loadList = async () => {
                 setLoading(true);
                 try {
-                    const res = await fetch(ADMIN_GAS_URL + '?action=getReports');
+                    const res = await fetch(ADMIN_GAS_URL + '?action=getReports&token=' + encodeURIComponent(getAuthToken()));
                     const d = await res.json();
                     if (d.status === 'ok' && Array.isArray(d.list)) setList(d.list);
                     else showToast('❌ 讀取失敗：' + (d.msg || '未知錯誤'), 'err');
@@ -291,7 +296,7 @@
                 try {
                     const body = new URLSearchParams();
                     body.append('action', 'updateStatus');
-                    body.append('payload', JSON.stringify({ sheet: 'report', row: item.row, status: status }));
+                    body.append('payload', JSON.stringify({ sheet: 'report', row: item.row, status: status, token: getAuthToken() }));
                     const res = await fetch(ADMIN_GAS_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, body: body.toString() });
                     const d = await res.json();
                     if (d.status === 'ok') {
@@ -311,7 +316,7 @@
                 try {
                     const body = new URLSearchParams();
                     body.append('action', 'deleteRow');
-                    body.append('payload', JSON.stringify({ sheet: 'report', row: item.row }));
+                    body.append('payload', JSON.stringify({ sheet: 'report', row: item.row, token: getAuthToken() }));
                     const res = await fetch(ADMIN_GAS_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, body: body.toString() });
                     const d = await res.json();
                     if (d.status === 'ok') {
