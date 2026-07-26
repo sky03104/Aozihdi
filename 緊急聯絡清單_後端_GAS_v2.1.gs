@@ -330,7 +330,7 @@ function getContacts(token) {
     if (!user) return jsonRes({status:'error', msg:'登入已失效，請重新登入天鷹保全 App'});
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName('_Contacts');
+    var sheet = ss.getSheetByName('緊急聯絡');
     if (!sheet) return jsonRes({status:'ok', contacts:[]});
 
     var data = sheet.getDataRange().getValues();
@@ -372,11 +372,11 @@ function setContacts(contactsJson, token) {
     }
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName('_Contacts');
+    var sheet = ss.getSheetByName('緊急聯絡');
 
-    // 若分頁不存在就新建
+    // 若分頁不存在就新建（正常情況不會走到這裡，「緊急聯絡」分頁本來就存在）
     if (!sheet) {
-      sheet = ss.insertSheet('_Contacts');
+      sheet = ss.insertSheet('緊急聯絡');
     }
 
     // 清空舊資料（保留第一行標題）
@@ -385,12 +385,15 @@ function setContacts(contactsJson, token) {
       sheet.getRange(2, 1, lastRow - 1, 8).clearContent();
     }
 
-    // 寫入標題（第一次）
-    var headers = ['ID','班別','姓名','職務','電話','緊急聯絡人','關係','緊急連絡人電話'];
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
-    sheet.getRange(1, 1, 1, headers.length).setBackground('#1a1a2e');
-    sheet.getRange(1, 1, 1, headers.length).setFontColor('#D4A800');
+    // 標題只在真的還沒有標題列時才寫入（沿用試算表原有的英文欄名 id/shift/name/...，
+    // 2026-07-26 前的版本每次存檔都會覆寫成中文標題，會把既有分頁的標題列改掉）
+    if (!sheet.getRange(1, 1).getValue()) {
+      var headers = ['id','shift','name','role','phone','ecName','ecRel','ecPhone'];
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+      sheet.getRange(1, 1, 1, headers.length).setBackground('#1a1a2e');
+      sheet.getRange(1, 1, 1, headers.length).setFontColor('#D4A800');
+    }
 
     var contacts = JSON.parse(contactsJson);
     if (!contacts || contacts.length === 0) return jsonRes({status:'ok'});
