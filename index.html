@@ -2530,6 +2530,13 @@ function App() {
                 if (['executive', 'admin'].includes(sessionUser.role)) loadReviewCounts();
                 setPage("main");
             } catch(e) {}
+            finally {
+                // 不論查到有效登入態、沒有登入態、還是查詢失敗，登入檢查都算「跑完了」，
+                // 這時才能安全把 splash 收掉——否則 splash 若按固定時間收掉、
+                // 這段驗證通行證的網路請求還沒回來，使用者會看到畫面先閃過登入頁
+                // 再跳回主選單（尤其公司網路較慢/GAS 冷啟動時特別明顯）。
+                if (typeof window.__authCheckDone === 'function') window.__authCheckDone();
+            }
         })();
         return () => { cancelled = true; };
     }, []);
@@ -4593,13 +4600,27 @@ function App() {
 const rootEl = document.getElementById('root');
 const reactRoot = ReactDOM.createRoot(rootEl);
 reactRoot.render(React.createElement(App, null));
-setTimeout(() => {
-    const splash = document.getElementById('splash');
-    if (splash) {
-        splash.classList.add('hide');
-        setTimeout(() => splash.remove(), 700);
-    }
-}, 800);
+
+/* Splash 收掉的時機改成「登入檢查真的跑完」才收，不再用固定 800ms。
+   固定時間的舊寫法在網路慢/GAS冷啟動時，驗證通行證的請求還沒回來splash就先收掉，
+   使用者會看到畫面閃過登入頁才跳回主選單。__authCheckDone 由 App 內的自動登入
+   effect 在 finally 裡呼叫；6 秒保底逾時是防呆，避免萬一 effect 拋出未預期例外
+   時使用者被卡在 splash 畫面出不去。 */
+var __splashStart = Date.now();
+var __splashHidden = false;
+window.__authCheckDone = function () {
+    if (__splashHidden) return;
+    __splashHidden = true;
+    var wait = Math.max(0, 400 - (Date.now() - __splashStart)); // 至少顯示 400ms，避免太快收掉造成畫面閃爍
+    setTimeout(function () {
+        const splash = document.getElementById('splash');
+        if (splash) {
+            splash.classList.add('hide');
+            setTimeout(() => splash.remove(), 700);
+        }
+    }, wait);
+};
+setTimeout(window.__authCheckDone, 6000);
 </script>
 </body>
 </html>
