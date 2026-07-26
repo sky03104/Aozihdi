@@ -2496,6 +2496,8 @@ function App() {
                             // 通行證過期或帳號已停用 → 清掉，讓使用者重新登入
                             setAuthToken('');
                             try { localStorage.removeItem('hsh_session_user'); } catch (e) {}
+                            /* 順手清掉緊急聯絡清單的本機快取，避免登入失效後這份工具還留著上次同步的電話資料 */
+                            try { localStorage.removeItem('hsh_ec_contacts'); } catch (e) {}
                             return;
                         }
                     } catch (e) {
@@ -2517,6 +2519,7 @@ function App() {
                     setAuthToken('');
                     localStorage.removeItem('hsh_remember_user');
                     localStorage.removeItem('hsh_session_user');
+                    localStorage.removeItem('hsh_ec_contacts');
                     return;
                 }
                 setCurrentUser(sessionUser);
@@ -2889,6 +2892,7 @@ function App() {
                 setAuthToken('');   // 通行證一併作廢，否則下次開啟又被自動登入
                 localStorage.removeItem('hsh_remember_user');
                 localStorage.removeItem('hsh_session_user');
+                localStorage.removeItem('hsh_ec_contacts');
             } catch (e) { }
             setCurrentUser(null);
             setPage('login');
@@ -3545,7 +3549,7 @@ function App() {
                     color: '#fff', cursor: 'pointer', marginBottom: 10,
                     fontFamily: "'Microsoft JhengHei',sans-serif",
                     boxShadow: '0 3px 14px rgba(6,199,85,.3)' } }, "\uD83D\uDCF1 \u7DA1\u5B9A LINE \u901A\u77E5"),
-            React.createElement("button", { className: "logout-btn", onClick: () => { try { if (typeof logWorkflow === 'function') logWorkflow('app', 'logout', '離線'); } catch (e) {} setPage("login"); setCurrentUser(null); localStorage.removeItem('hsh_session_user'); setAuthToken(''); try { localStorage.removeItem('hsh_remember_user'); } catch (e) {} showToast("已登出"); } }, "\u767B\u51FA\u5E33\u865F")));
+            React.createElement("button", { className: "logout-btn", onClick: () => { try { if (typeof logWorkflow === 'function') logWorkflow('app', 'logout', '離線'); } catch (e) {} setPage("login"); setCurrentUser(null); localStorage.removeItem('hsh_session_user'); setAuthToken(''); try { localStorage.removeItem('hsh_remember_user'); localStorage.removeItem('hsh_ec_contacts'); } catch (e) {} showToast("已登出"); } }, "\u767B\u51FA\u5E33\u865F")));
     };
     const NAV = [
         { id: "home", icon: "🏠", label: "首頁" },
