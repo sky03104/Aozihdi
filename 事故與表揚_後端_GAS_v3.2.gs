@@ -1,9 +1,16 @@
 /**
- * 天鷹保全 · 事故報告 + 匿名表揚／舉報 後端（合併版 v3.1）
+ * 天鷹保全 · 事故報告 + 匿名表揚／舉報 後端（合併版 v3.2）
  * ---------------------------------------------------------------
  * 【重要】此檔取代專案內原本的「事故報告.gs」與「匿名舉報.gs」兩支，
- *   也取代上一版 v3.0。請把舊檔內容「全部刪除」，只保留本檔，
+ *   也取代上一版 v3.0/v3.1。請把舊檔內容「全部刪除」，只保留本檔，
  *   避免同專案出現兩個 doPost／doGet 衝突。
+ *
+ * v3.2 相對 v3.1 新增（2026-07-26，資安修補）：
+ *   getReports/getFeedback/updateStatus/deleteRow 原本完全無驗證，只要
+ *   知道這支 GAS URL，任何人都能撈出全部事故報告與表揚檢舉（含工號姓名、
+ *   事故經過、照片連結），甚至竄改狀態或永久刪除。現在四個 action 都要求
+ *   帶主 App 登入通行證(token)，並比對角色需 executive/admin（deleteRow
+ *   需 admin），跟前端 AdminApp 的權限判斷一致。
  *
  * v3.1 相對 v3.0 新增（供主管專用畫面使用）：
  *   1. 兩個分頁末端新增「狀態」欄位，送出時預設「未讀」；舊表自動補表頭。
@@ -34,10 +41,36 @@ var PHOTO_FOLDER_ID  = '1K_RRPUjcWrdNAS2ppcx6OFDtlkfSfAl3';            // 公告
 var SHEET_REPORT     = '事故報告';      // 事故報告分頁
 var SHEET_FEEDBACK   = '匿名表揚檢舉';  // 匿名表揚／舉報分頁（後台含工號姓名）
 var TZ               = 'Asia/Taipei';
-var NOTIFY_GAS_URL   = "https://script.google.com/macros/s/AKfycbxEVBHseDpLWiWe4d8kLcCHbVFiKAK9wyoLwqNkt59PS4vPCY9QfG0_wiDJf2coO3zMcg/exec"; // 天鷹保全APP GAS（LINE推播轉發）
+var NOTIFY_GAS_URL   = "https://script.google.com/macros/s/AKfycbxEVBHseDpLWiWe4d8kLcCHbVFiKAK9wyoLwqNkt59PS4vPCY9QfG0_wiDJf2coO3zMcg/exec"; // 天鷹保全APP GAS（LINE推播轉發，也用於驗證登入通行證）
 
 // 狀態白名單（主管畫面四態）
 var STATUS_LIST = ['未讀', '待處理', '已知悉再觀察', '持續追蹤', '已讀', '處理中', '已處理'];
+
+// 主管審閱清單（getReports/getFeedback/updateStatus）允許角色，跟前端 AdminApp 的 allowed 一致
+var ADMIN_ROLES_  = ['executive', 'admin'];
+// 永久刪除（deleteRow）僅限管理員，跟前端 canDelete 一致
+var DELETE_ROLES_ = ['admin'];
+
+/**
+ * 驗證通行證，通過回傳 { empId, name, role, ... }，不通過回傳 null。
+ * 通行證由「天鷹保全APP」GAS 登入時發放，本檔沒有簽章金鑰，
+ * 直接呼叫對方的 verifySession action 幫忙確認（跟緊急聯絡清單同做法）。
+ */
+function verifyAuthToken_(token) {
+  if (!token) return null;
+  try {
+    var res = UrlFetchApp.fetch(NOTIFY_GAS_URL, {
+      method: 'post',
+      payload: { action: 'verifySession', data: JSON.stringify({ token: token }) },
+      muteHttpExceptions: true
+    });
+    var d = JSON.parse(res.getContentText());
+    if (d.status !== 'ok' || !d.user || !d.user.empId) return null;
+    return d.user;
+  } catch (err) {
+    return null;
+  }
+}
 
 // 各分頁表頭（末欄一律為「狀態」）
 var HEADERS_REPORT = [
@@ -74,8 +107,21 @@ function doPost(e) {
 
     if (action === 'report')         return handleReport_(d);
     if (action === 'feedback')       return handleFeedback_(d);
-    if (action === 'updateStatus')   return handleUpdateStatus_(d);
-    if (action === 'deleteRow')      return handleDeleteRow_(d);
+
+    if (action === 'updateStatus') {
+      var updUser = verifyAuthToken_(d.token);
+      if (!updUser || ADMIN_ROLES_.indexOf(updUser.role) === -1) {
+        return json_({ status: 'error', msg: '登入已失效或權限不足，請重新登入天鷹保全 App' });
+      }
+      return handleUpdateStatus_(d);
+    }
+    if (action === 'deleteRow') {
+      var delUser = verifyAuthToken_(d.token);
+      if (!delUser || DELETE_ROLES_.indexOf(delUser.role) === -1) {
+        return json_({ status: 'error', msg: '登入已失效或權限不足（僅管理員可刪除），請重新登入' });
+      }
+      return handleDeleteRow_(d);
+    }
     // 車牌辨識已移至「天鷹AI助手_GAS.gs」的 recognizePlate（共用 Gemini API Key）；
     // 本檔原本的 recognizePlate / vehicleReg 路由指向不存在的函數，已移除避免整支 doPost 崩潰。
 
@@ -326,16 +372,26 @@ function json_(obj) {
 }
 
 // ====== GET：連線測試 + 主管讀清單 ======
+// getReports/getFeedback 含工號姓名、事故經過、照片連結，只有主管(executive)/管理員(admin)
+// 帶著有效通行證才能讀，跟前端 AdminApp 的 allowed 一致。
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || '';
 
   if (action === 'getReports') {
+    var rUser = verifyAuthToken_(e.parameter.token);
+    if (!rUser || ADMIN_ROLES_.indexOf(rUser.role) === -1) {
+      return json_({ status: 'error', msg: '登入已失效或權限不足，請重新登入天鷹保全 App' });
+    }
     var rList = readSheetRows_(SHEET_REPORT, HEADERS_REPORT,
       ['提交時間', '工號', '姓名', '日期', '時間', '地點', '類別', '描述', '處理經過', '相關人員', '照片連結', '狀態']);
     return json_({ status: 'ok', list: rList });
   }
 
   if (action === 'getFeedback') {
+    var fUser = verifyAuthToken_(e.parameter.token);
+    if (!fUser || ADMIN_ROLES_.indexOf(fUser.role) === -1) {
+      return json_({ status: 'error', msg: '登入已失效或權限不足，請重新登入天鷹保全 App' });
+    }
     var fList = readSheetRows_(SHEET_FEEDBACK, HEADERS_FEEDBACK,
       ['時間戳記', '類型', '對象', '分類', '描述', '發生日期', '附件', '工號', '姓名', '狀態', '處置']);
     return json_({ status: 'ok', list: fList });
