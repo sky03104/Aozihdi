@@ -337,7 +337,8 @@ input[type=date]{color-scheme:dark}
     </div>
     <div class="mo-row">
       <label>申請單位</label>
-      <input id="mo-unit" type="text" placeholder="例：○○裝潢工程行">
+      <select id="mo-unit-select" onchange="onMoUnitSelectChange()"></select>
+      <input id="mo-unit-other" type="text" placeholder="輸入申請單位" style="display:none;margin-top:.4rem">
     </div>
     <div class="mo-row">
       <label>廠商／專櫃名稱</label>
@@ -1156,13 +1157,54 @@ async function loadAll(silent){
      施工單 rows：[申請單位,廠商,月,日,進場時間,退場時間,人數,監工,施工地點,施工項目]（10欄）
      動火 fireRows：上述10欄 + [使用器具]（11欄）
 ══════════════════════════════════════════ */
+var MO_UNIT_OTHER = '__other__';
+// 樓層排序：B1F、B2F…在前，1F、2F…接著，其餘（設備課/企劃課等單位）依筆畫排最後
+function moUnitSortKey(u){
+  var m = /^B(\d+)F$/i.exec(u);
+  if(m) return -10000 + parseInt(m[1],10);
+  m = /^(\d+)F$/i.exec(u);
+  if(m) return parseInt(m[1],10);
+  return 100000;
+}
+// 從目前已載入的施工單/動火資料裡，收集出現過的「申請單位」，去重＋排序
+function buildUnitOptions(){
+  var set = {};
+  (S.data.con||[]).concat(S.data.hot||[]).forEach(function(rec){
+    var u = String(rec['申請單位']||'').trim();
+    if(u) set[u] = true;
+  });
+  return Object.keys(set).sort(function(a,b){
+    var ka=moUnitSortKey(a), kb=moUnitSortKey(b);
+    return ka!==kb ? ka-kb : a.localeCompare(b,'zh-Hant');
+  });
+}
+function populateMoUnitSelect(){
+  var sel = document.getElementById('mo-unit-select');
+  var opts = buildUnitOptions();
+  var html = '<option value="">— 請選擇 —</option>';
+  opts.forEach(function(u){ html += '<option value="'+u.replace(/"/g,'&quot;')+'">'+u+'</option>'; });
+  html += '<option value="'+MO_UNIT_OTHER+'">➕ 其他（手動輸入）</option>';
+  sel.innerHTML = html;
+  document.getElementById('mo-unit-other').style.display = 'none';
+  document.getElementById('mo-unit-other').value = '';
+}
+function onMoUnitSelectChange(){
+  var isOther = document.getElementById('mo-unit-select').value === MO_UNIT_OTHER;
+  document.getElementById('mo-unit-other').style.display = isOther ? 'block' : 'none';
+}
+function getMoUnitValue(){
+  var sel = document.getElementById('mo-unit-select').value;
+  if(sel === MO_UNIT_OTHER) return document.getElementById('mo-unit-other').value.trim();
+  return sel;
+}
 function openManualAdd(){
   var isHot = S.tab === 'hot';
   document.getElementById('mo-title').innerHTML =
     '<i class="ti ti-clipboard-plus"></i>手動補' + (isHot ? '動火申請' : '施工單');
   document.getElementById('mo-tool-row').style.display = isHot ? 'block' : 'none';
-  ['mo-unit','mo-vendor','mo-month','mo-day','mo-in','mo-out','mo-count','mo-super','mo-loc','mo-item','mo-tool']
+  ['mo-vendor','mo-month','mo-day','mo-in','mo-out','mo-count','mo-super','mo-loc','mo-item','mo-tool']
     .forEach(function(id){ document.getElementById(id).value=''; });
+  populateMoUnitSelect();
   document.getElementById('mo-ovl').classList.add('show');
 }
 function closeManualAdd(){
@@ -1183,7 +1225,7 @@ async function submitManualAdd(){
   }
 
   var row = [
-    v('mo-unit'), vendor, month, day, inTime, v('mo-out'),
+    getMoUnitValue(), vendor, month, day, inTime, v('mo-out'),
     v('mo-count'), v('mo-super'), v('mo-loc'), v('mo-item')
   ];
   if(isHot) row.push(v('mo-tool'));
