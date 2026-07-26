@@ -375,6 +375,12 @@ function getGasUrl(){
   return (override&&override.trim()) ? override.trim() : BUILT_IN_GAS_URL;
 }
 
+/* ── 取得登入通行證（跟主 App index.html 共用同一把 localStorage key）
+   getContacts/setContacts 現在後端會驗證這個 token，沒有就讀不到、也存不進去。 ── */
+function getAuthToken(){
+  try{return localStorage.getItem('hsh_auth_token')||'';}catch(e){return '';}
+}
+
 /* ── 修正電話：雲端試算表把開頭 0 吃掉時補回（台灣手機 9 碼→補 0 成 10 碼） ── */
 function normalizePhone(p){
   if(p===null||p===undefined) return '';
@@ -669,8 +675,17 @@ async function pullFromGAS(silent){
   setSyncStatus('☁ 同步中…','loading');
   if(!silent) toast('⏳ 從雲端拉取中…');
 
+  var token=getAuthToken();
+  if(!token){
+    loadState='fail';
+    setSyncStatus('未登入','err');
+    render();
+    if(!silent) toast('❌ 請先從主選單登入天鷹保全 App','err');
+    return;
+  }
+
   try{
-    var r=await fetch(url+'?action=getContacts');
+    var r=await fetch(url+'?action=getContacts&token='+encodeURIComponent(token));
     var d=await r.json();
     if(d.status==='ok'&&d.contacts&&d.contacts.length){
       contacts=d.contacts.map(function(c){c.phone=normalizePhone(c.phone);c.ecPhone=normalizePhone(c.ecPhone);return c;});
@@ -681,6 +696,11 @@ async function pullFromGAS(silent){
       var timeStr=(now.getHours()<10?'0':'')+now.getHours()+':'+(now.getMinutes()<10?'0':'')+now.getMinutes();
       setSyncStatus('✓ '+timeStr+' 已同步','ok');
       if(!silent) toast('✅ 已同步 '+contacts.length+' 筆','ok');
+    }else if(d.status==='error'){
+      loadState='fail';
+      setSyncStatus(d.msg||'讀取失敗','err');
+      render();
+      if(!silent) toast('❌ '+(d.msg||'讀取失敗'),'err');
     }else{
       loadState='empty';
       setSyncStatus('—','');
@@ -700,11 +720,19 @@ async function pushToGAS(){
   var url=getGasUrl();
   if(!url) return;
 
+  var token=getAuthToken();
+  if(!token){
+    setSyncStatus('未登入','err');
+    toast('❌ 請先從主選單登入天鷹保全 App','err');
+    return;
+  }
+
   setSyncStatus('☁ 推送中…','loading');
   try{
     var b=new URLSearchParams();
     b.append('action','setContacts');
     b.append('contacts',JSON.stringify(contacts));
+    b.append('token',token);
     var r=await fetch(url,{method:'POST',body:b});
     var d=await r.json();
     if(d.status==='ok'){
