@@ -91,6 +91,7 @@ const TOOLS = [
     { id: 18, name: "物流車輛統計", icon: "🚚", category: "門禁管理", toolId: "logistics" },
     { id: 19, name: "帶班交接事項", icon: "🔄", category: "核心工具", toolId: "handover" },
     { id: 20, name: "自動排哨工具", icon: "🛡️", category: "人事管理", externalUrl: "https://sky03104.github.io/tianying-security/tool_guard_gen.html" },
+    { id: 21, name: "缺班時數/調補班紀錄", icon: "⏱️", category: "人事管理", externalUrl: "https://sky03104.github.io/tianying-security/tool_shift_adjust.html" },
 ];
 const ROLES = [
     { id: "fulltime", label: "正職保全", color: "#3B82F6" },
@@ -159,9 +160,9 @@ const DEFAULT_PERMS = {
     parttime: [1, 2, 3, 7, 5, 6, 9, 12, 13, 18, 99],
     leader: [1, 2, 3, 7, 4, 5, 6, 9, 11, 12, 13, 18, 19, 99],
     vicecaptain: [1, 2, 3, 7, 4, 5, 6, 9, 10, 11, 12, 13, 18, 19, 99],
-    captain: [1, 2, 3, 7, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 18, 19, 99],
-    executive: [1, 2, 3, 7, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 18, 19, 99],
-    admin: [1, 2, 3, 7, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 99],
+    captain: [1, 2, 3, 7, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 18, 19, 21, 99],
+    executive: [1, 2, 3, 7, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 18, 19, 21, 99],
+    admin: [1, 2, 3, 7, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 99],
 };
 /* 2026-07-26：原本這裡有一份全公司 48 筆的帳號密碼表（USER_DB）。
    因為 index.html 會整份下載到每個使用者的手機上，等於把密碼公開，

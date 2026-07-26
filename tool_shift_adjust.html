@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>天鷹保全 · 缺班時數/調補班紀錄</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js" defer></script>
+<!--
+=============================================================
+【GAS Web App 部署說明】
+1. Google Drive 新建一份空白試算表，複製它的 ID（網址 /d/ 跟 /edit 中間那段）
+2. 開啟 Google Apps Script：https://script.google.com/，新增專案，
+   貼上 缺班調班紀錄_GAS.gs 的完整內容
+3. 把 SPREADSHEET_ID 常數換成剛剛複製的試算表 ID
+4. 部署 → 新增部署 → 類型選「網路應用程式」
+   執行身分：我（你的 Google 帳號）　存取權限：所有人
+5. 複製部署網址，填入下方 JS 的 SHIFT_GAS_URL 變數
+6. 之後改動 GAS 程式碼：部署 → 管理部署作業 → 編輯(鉛筆) → 版本「新版本」
+   （不要「新增部署」，網址會變，前端全斷）
+=============================================================
+-->
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0A0C10;--bg2:#0D0F14;--sur:#111827;
+  --gld:#D4A800;--gld2:#FFD700;--gld3:#C9A227;--gldg:rgba(212,168,0,.14);
+  --ind:#818CF8;--wrn:#FB923C;--red:#F87171;--grn:#4ADE80;
+  --t1:#F5F5F5;--t2:#8A95A8;--t3:#4B5563;
+  --bdr:rgba(255,255,255,.07);
+}
+body{background:var(--bg);color:var(--t1);font-family:'Microsoft JhengHei','微軟正黑體',system-ui,sans-serif;font-size:15px;min-height:100vh;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--t3);border-radius:2px}
+input[type=date],input[type=month]{color-scheme:dark}
+
+/* ── SPLASH ── */
+#splash{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s}
+#splash.out{opacity:0;pointer-events:none}
+.sp-ring{width:56px;height:56px;border-radius:50%;border:3px solid rgba(212,168,0,.15);border-top-color:var(--gld);animation:spin .9s linear infinite;margin-bottom:16px}
+.sp-txt{color:var(--gld);font-size:14px;letter-spacing:2px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.hdr{position:sticky;top:0;z-index:200;background:rgba(10,12,16,.94);backdrop-filter:blur(18px);border-bottom:1px solid var(--bdr);padding:.65rem 1rem;display:flex;align-items:center;justify-content:space-between}
+.hdr-ttl{font-size:1rem;font-weight:800;display:flex;align-items:center;gap:.4rem}
+.hdr-ttl i{color:var(--gld)}
+.hdr-r{display:flex;gap:.4rem;align-items:center}
+.ibtn{width:36px;height:36px;border-radius:8px;background:var(--sur);border:1px solid var(--bdr);color:var(--t2);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+.tabs{display:flex;padding:.6rem 1rem 0;gap:.5rem}
+.tab{flex:1;padding:.6rem;text-align:center;border-radius:10px 10px 0 0;background:var(--sur);color:var(--t2);font-size:.86rem;font-weight:700;cursor:pointer;border:1px solid var(--bdr);border-bottom:none;display:flex;align-items:center;justify-content:center;gap:.3rem}
+.tab.on{background:var(--gldg);color:var(--gld);border-color:rgba(212,168,0,.3)}
+
+.mbar{display:flex;align-items:center;gap:.6rem;padding:.8rem 1rem;background:var(--sur);border-bottom:1px solid var(--bdr)}
+.mbar input[type=month]{flex:1;padding:.5rem .65rem;border-radius:8px;background:var(--bg2);border:1px solid var(--bdr);color:var(--t1);font-size:.88rem}
+.xbtn{padding:.5rem .8rem;border-radius:8px;background:linear-gradient(135deg,#818CF8 0%,#6366F1 100%);color:#fff;border:none;font-size:.82rem;font-weight:700;display:flex;align-items:center;gap:.3rem;cursor:pointer;white-space:nowrap}
+.xbtn:disabled{opacity:.5;cursor:not-allowed}
+
+#content{padding:.8rem 1rem 6rem}
+.rcard{background:var(--sur);border:1px solid var(--bdr);border-radius:12px;padding:.75rem .9rem;margin-bottom:.6rem;display:flex;align-items:center;gap:.7rem}
+.rcard .rdate{font-size:.72rem;color:var(--t3);width:52px;flex-shrink:0;line-height:1.3}
+.rcard .rmain{flex:1;min-width:0}
+.rcard .rname{font-size:.94rem;font-weight:700}
+.rcard .rreason{font-size:.78rem;color:var(--t2);margin-top:2px}
+.rcard .rnote{font-size:.72rem;color:var(--t3);margin-top:2px}
+.rcard .rhrs{font-size:1.05rem;font-weight:800;flex-shrink:0}
+.rhrs.pos{color:var(--grn)}
+.rhrs.neg{color:var(--red)}
+.rdel{width:30px;height:30px;border-radius:8px;background:rgba(229,62,62,.1);border:1px solid rgba(229,62,62,.25);color:var(--red);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+
+.stctr{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;padding:3rem 1rem;color:var(--t2);text-align:center}
+.spinner{width:36px;height:36px;border:2px solid rgba(212,168,0,.18);border-top-color:var(--gld);border-radius:50%;animation:spin .8s linear infinite}
+
+.sumrow{display:flex;align-items:center;justify-content:space-between;background:var(--sur);border:1px solid var(--bdr);border-radius:12px;padding:.75rem .9rem;margin-bottom:.55rem}
+.sumrow .sname{font-size:.94rem;font-weight:700}
+.sumrow .scnt{font-size:.72rem;color:var(--t3);margin-top:2px}
+.sumrow .stot{font-size:1.15rem;font-weight:900}
+
+.errbox{margin:.8rem 0;padding:.85rem;border-radius:8px;background:rgba(229,62,62,.08);border:1px solid rgba(229,62,62,.25);color:#F87171;font-size:.84rem;display:flex;gap:.45rem;align-items:flex-start}
+
+/* ── TOAST ── */
+.twrap{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);z-index:2000;display:flex;flex-direction:column;gap:.38rem;pointer-events:none;align-items:center}
+.toast{padding:.48rem 1.1rem;border-radius:8px;font-size:.82rem;font-weight:500;white-space:nowrap;box-shadow:0 4px 18px rgba(0,0,0,.5);animation:tup .25s ease}
+.t-ok{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.32);color:#4ADE80}
+.t-err{background:rgba(229,62,62,.12);border:1px solid rgba(229,62,62,.32);color:#F87171}
+.t-inf{background:rgba(129,140,248,.12);border:1px solid rgba(129,140,248,.32);color:var(--ind)}
+@keyframes tup{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+
+/* ── FAB + Modal ── */
+.fab-add{position:fixed;right:1rem;bottom:1rem;z-index:1500;width:52px;height:52px;border-radius:50%;
+  background:linear-gradient(135deg,#D4A800 0%,#FFD700 100%);color:#0A0C10;border:none;
+  display:flex;align-items:center;justify-content:center;font-size:1.4rem;cursor:pointer;
+  box-shadow:0 6px 20px rgba(212,168,0,.35)}
+.mo-ovl{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);display:none;align-items:flex-end;justify-content:center}
+.mo-ovl.show{display:flex}
+.mo-box{width:100%;max-width:480px;max-height:88vh;overflow-y:auto;background:var(--bg2);border:1px solid var(--bdr);border-radius:16px 16px 0 0;padding:1.1rem 1.1rem 1.4rem}
+.mo-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:.9rem}
+.mo-hd h3{font-size:1.02rem;display:flex;align-items:center;gap:.4rem}
+.mo-close{width:32px;height:32px;border-radius:8px;background:var(--sur);border:1px solid var(--bdr);color:var(--t2);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.mo-row{margin-bottom:.7rem}
+.mo-row label{display:block;font-size:.76rem;color:var(--t2);margin-bottom:.3rem}
+.mo-row input,.mo-row select{width:100%;padding:.55rem .7rem;border-radius:8px;background:var(--sur);border:1px solid var(--bdr);color:var(--t1);font-size:.92rem;font-family:inherit}
+.mo-row input:focus,.mo-row select:focus{outline:none;border-color:var(--gld)}
+.mo-hrs-row{display:flex;gap:.5rem;align-items:center}
+.hrs-sign{display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--bdr);flex-shrink:0}
+.hrs-sign button{padding:.55rem .9rem;border:none;background:var(--sur);color:var(--t2);font-weight:800;cursor:pointer;font-size:.92rem}
+.hrs-sign button.on-pos{background:rgba(74,222,128,.18);color:var(--grn)}
+.hrs-sign button.on-neg{background:rgba(248,113,113,.18);color:var(--red)}
+.mo-hint{font-size:.7rem;color:var(--t3);margin-top:.25rem}
+.mo-submit{width:100%;margin-top:.4rem;padding:.75rem;border-radius:10px;border:none;
+  background:linear-gradient(135deg,#D4A800 0%,#FFD700 100%);color:#0A0C10;font-weight:700;
+  font-size:.94rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.4rem}
+.mo-submit:disabled{opacity:.55;cursor:not-allowed}
+</style>
+</head>
+<body>
+
+<div id="splash"><div class="sp-ring"></div><div class="sp-txt">天鷹保全</div></div>
+
+<div class="hdr">
+  <div class="hdr-ttl"><i class="ti ti-clock-exclamation"></i>缺班時數/調補班紀錄</div>
+  <div class="hdr-r">
+    <button class="ibtn" onclick="window.opener?window.close():window.location.href='https://sky03104.github.io/tianying-security/'" title="返回主系統"><i class="ti ti-home"></i></button>
+    <button class="ibtn" id="btn-refresh" onclick="loadRecords()" title="重新整理"><i class="ti ti-refresh"></i></button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab on" id="tab-list" onclick="switchTab('list')"><i class="ti ti-list"></i>紀錄列表</div>
+  <div class="tab" id="tab-sum" onclick="switchTab('sum')"><i class="ti ti-report-money"></i>月彙總</div>
+</div>
+
+<div class="mbar">
+  <input type="month" id="minp" onchange="onMonthChange(this.value)">
+  <button class="xbtn" id="btn-export" onclick="exportXlsx()"><i class="ti ti-file-spreadsheet"></i>匯出 Excel</button>
+</div>
+
+<div id="content"></div>
+
+<div class="twrap" id="twrap"></div>
+
+<!-- 新增紀錄 -->
+<button class="fab-add" id="fab-add" onclick="openAddModal()" title="新增紀錄"><i class="ti ti-plus"></i></button>
+<div class="mo-ovl" id="mo-ovl" onclick="if(event.target===this)closeAddModal()">
+  <div class="mo-box">
+    <div class="mo-hd">
+      <h3><i class="ti ti-clock-plus"></i>新增缺班/調補班紀錄</h3>
+      <button class="mo-close" onclick="closeAddModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="mo-row">
+      <label>日期</label>
+      <input id="mo-date" type="date">
+    </div>
+    <div class="mo-row">
+      <label>員工</label>
+      <select id="mo-emp"></select>
+    </div>
+    <div class="mo-row">
+      <label>時數</label>
+      <div class="mo-hrs-row">
+        <div class="hrs-sign">
+          <button type="button" id="btn-sign-neg" onclick="setHrsSign(-1)">－ 缺班</button>
+          <button type="button" id="btn-sign-pos" onclick="setHrsSign(1)">＋ 補班</button>
+        </div>
+        <input id="mo-hrs" type="number" min="0" step="0.5" placeholder="小時數（正數）">
+      </div>
+      <div class="mo-hint">缺班時數請點「－」；補班/加班回補請點「＋」，輸入小時數一律填正數</div>
+    </div>
+    <div class="mo-row">
+      <label>原因</label>
+      <input id="mo-reason" type="text" placeholder="例：曠職、請假未登記、換班、補班…">
+    </div>
+    <div class="mo-row">
+      <label>備註（可不填）</label>
+      <input id="mo-note" type="text" placeholder="補充說明">
+    </div>
+    <button class="mo-submit" id="mo-submit-btn" onclick="submitAdd()"><i class="ti ti-send"></i>送出紀錄</button>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════
+   CONFIG
+══════════════════════════════════════════ */
+var SHIFT_GAS_URL = ''; // ← 部署 GAS 後填入網址（見上方部署說明）
+var ACCOUNT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxEVBHseDpLWiWe4d8kLcCHbVFiKAK9wyoLwqNkt59PS4vPCY9QfG0_wiDJf2coO3zMcg/exec'; // 天鷹保全APP 帳號 GAS（讀員工清單、驗證登入通行證用）
+
+/* ══════════════════════════════════════════
+   STATE
+══════════════════════════════════════════ */
+var S = { tab:'list', month:'', records:[], employees:{}, loading:true, error:null, hrsSign:-1 };
+
+function pad2(n){ return n<10 ? '0'+n : ''+n; }
+function currentMonthStr(){
+  var d = new Date();
+  return d.getFullYear()+'-'+pad2(d.getMonth()+1);
+}
+
+/* ══════════════════════════════════════════
+   權限：隊長以上（captain/executive/admin）才能使用
+   前端只是先擋畫面，真正防線在後端每個 action 都會再驗一次
+══════════════════════════════════════════ */
+var CAPTAIN_PLUS_ROLES = ['captain','executive','admin'];
+function getSessionUser(){
+  try { return JSON.parse(localStorage.getItem('hsh_session_user') || 'null'); } catch(e){ return null; }
+}
+function getAuthToken(){
+  try { return localStorage.getItem('hsh_auth_token') || ''; } catch(e){ return ''; }
+}
+function showNoPerm(msg){
+  var sp = document.getElementById('splash');
+  if(sp) sp.classList.add('out');
+  document.body.innerHTML = '<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:#0A0C10">'+
+    '<div class="errbox" style="max-width:360px"><i class="ti ti-lock"></i><div>'+msg+'</div></div></div>';
+}
+function checkPermission(){
+  var u = getSessionUser();
+  if(!u || !u.empId){ showNoPerm('請從天鷹保全 App 登入後開啟本工具'); return false; }
+  if(!getAuthToken()){ showNoPerm('登入已失效，請重新從天鷹保全 App 登入'); return false; }
+  if(CAPTAIN_PLUS_ROLES.indexOf(u.role) === -1){ showNoPerm('此工具僅限隊長以上使用，如有需要請洽主管'); return false; }
+  return true;
+}
+
+/* ══════════════════════════════════════════
+   Toast
+══════════════════════════════════════════ */
+function toast(msg, type){
+  var wrap = document.getElementById('twrap');
+  var div = document.createElement('div');
+  div.className = 'toast ' + (type==='ok'?'t-ok':type==='err'?'t-err':'t-inf');
+  div.textContent = msg;
+  wrap.appendChild(div);
+  setTimeout(function(){ if(div.parentNode) div.parentNode.removeChild(div); }, 3200);
+}
+function hideSplash(){
+  var sp = document.getElementById('splash');
+  if(sp){ sp.classList.add('out'); setTimeout(function(){ sp.remove(); }, 500); }
+}
+
+/* ══════════════════════════════════════════
+   員工清單（給新增紀錄的下拉選單用）
+══════════════════════════════════════════ */
+async function loadEmployees(){
+  try {
+    var res = await fetch(ACCOUNT_GAS_URL + '?action=getApprovedUsers');
+    var d = await res.json();
+    if(d && d.status === 'ok' && d.users) S.employees = d.users;
+  } catch(e){ /* 拿不到就留空，新增時仍可手動選不到人但不擋其他功能 */ }
+}
+function populateEmpSelect(){
+  var sel = document.getElementById('mo-emp');
+  var ids = Object.keys(S.employees).sort(function(a,b){
+    return String(S.employees[a].name||'').localeCompare(String(S.employees[b].name||''),'zh-Hant');
+  });
+  var html = '<option value="">— 請選擇 —</option>';
+  ids.forEach(function(id){
+    var e = S.employees[id];
+    html += '<option value="'+id+'">'+(e.name||id)+'</option>';
+  });
+  sel.innerHTML = html;
+}
+
+/* ══════════════════════════════════════════
+   讀取紀錄
+══════════════════════════════════════════ */
+async function loadRecords(){
+  if(!SHIFT_GAS_URL){ S.error = '尚未設定 SHIFT_GAS_URL，請聯絡系統管理員'; render(); hideSplash(); return; }
+  S.loading = true; S.error = null; render();
+  try {
+    var token = encodeURIComponent(getAuthToken());
+    var res = await fetch(SHIFT_GAS_URL + '?action=getRecords&token=' + token);
+    var d = await res.json();
+    if(d.status === 'ok' && Array.isArray(d.records)){
+      S.records = d.records;
+    } else {
+      S.error = d.msg || '讀取失敗';
+    }
+  } catch(e){
+    S.error = '連線失敗：' + e.message;
+  }
+  S.loading = false;
+  render();
+  hideSplash();
+}
+
+/* ══════════════════════════════════════════
+   篩選：目前選擇的月份
+══════════════════════════════════════════ */
+function recordsInMonth(){
+  return S.records.filter(function(r){ return String(r.date||'').slice(0,7) === S.month; });
+}
+
+/* ══════════════════════════════════════════
+   Render
+══════════════════════════════════════════ */
+function switchTab(t){
+  S.tab = t;
+  ['list','sum'].forEach(function(x){ document.getElementById('tab-'+x).classList.toggle('on', x===t); });
+  render();
+}
+function onMonthChange(v){
+  S.month = v;
+  render();
+}
+function render(){
+  var content = document.getElementById('content');
+  if(S.loading){
+    content.innerHTML = '<div class="stctr"><div class="spinner"></div><span>讀取紀錄中…</span></div>';
+    return;
+  }
+  if(S.error){
+    content.innerHTML = '<div class="errbox"><i class="ti ti-alert-circle"></i><div>'+S.error+'</div></div>';
+    return;
+  }
+  var rows = recordsInMonth();
+  if(S.tab === 'list') renderList(content, rows);
+  else renderSummary(content, rows);
+}
+function renderList(content, rows){
+  if(!rows.length){
+    content.innerHTML = '<div class="stctr"><i class="ti ti-calendar-off" style="font-size:2rem;color:var(--t3)"></i><span>這個月還沒有紀錄</span></div>';
+    return;
+  }
+  rows.sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
+  var html = '';
+  rows.forEach(function(r){
+    var hrs = Number(r.hours) || 0;
+    var d = String(r.date||'').split('-');
+    var dispDate = d.length===3 ? (d[1]+'/'+d[2]) : r.date;
+    html += '<div class="rcard">'+
+      '<div class="rdate">'+dispDate+'</div>'+
+      '<div class="rmain">'+
+        '<div class="rname">'+(r.name||r.empId||'')+'</div>'+
+        '<div class="rreason">'+(r.reason||'（未填原因）')+'</div>'+
+        (r.note ? '<div class="rnote">'+r.note+'</div>' : '')+
+      '</div>'+
+      '<div class="rhrs '+(hrs>=0?'pos':'neg')+'">'+(hrs>=0?'+':'')+hrs+'</div>'+
+      '<div class="rdel" onclick="deleteRecord(\''+r.id+'\')"><i class="ti ti-trash"></i></div>'+
+    '</div>';
+  });
+  content.innerHTML = html;
+}
+function renderSummary(content, rows){
+  if(!rows.length){
+    content.innerHTML = '<div class="stctr"><i class="ti ti-report-money" style="font-size:2rem;color:var(--t3)"></i><span>這個月還沒有紀錄可彙總</span></div>';
+    return;
+  }
+  var byEmp = {};
+  rows.forEach(function(r){
+    var key = r.empId || r.name;
+    if(!byEmp[key]) byEmp[key] = { name: r.name||r.empId, total:0, count:0 };
+    byEmp[key].total += Number(r.hours)||0;
+    byEmp[key].count++;
+  });
+  var keys = Object.keys(byEmp).sort(function(a,b){ return byEmp[a].name.localeCompare(byEmp[b].name,'zh-Hant'); });
+  var html = '';
+  keys.forEach(function(k){
+    var s = byEmp[k];
+    html += '<div class="sumrow">'+
+      '<div><div class="sname">'+s.name+'</div><div class="scnt">共 '+s.count+' 筆紀錄</div></div>'+
+      '<div class="stot" style="color:'+(s.total>=0?'var(--grn)':'var(--red)')+'">'+(s.total>=0?'+':'')+s.total+' 小時</div>'+
+    '</div>';
+  });
+  content.innerHTML = html;
+}
+
+/* ══════════════════════════════════════════
+   新增紀錄
+══════════════════════════════════════════ */
+function setHrsSign(sign){
+  S.hrsSign = sign;
+  document.getElementById('btn-sign-neg').classList.toggle('on-neg', sign===-1);
+  document.getElementById('btn-sign-pos').classList.toggle('on-pos', sign===1);
+}
+function openAddModal(){
+  document.getElementById('mo-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('mo-hrs').value = '';
+  document.getElementById('mo-reason').value = '';
+  document.getElementById('mo-note').value = '';
+  populateEmpSelect();
+  setHrsSign(-1);
+  document.getElementById('mo-ovl').classList.add('show');
+}
+function closeAddModal(){
+  document.getElementById('mo-ovl').classList.remove('show');
+}
+async function submitAdd(){
+  var date = document.getElementById('mo-date').value;
+  var empId = document.getElementById('mo-emp').value;
+  var hrsRaw = document.getElementById('mo-hrs').value.trim();
+  var reason = document.getElementById('mo-reason').value.trim();
+  var note = document.getElementById('mo-note').value.trim();
+
+  if(!date || !empId || !hrsRaw || !reason){
+    toast('✗ 日期、員工、時數、原因為必填','err');
+    return;
+  }
+  var hrsNum = Number(hrsRaw);
+  if(isNaN(hrsNum) || hrsNum <= 0){
+    toast('✗ 時數請輸入大於 0 的數字','err');
+    return;
+  }
+  var hours = hrsNum * S.hrsSign;
+  var empName = (S.employees[empId] && S.employees[empId].name) || empId;
+
+  var btn = document.getElementById('mo-submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader" style="animation:spin .6s linear infinite"></i>送出中…';
+
+  try {
+    var body = new URLSearchParams();
+    body.append('action', 'addRecord');
+    body.append('token', getAuthToken());
+    body.append('data', JSON.stringify({ date:date, empId:empId, name:empName, hours:hours, reason:reason, note:note }));
+    var res = await fetch(SHIFT_GAS_URL, { method:'POST', body:body });
+    var d = await res.json();
+    if(d.status !== 'ok') throw new Error(d.msg || '未知錯誤');
+    toast('✓ 已新增紀錄','ok');
+    closeAddModal();
+    loadRecords();
+  } catch(err){
+    toast('✗ 新增失敗：'+err.message,'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-send"></i>送出紀錄';
+  }
+}
+
+/* ══════════════════════════════════════════
+   刪除紀錄
+══════════════════════════════════════════ */
+async function deleteRecord(id){
+  if(!window.confirm('確定刪除這筆紀錄？此動作無法復原。')) return;
+  try {
+    var body = new URLSearchParams();
+    body.append('action', 'deleteRecord');
+    body.append('token', getAuthToken());
+    body.append('data', JSON.stringify({ id:id }));
+    var res = await fetch(SHIFT_GAS_URL, { method:'POST', body:body });
+    var d = await res.json();
+    if(d.status !== 'ok') throw new Error(d.msg || '未知錯誤');
+    toast('🗑 已刪除','ok');
+    loadRecords();
+  } catch(err){
+    toast('✗ 刪除失敗：'+err.message,'err');
+  }
+}
+
+/* ══════════════════════════════════════════
+   匯出 Excel（目前分頁＋目前選擇月份的資料）
+══════════════════════════════════════════ */
+function exportXlsx(){
+  if(typeof XLSX === 'undefined'){ toast('匯出元件尚未載入完成，稍後再試','err'); return; }
+  var rows = recordsInMonth();
+  if(!rows.length){ toast('這個月沒有資料可匯出','err'); return; }
+
+  var wb = XLSX.utils.book_new();
+
+  if(S.tab === 'list'){
+    var sorted = rows.slice().sort(function(a,b){ return String(a.date).localeCompare(String(b.date)); });
+    var data = sorted.map(function(r){
+      return { '日期':r.date, '工號':r.empId, '姓名':r.name, '時數':Number(r.hours)||0, '原因':r.reason||'', '備註':r.note||'', '登記人':r.createdByName||'', '登記時間':r.createdAt||'' };
+    });
+    var ws = XLSX.utils.json_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, '紀錄列表');
+  } else {
+    var byEmp = {};
+    rows.forEach(function(r){
+      var key = r.empId || r.name;
+      if(!byEmp[key]) byEmp[key] = { name:r.name||r.empId, total:0, count:0 };
+      byEmp[key].total += Number(r.hours)||0;
+      byEmp[key].count++;
+    });
+    var keys = Object.keys(byEmp).sort(function(a,b){ return byEmp[a].name.localeCompare(byEmp[b].name,'zh-Hant'); });
+    var data2 = keys.map(function(k){ return { '姓名':byEmp[k].name, '累計時數':byEmp[k].total, '筆數':byEmp[k].count }; });
+    var ws2 = XLSX.utils.json_to_sheet(data2);
+    XLSX.utils.book_append_sheet(wb, ws2, '月彙總');
+  }
+
+  var fname = '缺班調班紀錄_' + S.month + (S.tab==='sum'?'_月彙總':'_明細') + '.xlsx';
+  XLSX.writeFile(wb, fname);
+  toast('✓ 已匯出 '+fname,'ok');
+}
+
+/* ══════════════════════════════════════════
+   啟動
+══════════════════════════════════════════ */
+(function init(){
+  if(!checkPermission()) return;
+  S.month = currentMonthStr();
+  document.getElementById('minp').value = S.month;
+  loadEmployees();
+  loadRecords();
+})();
+</script>
+</body>
+</html>
