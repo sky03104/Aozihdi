@@ -176,12 +176,36 @@ function doPost(e) {
       var sheet = ss.getSheetByName(payload.typeLabel);
       if (!sheet) return jsonOut({ success: false, error: '找不到「' + payload.typeLabel + '」分頁，請確認試算表分頁名稱是否與類型名稱一致' });
       var timestamp = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss');
-      sheet.appendRow([
-        timestamp,
-        payload.typeLabel,
-        payload.plate,
-        "'" + (payload.operator || '未登入')  // ' 前綴：工號純數字，防試算表吃掉開頭 0
-      ]);
+      // 上鎖：append+抓行號要當成一個原子操作，避免多支手機同時登記時，
+      // 兩個請求的 getLastRow() 讀到彼此交錯後的行號，回傳給前端的 row 對不上實際寫入的那一列。
+      var lock = LockService.getScriptLock();
+      lock.waitLock(10000);
+      var newRow;
+      try {
+        sheet.appendRow([
+          timestamp,
+          payload.typeLabel,
+          payload.plate,
+          "'" + (payload.operator || '未登入')  // ' 前綴：工號純數字，防試算表吃掉開頭 0
+        ]);
+        newRow = sheet.getLastRow();
+      } finally {
+        lock.releaseLock();
+      }
+      // row 回傳給前端：辨識錯誤時前端可用這個列號呼叫 updatePlate 就地修正，不用手動開試算表改。
+      return jsonOut({ success: true, row: newRow });
+    }
+
+    // --- 功能 C: 修正已登記的車牌（辨識錯誤但已送出時，前端「最近登記」列表可就地編輯）---
+    if (payload.action === 'updatePlate') {
+      var ss2 = SpreadsheetApp.openById(SPREADSHEET_ID);
+      var sheet2 = ss2.getSheetByName(payload.typeLabel);
+      if (!sheet2) return jsonOut({ success: false, error: '找不到「' + payload.typeLabel + '」分頁' });
+      var row2 = parseInt(payload.row, 10);
+      if (!row2 || row2 < 2) return jsonOut({ success: false, error: '列號無效' });
+      var newPlate = String(payload.plate || '').trim().toUpperCase();
+      if (!newPlate) return jsonOut({ success: false, error: '車牌不可為空' });
+      sheet2.getRange(row2, 3).setValue(newPlate); // C欄＝車牌（欄位順序見 vehicleReg：時間/類型/車牌/登記人）
       return jsonOut({ success: true });
     }
 

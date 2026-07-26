@@ -64,6 +64,9 @@ function logWorkflow(tool,actionType,status){
     .big-cam .ic{font-size:44px;color:#0A0C10}
     .big-cam .tx{font-size:18px;font-weight:900;color:#0A0C10;letter-spacing:1px}
     .big-cam .sb{font-size:11px;color:rgba(10,12,16,.65)}
+    /* ── 手動輸入車牌連結（拍照按鈕下方，不用等辨識失敗才能手動輸入）── */
+    .manual-link{width:100%;background:transparent;border:none;color:#818CF8;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;padding:12px;display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent}
+    .manual-link:active{opacity:.6}
     /* ── 處理中遮罩卡 ── */
     .proc-card{background:rgba(129,140,248,.07);border:1px solid rgba(129,140,248,.25);border-radius:14px;padding:18px;margin-top:14px;display:none}
     .proc-card.show{display:block}
@@ -92,6 +95,8 @@ function logWorkflow(tool,actionType,status){
     /* ── 錯誤卡 ── */
     .err-card{background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.3);border-radius:14px;padding:16px;margin-top:14px;display:none}
     .err-card.show{display:block}
+    .err-card.manual{background:rgba(129,140,248,.07);border-color:rgba(129,140,248,.3)}
+    .err-card.manual .err-lbl{color:#818CF8}
     .err-lbl{font-size:13px;color:#F87171;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:7px}
     .err-input-row{display:flex;gap:8px}
     .err-plate{flex:1;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px;font-size:20px;font-weight:800;letter-spacing:2px;text-align:center;color:#FFD700;font-family:inherit;outline:none;text-transform:uppercase;-webkit-appearance:none}
@@ -104,6 +109,9 @@ function logWorkflow(tool,actionType,status){
     .recent-time{font-size:11px;color:#6B7280}
     .recent-ok{color:#4ADE80;font-size:15px}
     .recent-fail{color:#FB923C;font-size:15px}
+    .recent-edit{background:none;border:none;color:#818CF8;font-size:16px;cursor:pointer;padding:8px;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+    .recent-edit:active{opacity:.6}
+    .recent-edit-inp{flex:1;min-width:0;background:rgba(0,0,0,.3);border:1px solid rgba(255,215,0,.35);border-radius:6px;padding:5px 8px;font-size:16px;font-weight:800;letter-spacing:2px;color:#FFD700;font-family:inherit;outline:none;text-transform:uppercase;-webkit-appearance:none}
     /* divider/ms */
     .divider{display:flex;align-items:center;gap:10px;margin:14px 0 8px;color:#4B5563;font-size:11px}
     .divider::before,.divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.08)}
@@ -177,6 +185,7 @@ function logWorkflow(tool,actionType,status){
     <span class="tx">拍攝車牌</span>
     <span class="sb">拍照後 AI 自動辨識並登記</span>
   </button>
+  <button class="manual-link" onclick="showManualEntry()"><i class="ti ti-keyboard"></i> 手動輸入車牌</button>
 
   <!-- 處理中 -->
   <div class="proc-card" id="procCard">
@@ -209,7 +218,7 @@ function logWorkflow(tool,actionType,status){
 
   <!-- 辨識失敗：手動輸入 -->
   <div class="err-card" id="errCard">
-    <div class="err-lbl"><i class="ti ti-alert-circle"></i> 辨識失敗，請手動輸入車牌</div>
+    <div class="err-lbl" id="errLbl"><i class="ti ti-alert-circle"></i> 辨識失敗，請手動輸入車牌</div>
     <div class="err-input-row">
       <input type="text" class="err-plate" id="errPlate" placeholder="BNZ-5205" autocomplete="off" oninput="this.value=this.value.toUpperCase()"/>
       <button class="err-send" onclick="sendManual()">登記</button>
@@ -315,20 +324,20 @@ function triggerCam(){document.getElementById('camInp').value='';document.getEle
 document.getElementById('camInp').addEventListener('change',function(e){var f=e.target.files[0];if(f)startOCR(f);});
 
 // ═══════ 圖片壓縮 ═══════
-// 車牌是大塊清楚文字，不需要相片級精細度；長邊縮到800px+品質70%
-// 進一步縮小上傳量加快辨識速度。若實測太模糊導致辨識率下降，
-// 可調回 1000px/0.78（2026-07-11 之前的設定）。
+// 長邊縮到1000px+品質78%。2026-07-11 曾為加快辨識速度改成800px/70%，
+// 但夜間近拍車牌（閃光燈打亮、背景全黑）壓縮後末位數字容易糊到AI看錯
+// （2026-07-27 實際案例：MEZ-8235 被誤讀成 MEZ-823），改回此設定救準確度。
 function compressImg(file){
   return new Promise(function(resolve){
     var url=URL.createObjectURL(file);
     var img=new Image();
     img.onload=function(){
-      var MAX=800;
+      var MAX=1000;
       var sc=Math.min(1,MAX/Math.max(img.width,img.height));
       var cvs=document.createElement('canvas');
       cvs.width=Math.round(img.width*sc);cvs.height=Math.round(img.height*sc);
       cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);
-      resolve({dataUrl:cvs.toDataURL('image/jpeg',0.70),previewUrl:url});
+      resolve({dataUrl:cvs.toDataURL('image/jpeg',0.78),previewUrl:url});
     };
     img.src=url;
   });
@@ -412,11 +421,24 @@ function confirmNow(){
 
 // ═══════ 失敗手動 ═══════
 function showErr(debug){
+  document.getElementById('errCard').classList.remove('manual');
+  document.getElementById('errLbl').innerHTML='<i class="ti ti-alert-circle"></i> 辨識失敗，請手動輸入車牌';
   document.getElementById('errPlate').value='';
   document.getElementById('errCard').classList.add('show');
   var dbgEl=document.getElementById('errDebug');
   dbgEl.textContent=debug?('🔧 '+debug):'';
   showToast('❌ 辨識失敗，請手動輸入');
+}
+// ═══════ 主動手動輸入（拍照按鈕下方的連結，不用等辨識失敗）═══════
+function showManualEntry(){
+  hideAllCards();
+  var card=document.getElementById('errCard');
+  card.classList.add('manual');
+  document.getElementById('errLbl').innerHTML='<i class="ti ti-keyboard"></i> 手動輸入車牌';
+  document.getElementById('errPlate').value='';
+  document.getElementById('errDebug').textContent='';
+  card.classList.add('show');
+  document.getElementById('errPlate').focus();
 }
 function sendManual(){
   var plate=document.getElementById('errPlate').value.trim().toUpperCase();
@@ -432,20 +454,28 @@ function doSubmit(plate){
   document.getElementById('statCount').textContent=sessCount;
   document.getElementById('statLast').textContent=plate;
   var itemId='r'+Date.now();
+  var typeLabel=TYPE_INFO[curType].label;
   var list=document.getElementById('recentList');
   var div=document.createElement('div');
   div.className='recent-item';div.id=itemId;
-  div.innerHTML='<span class="recent-plate">'+plate+'</span><span class="recent-time">'+new Date().toLocaleTimeString('zh-TW',{hour12:false,hour:'2-digit',minute:'2-digit'})+'</span><span class="recent-ok" id="'+itemId+'-st"><span class="spin" style="width:12px;height:12px;border-top-color:#4ADE80"></span></span>';
+  div.dataset.type=typeLabel;
+  div.innerHTML='<span class="recent-plate" id="'+itemId+'-txt">'+plate+'</span><span class="recent-time">'+new Date().toLocaleTimeString('zh-TW',{hour12:false,hour:'2-digit',minute:'2-digit'})+'</span><span class="recent-ok" id="'+itemId+'-st"><span class="spin" style="width:12px;height:12px;border-top-color:#4ADE80"></span></span>';
   list.insertBefore(div,list.firstChild);
 
   // 背景送出（日期時間 = 送出當下，GAS端自動填）
-  fetch(PLATE_GAS_URL,{method:'POST',body:JSON.stringify({action:'vehicleReg',type:curType,typeLabel:TYPE_INFO[curType].label,plate:plate,operator:empName||empId||'未登入'})})
+  fetch(PLATE_GAS_URL,{method:'POST',body:JSON.stringify({action:'vehicleReg',type:curType,typeLabel:typeLabel,plate:plate,operator:empName||empId||'未登入'})})
     .then(function(r){return r.json();})
     .then(function(j){
       var st=document.getElementById(itemId+'-st');
-      if(st) st.innerHTML=j.success?'<i class="ti ti-check"></i>':'<i class="ti ti-alert-triangle" style="color:#FB923C"></i>';
-      if(!j.success) showToast('⚠️ '+plate+' 寫入失敗');
-      if(j.success) logWorkflow('signin','vehicle-reg','已完成');
+      if(j.success){
+        if(st) st.innerHTML='<i class="ti ti-check"></i>';
+        div.dataset.row=j.row; // 有row才能編輯，避免修改到還沒寫入成功的假資料
+        addEditBtn(itemId);
+        logWorkflow('signin','vehicle-reg','已完成');
+      }else{
+        if(st) st.innerHTML='<i class="ti ti-alert-triangle" style="color:#FB923C"></i>';
+        showToast('⚠️ '+plate+' 寫入失敗');
+      }
     })
     .catch(function(){
       var st=document.getElementById(itemId+'-st');
@@ -454,6 +484,59 @@ function doSubmit(plate){
     });
 
   showToast('✅ '+plate+' 已登記');
+}
+
+// ═══════ 最近登記：辨識錯誤時就地編輯（不用開試算表手改）═══════
+function addEditBtn(itemId){
+  var div=document.getElementById(itemId);
+  if(!div||div.querySelector('.recent-edit'))return;
+  var btn=document.createElement('button');
+  btn.className='recent-edit';btn.title='修改車牌';
+  btn.innerHTML='<i class="ti ti-pencil"></i>';
+  btn.onclick=function(){editRecent(itemId);};
+  div.insertBefore(btn,document.getElementById(itemId+'-st'));
+}
+function editRecent(itemId){
+  var div=document.getElementById(itemId);
+  if(!div||!div.dataset.row)return; // 還沒拿到列號（寫入還沒成功）不給編輯
+  var txt=document.getElementById(itemId+'-txt');
+  var oldPlate=txt.textContent;
+  var inp=document.createElement('input');
+  inp.type='text';inp.className='recent-edit-inp';inp.id=itemId+'-txt';inp.value=oldPlate;
+  inp.autocomplete='off';inp.autocorrect='off';inp.spellcheck=false;
+  inp.oninput=function(){inp.value=inp.value.toUpperCase();};
+  inp.onkeydown=function(e){if(e.key==='Enter')saveRecentEdit(itemId,oldPlate);};
+  txt.replaceWith(inp);
+  inp.focus();inp.select();
+  var editBtn=div.querySelector('.recent-edit');
+  editBtn.innerHTML='<i class="ti ti-check"></i>';
+  editBtn.onclick=function(){saveRecentEdit(itemId,oldPlate);};
+}
+function saveRecentEdit(itemId,oldPlate){
+  var div=document.getElementById(itemId);
+  var inp=document.getElementById(itemId+'-txt');
+  var newPlate=inp.value.trim().toUpperCase();
+  if(!newPlate){showToast('⚠️ 車牌不可為空');return;}
+  var span=document.createElement('span');
+  span.className='recent-plate';span.id=itemId+'-txt';span.textContent=newPlate;
+  inp.replaceWith(span);
+  var editBtn=div.querySelector('.recent-edit');
+  editBtn.innerHTML='<i class="ti ti-pencil"></i>';
+  editBtn.onclick=function(){editRecent(itemId);};
+  if(newPlate===oldPlate)return; // 沒改內容就不用打回後端
+
+  var st=document.getElementById(itemId+'-st');
+  if(st) st.innerHTML='<span class="spin" style="width:12px;height:12px;border-top-color:#818CF8"></span>';
+  fetch(PLATE_GAS_URL,{method:'POST',body:JSON.stringify({action:'updatePlate',typeLabel:div.dataset.type,row:div.dataset.row,plate:newPlate})})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if(st) st.innerHTML=j.success?'<i class="ti ti-check"></i>':'<i class="ti ti-alert-triangle" style="color:#FB923C"></i>';
+      showToast(j.success?('✅ 已更新為 '+newPlate):('⚠️ 更新失敗：'+(j.error||'未知錯誤')));
+    })
+    .catch(function(){
+      if(st) st.innerHTML='<i class="ti ti-wifi-off" style="color:#F87171"></i>';
+      showToast('⚠️ 網路錯誤，更新失敗');
+    });
 }
 
 var _tt;
