@@ -390,18 +390,14 @@ function normalizePhone(p){
 }
 
 /* ── 初始化 ── */
+// 2026-07-26：先前不管有沒有登入，一開機就會把 localStorage 裡上次同步
+// 存下的 hsh_ec_contacts（全部同仁電話＋緊急聯絡人電話）直接畫出來，
+// 要等呼叫雲端才會發現沒登入，但畫面早就顯示完了，等於沒登入也看得到。
+// 現在改成：登入身份先判斷，沒登入就不讀取、不顯示任何一筆真實資料。
 function init(){
-  /* 從 localStorage 還原聯絡人，失敗則載入預設值 */
-  var sv=localStorage.getItem('hsh_ec_contacts');
-  if(sv){
-    try{
-      contacts=JSON.parse(sv).map(function(c){c.phone=normalizePhone(c.phone);c.ecPhone=normalizePhone(c.ecPhone);return c;});
-      nextId=Math.max.apply(null,contacts.map(function(c){return c.id;}).concat([99]))+1;
-    }catch(e){loadDef();}
-  }else{loadDef();}
-
-  /* 讀取登入身份（內嵌於主 App 時） */
+  /* 讀取登入身份（優先判斷，決定要不要顯示聯絡人資料） */
   var raw=localStorage.getItem('hsh_session_user');
+  var loggedIn=false;
   if(raw){
     try{
       var u=JSON.parse(raw);
@@ -411,7 +407,17 @@ function init(){
       var b=document.getElementById('roleBadge');
       b.textContent=u.name+' · '+(ROLE_MAP[u.role]||u.role);
       b.style.display='inline-flex';
+      loggedIn=true;
     }catch(e){}
+  }
+
+  if(!loggedIn){
+    /* 沒登入：不讀取、不顯示任何本機快取的聯絡人資料，只顯示登入提示 */
+    loadState='needLogin';
+    contacts=[];
+    render();
+    stats();
+    return;
   }
 
   /* 獨立開啟時（非 iframe），視為管理員 */
@@ -426,6 +432,15 @@ function init(){
 
   /* 有編輯權限才顯示 FAB 新增按鈕 */
   if(canEdit) document.getElementById('fabBtn').style.display='flex';
+
+  /* 已登入才讀本機快取讓畫面秒開，隨後仍會向雲端拉取最新資料 */
+  var sv=localStorage.getItem('hsh_ec_contacts');
+  if(sv){
+    try{
+      contacts=JSON.parse(sv).map(function(c){c.phone=normalizePhone(c.phone);c.ecPhone=normalizePhone(c.ecPhone);return c;});
+      nextId=Math.max.apply(null,contacts.map(function(c){return c.id;}).concat([99]))+1;
+    }catch(e){loadDef();}
+  }else{loadDef();}
 
   render();
   stats();
@@ -485,7 +500,10 @@ function render(){
        所以「清單是空的」可能是還在載入或載入失敗，不一定是篩選條件的問題。
        這裡照實說明目前狀況，不要一律顯示「找不到符合條件」誤導使用者。 */
     var msg, icon='ti-address-book-off';
-    if(!contacts.length && loadState==='loading'){
+    if(!contacts.length && loadState==='needLogin'){
+      msg='請先從主選單登入天鷹保全 App<br><span style="font-size:12px;opacity:.7">同仁與緊急聯絡人的電話僅開放已登入使用者查看</span>';
+      icon='ti-lock';
+    }else if(!contacts.length && loadState==='loading'){
       msg='正在從雲端載入聯絡人…'; icon='ti-cloud-download';
     }else if(!contacts.length && loadState==='fail'){
       msg='連不上雲端，暫時無法顯示聯絡人<br><span style="font-size:12px;opacity:.7">請確認網路後，點右上角重新整理</span>';
