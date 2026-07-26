@@ -2208,6 +2208,9 @@ function App() {
     });
     const [editingAnn, setEditingAnn] = useState(null);
     const [annMarqueeIdx, setAnnMarqueeIdx] = useState(0); // 首頁公告跑馬燈目前播放到第幾則（置頂優先，其餘輪播）
+    // 掛載時的公告載入已經由下面的「開啟時自雲端讀取最新」effect 處理（含首次部署種子化）。
+    // 這個旗標讓「切回首頁分頁刷新」effect 跳過第一次執行，避免掛載當下 getAnnouncements 被打兩次。
+    const annMountedRef = useRef(false);
     // 宣導事項：獨立於公告欄，首頁「宣導事項」按鈕點開的清單（獨立試算表同步）
     const [directives, setDirectives] = useState(() => {
         try {
@@ -2341,8 +2344,9 @@ function App() {
             }
         } catch (e) { /* 離線：本機已更新，下次連線再同步 */ }
     };
-    // 宣導事項：開啟時自雲端載入最新
-    useEffect(() => { loadDirectivesCloud(); }, []);
+    // 宣導事項：開啟時自雲端載入最新，切回首頁分頁時再刷新一次
+    // （tab 初始值就是 'home'，下面這個 effect 掛載當下就會跑到，不用再另外寫一個 [] 的掛載 effect，
+    //  以前兩個 effect 都會在開啟當下各打一次 getDirectives，變成同一份資料重複抓兩次）
     useEffect(() => {
         if (tab === 'home') loadDirectivesCloud();
     }, [tab]);
@@ -2405,7 +2409,10 @@ function App() {
         return () => clearInterval(timer);
     }, []);
     // 切回首頁分頁時，順手刷新一次公告（避免切到其他分頁再切回還是看到舊公告）
+    // 第一次執行（掛載當下）跳過：上面「開啟時自雲端讀取最新」那個 effect 已經處理過，
+    // 不跳過的話 tab 初始值就是 'home'，兩個 effect 會在開啟當下各打一次 getAnnouncements
     useEffect(() => {
+        if (!annMountedRef.current) { annMountedRef.current = true; return; }
         if (tab === 'home') loadAnnouncementsCloud();
     }, [tab]);
     // 未讀公告：登入後依工號讀取「已讀到的最大公告ID」，算出未讀數用於右上角紅點
