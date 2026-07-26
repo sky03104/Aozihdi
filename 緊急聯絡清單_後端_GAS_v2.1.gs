@@ -4,7 +4,25 @@
 //   （2026-07-26 前是任何人拿到這支網址就能讀寫全體同仁與家屬電話，
 //    這版改成必須帶主 App 登入後發的通行證(token)才能呼叫）
 // Spreadsheet ID: 1TnN3iJb1w9XTuw0-QuNrtXEOa71KCCy7y8Q3_1b1FmI
+//
+// ⚠ 部署新版本後，就算重新部署也不會生效！getContacts/setContacts 改用
+//   UrlFetchApp 呼叫主 App 驗證通行證，這是「連上外部服務」的權限，跟
+//   Sheet 讀寫是不同的授權範圍，第一次用到時 Google 不會自動彈出同意視窗、
+//   也不會在部署當下觸發，只會在腳本編輯器裡「手動執行一次函式」時觸發。
+//   部署完後，請在 Apps Script 編輯器選擇 forceAuth 函式並執行一次、
+//   跳出授權視窗後同意，之後 getContacts/setContacts 才會真的能用；
+//   沒跑這步的話，任何通行證（包含真的）都會被誤判成「登入已失效」。
 // ============================================================
+
+/**
+ * 部署新版本後手動執行一次，觸發「連上外部服務」的授權同意視窗。
+ * 不用重新部署，跑一次、同意權限即可。
+ */
+function forceAuth() {
+  var authTestResult = verifyAuthToken_('auth-test-dummy-token');
+  console.log('UrlFetchApp 測試呼叫完成（回傳 ' + (authTestResult ? '有效使用者' : 'null，正常，假token本來就驗不過') + '）');
+  console.log('授權測試成功！外部連線權限已授權，getContacts/setContacts 現在可以正常驗證通行證了');
+}
 
 // ============================
 // 身分驗證：呼叫主 App 的 GAS 驗證通行證
