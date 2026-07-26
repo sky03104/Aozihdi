@@ -2652,9 +2652,10 @@ function App() {
     /* ── 主管待審卡片：讀事故報告／匿名表揚清單（僅 executive/admin 觸發） ── */
     const loadReviewCounts = async () => {
         try {
+            const _t = encodeURIComponent(getAuthToken());
             const [r1, r2] = await Promise.all([
-                fetch(REPORT_GAS_URL + '?action=getReports').then(x => x.json()).catch(() => null),
-                fetch(REPORT_GAS_URL + '?action=getFeedback').then(x => x.json()).catch(() => null)
+                fetch(REPORT_GAS_URL + '?action=getReports&token=' + _t).then(x => x.json()).catch(() => null),
+                fetch(REPORT_GAS_URL + '?action=getFeedback&token=' + _t).then(x => x.json()).catch(() => null)
             ]);
             if (r1 && r1.status === 'ok' && Array.isArray(r1.list)) setPendingReports(r1.list);
             if (r2 && r2.status === 'ok' && Array.isArray(r2.list)) setPendingFeedback(r2.list);

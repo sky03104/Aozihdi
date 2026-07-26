@@ -403,6 +403,10 @@ function doGet(e) {
 // ====== 首次部署用：手動執行一次以觸發授權 ======
 // ⚠ 照片上傳需「完整 Drive 權限」(auth/drive)。若只授到 drive.file，寫入既有資料夾會失敗。
 //   請先在「專案設定 → 顯示 appsscript.json」加上 oauthScopes（見部署說明），再執行本函式並同意授權。
+// ⚠ v3.2 新增：getReports/getFeedback/updateStatus/deleteRow 現在會用 UrlFetchApp
+//   呼叫主 App 驗證通行證，這是「連上外部服務」的權限，跟 Sheet/Drive 是不同範圍，
+//   沒授權過的話這幾個 action 會直接連線失敗（回傳的不是 JSON，前端解析炸掉）。
+//   本函式一併觸發，跑一次、同意權限視窗即可，不用重新部署。
 function forceAuth() {
   // 觸發 Sheet 讀寫
   SpreadsheetApp.openById(SS_ID);
@@ -410,7 +414,11 @@ function forceAuth() {
   var folder = DriveApp.getFolderById(PHOTO_FOLDER_ID);
   var f = folder.createFile('授權測試_' + Date.now() + '.txt', 'auth test', MimeType.PLAIN_TEXT);
   f.setTrashed(true);
-  console.log('授權測試成功！Sheet 讀寫 + Drive 建檔權限皆已授權');
+  // 觸發「連上外部服務」權限（UrlFetchApp）：帶一個假 token 打主 App，預期回傳「登入已失效」也算成功，
+  // 重點是這行程式碼真的有執行到、跳出授權視窗讓你同意。
+  var authTestResult = verifyAuthToken_('auth-test-dummy-token');
+  console.log('UrlFetchApp 測試呼叫完成（回傳 ' + (authTestResult ? '有效使用者' : 'null，正常，假token本來就驗不過') + '）');
+  console.log('授權測試成功！Sheet 讀寫 + Drive 建檔 + 外部連線權限皆已授權');
 }
 
 // ====== 測試用 ======
