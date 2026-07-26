@@ -24,6 +24,47 @@ function forceAuth() {
   console.log('授權測試成功！外部連線權限已授權，getContacts/setContacts 現在可以正常驗證通行證了');
 }
 
+/**
+ * 【暫時診斷用】不吃掉任何錯誤，把呼叫主 App 的實際過程全部印出來。
+ * 執行前請先把下面 TEST_TOKEN 換成一組真的登入通行證
+ *（用主 App 登入一次，從回應的 token 欄位複製）。
+ * 執行後到左側選單「執行項目」點開這次紀錄，把 Log 內容整段複製回報。
+ * 問題排除後這個函式可以刪掉，不影響正式功能。
+ */
+function debugTokenCheck() {
+  // 這組是剛剛現場登入產生的真通行證，有效期 30 天內可用
+  var TEST_TOKEN = 'c2t5MDMxMDR8MTc4NzY2NDEzMjQ4Nw==.48e74dafae6c509102b5079f3e29e49be973d9723c7c08092e763ccf2f5d7538';
+
+  Logger.log('步驟1：準備呼叫主 App，網址=' + MAIN_APP_GAS_URL_);
+  Logger.log('步驟1：使用的 token 長度=' + TEST_TOKEN.length);
+
+  var res;
+  try {
+    res = UrlFetchApp.fetch(MAIN_APP_GAS_URL_, {
+      method: 'post',
+      payload: { action: 'verifySession', data: JSON.stringify({ token: TEST_TOKEN }) },
+      muteHttpExceptions: true
+    });
+  } catch (err) {
+    Logger.log('❌ 步驟2失敗：UrlFetchApp.fetch 本身丟出例外（很可能是權限問題）');
+    Logger.log('錯誤內容：' + err.toString());
+    Logger.log('錯誤堆疊：' + (err.stack || '(無)'));
+    return;
+  }
+
+  Logger.log('✅ 步驟2成功：UrlFetchApp.fetch 沒有丟出例外');
+  Logger.log('HTTP 狀態碼：' + res.getResponseCode());
+  Logger.log('回應內容：' + res.getContentText());
+
+  try {
+    var d = JSON.parse(res.getContentText());
+    Logger.log('步驟3：JSON 解析成功，status=' + d.status);
+    if (d.user) Logger.log('步驟3：解析到的角色=' + d.user.role + '，工號=' + d.user.empId);
+  } catch (err2) {
+    Logger.log('❌ 步驟3失敗：回應內容不是合法 JSON，解析出錯：' + err2.toString());
+  }
+}
+
 // ============================
 // 身分驗證：呼叫主 App 的 GAS 驗證通行證
 // ============================
