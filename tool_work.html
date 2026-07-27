@@ -508,23 +508,43 @@ function parseGvizTable(table){
 }
 
 /* ══════════════════════════════════════════
-   去重：來源表常有同一張常態性施工單被重複登錄的列
-   （同廠商/地點/項目/監工，但時間、人數常有變異或爛資料 4230800）
-   故以「穩定身份鍵 = 廠商+地點+施工項目+監工+施工日期」判定重複，相同只留一筆
-   2026-07-27 修正：鍵原本沒有施工日期，導致「飛躍數位」這類固定班底的
-   常態性巡檢（每隔幾天同廠商/同地點/同監工來一次）被誤判成同一筆的重複
-   登錄，只留最早那次，後面日期的施工單全部從查詢結果消失（實際案例：
-   7/24 有登記、7/27 同樣班底再次施工，7/27 那筆整個不見）。
-   加回施工日期後，同一天重複登錄的爛資料仍會去重，不同天的正常施工不會
-   再被錯殺。
+   去重：來源表常有同一張常態性施工單被重複登錄的列，但重複的樣態不只一種：
+   ① 飛躍數位型：同廠商/地點/項目/監工，真的是不同天各自獨立的一次性工作
+      （7/24 一天、7/27 一天）→ 不該合併，日期不重疊就當兩筆。
+   ② 伸達物流型：同一份長期授權（如「每週四進貨」）被每隔幾天重新登記一次，
+      結束日相同、開始日一直往後挪（6/4~12/31、6/11~12/31、6/18~12/31…）
+      → 日期區間大量重疊，其實是同一件事，該合併成一筆。
+   ③ 162咖啡／AESOP型：同一天同一批人，但廠商或地點欄位文字打法不同
+      （「1F AESOP」vs「AESOP」、「手扶梯 超大前」vs「手扶梯」）→ 用寬鬆比對
+      （去空白/大小寫後，其中一個字串包含另一個）視為同一地點/廠商。
+   2026-07-27：原本用「廠商+地點+項目+監工+施工日期」完全相同才算重複，先解決
+   了①，但②、③這兩種「文字不完全一樣、但其實是同一件事」的重複就漏抓，這批
+   反而變成一堆卡片。改成「監工+項目需完全相同、廠商/地點寬鬆比對相同、且施工
+   區間有重疊（或其中一筆日期本身是爛資料）」才判定為重複。
+   判斷方向：漏掉真的存在的工作單（保全不知道有人要來）比多顯示幾張重複卡片
+   嚴重很多，所以拿不準的邊界案例一律不合併，寧可讓保全自己看出是同一批人。
 ══════════════════════════════════════════ */
-function dedupeKey(r){
-  var parts = ['廠商專櫃名稱','施工地點','施工項目','監工']
-    .map(function(k){ return String(r[k]==null?'':r[k]).trim(); });
-  var d = r['施工日期'];
-  parts.push(d instanceof Date ? (d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()) : String(d==null?'':d).trim());
-  return parts.join('|');
+// 文字寬鬆比對用：去頭尾空白、內部空白、轉小寫
+function normLoose(s){
+  return String(s==null?'':s).trim().toLowerCase().replace(/\s+/g,'');
 }
+// 廠商/地點文字視為同一個：完全相同，或其中一個字串完整包含另一個（且都非空）
+function looseTextMatch(a,b){
+  var na=normLoose(a), nb=normLoose(b);
+  if(!na || !nb) return na===nb;
+  return na===nb || na.indexOf(nb)>=0 || nb.indexOf(na)>=0;
+}
+// 施工區間 [施工日期, 退場日期]：無退場日期視為單日，退場早於施工則修正為單日；
+// 施工日期本身不是合法日期（爛資料）回 null。
+function jobRange(r){
+  var sd=r['施工日期'];
+  if(!(sd instanceof Date)) return null;
+  var s=d0(sd), xd=r['退場日期'];
+  var e=(xd instanceof Date)?d0(xd):s;
+  if(e<s) e=s;
+  return {s:s, e:e};
+}
+function rangesOverlap(g1,g2){ return g1.s<=g2.e && g2.s<=g1.e; }
 // 進場時間是否為正常值（非爛資料）：用既有 fmtT/isBadTime 判定
 function hasGoodInTime(r){
   var t=fmtT(r['進場時間輸入']);
@@ -576,16 +596,40 @@ function nowStamp(){
   return n.getFullYear()+'-'+p(n.getMonth()+1)+'-'+p(n.getDate())+' '+p(n.getHours())+':'+p(n.getMinutes());
 }
 function dedupeRows(rows){
-  var seen={}, out=[];
+  // 先用「監工+施工項目」完全相同分桶（這兩欄打法穩定，用來把比對範圍縮小，
+  // 避免整批資料做 O(n²) 寬鬆比對太慢）；桶內再逐筆比對廠商/地點寬鬆比對＋
+  // 施工區間是否重疊。
+  var buckets={};
   for(var i=0;i<rows.length;i++){
-    var r=rows[i], key=dedupeKey(r);
-    if(seen[key]==null){
-      seen[key]=out.length;
-      out.push(r);
-    } else if(preferOver(r, out[seen[key]])){
-      out[seen[key]]=r;                         // ③ 否則保留先到的那筆
+    var r=rows[i];
+    var bkey=String(r['監工']==null?'':r['監工']).trim()+'|'+String(r['施工項目']==null?'':r['施工項目']).trim();
+    var bucket=buckets[bkey]||(buckets[bkey]=[]);
+    var g=jobRange(r);
+    var matched=null;
+    for(var j=0;j<bucket.length;j++){
+      var slot=bucket[j];
+      if(!looseTextMatch(r['廠商專櫃名稱'], slot.rep['廠商專櫃名稱'])) continue;
+      if(!looseTextMatch(r['施工地點'], slot.rep['施工地點'])) continue;
+      // 兩邊都有合法日期 → 要求區間重疊才算重複；只要有一邊日期是爛資料，
+      // 沿用原本設計「靠廠商/地點/項目/監工就判定重複」，不因爛資料漏抓。
+      if(g && slot.range){ if(!rangesOverlap(g, slot.range)) continue; }
+      matched=slot; break;
+    }
+    if(!matched){
+      bucket.push({rep:r, range:g});
+    } else {
+      if(g && matched.range){
+        matched.range = { s: g.s<matched.range.s?g.s:matched.range.s, e: g.e>matched.range.e?g.e:matched.range.e };
+      } else if(g && !matched.range){
+        matched.range = g;
+      }
+      if(preferOver(r, matched.rep)) matched.rep=r; // 否則保留先到的那筆
     }
   }
+  var out=[];
+  Object.keys(buckets).forEach(function(k){
+    buckets[k].forEach(function(slot){ out.push(slot.rep); });
+  });
   return out;
 }
 
@@ -646,16 +690,6 @@ function filterRows(rows, view, search, histDate){
   var today = d0(new Date());
   var tmr   = new Date(today); tmr.setDate(tmr.getDate()+1);
   var res;
-
-  // 施工區間 [施工日期, 退場日期]：無退場日期視為單日，退場早於施工則修正為單日
-  function jobRange(r){
-    var sd=r['施工日期'];
-    if(!(sd instanceof Date)) return null;
-    var s=d0(sd), xd=r['退場日期'];
-    var e=(xd instanceof Date)?d0(xd):s;
-    if(e<s) e=s;
-    return {s:s, e:e};
-  }
 
   if(view==='tonight'){
     // 今天：今天落在施工區間內（跨多天施工如 6/1~6/30，6/15 當天也會顯示）
