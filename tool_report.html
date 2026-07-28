@@ -136,9 +136,15 @@
             );
         }
 
+        // 台灣本地日期字串（yyyy-mm-dd），不能用 toISOString() —— 那是 UTC，晚班 00:00~07:59 送出會被扣成前一天
+        function localDateStr(d) {
+            d = d || new Date();
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+
         function App() {
             const [formData, setFormData] = useState({
-                date: new Date().toISOString().split('T')[0],
+                date: localDateStr(),
                 time: new Date().toTimeString().slice(0,5),
                 location: '',
                 category: '一般事故',

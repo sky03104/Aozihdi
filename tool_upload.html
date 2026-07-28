@@ -933,6 +933,21 @@ function schSetShift(s){
   schLog('info','已切換為「'+SCH_SHIFTS[s].label+'」上傳模式');
   if(schFile)schHandleFile(schFile); /* 已選檔案時依新班別重新解析預覽 */
 }
+/* 2026-07-15 咖哩要求：內容比對防呆——只憑分頁名稱不夠（哨表檔案若只有單一分頁會被誤判成班表），
+   解析出資料後再檢查「內容看起來像不像班表」，不像就跳確認視窗，避免誤傳整月覆蓋。
+   2026-07-29：7/26 抽成外部檔案時漏帶這支函式與呼叫點，健檢查出後補回。 */
+function schContentLooksValid(monthNum,headerData,mainData){
+  const reasons=[];
+  if(!(monthNum>=1&&monthNum<=12))reasons.push('Z1 儲存格讀不到 1~12 的月份數字');
+  // C2:AG3 兩列：第一列(C2:AG2)才是 1~31 日期數字，第二列(C3:AG3)是「三/四/五…」星期文字
+  const dayRow=(headerData&&headerData[0])||[];
+  const dayVals=dayRow.filter(function(v){return String(v).trim()!=='';});
+  const dayNums=dayVals.filter(function(v){const n=Number(v);return !isNaN(n)&&n>=1&&n<=31;});
+  if(dayVals.length&&dayNums.length<dayVals.length*0.5)reasons.push('表頭列（C2:AG2）看起來不是 1~31 的日期序列');
+  const names=(mainData||[]).map(function(r){return String((r&&r[1])||'').trim();}).filter(function(n){return n&&n.length>=2&&!/^\d+$/.test(n);});
+  if(names.length<3)reasons.push('姓名欄（B欄）偵測到的有效姓名少於 3 筆');
+  return {valid:reasons.length===0,reasons:reasons};
+}
 /* 依班別在活頁簿中尋找來源分頁：精確名稱 → 名稱包含班別 → 僅一個分頁時取用 */
 function schResolveSheet(wb){
   const want=SCH_SHIFTS[schShift].sheetName;
@@ -970,6 +985,13 @@ function schHandleFile(file){
     document.getElementById('sch-month-text').textContent=monthFormatted;schLog('ok','Z1 月份：'+monthVal+' → '+monthFormatted);
     const mainData=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',range:'A4:AG30'});schMainRows=mainData;schMonthNum=(monthNum>=1&&monthNum<=12)?monthNum:null;buildSchPreview('sch-preview-main',mainData,10);schLog('ok','A4:AG30 讀取完成，共 '+mainData.length+' 列');
     const headerData=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',range:'C2:AG3'});buildSchPreview('sch-preview-header-range',headerData,3);schLog('ok','C2:AG3 讀取完成');
+    const contentCheck=schContentLooksValid(monthNum,headerData,mainData);
+    if(!contentCheck.valid){
+      schLog('err','⚠️ 內容比對異常：'+contentCheck.reasons.join('；'));
+      const proceed=window.confirm('⚠️ 這份檔案內容看起來不像「'+SCH_SHIFTS[schShift].label+'班表」：\n\n・'+contentCheck.reasons.join('\n・')+'\n\n若繼續，稍後按下「更新線上班表」會覆蓋整個月的線上班表資料。\n\n確定要繼續使用這份檔案嗎？');
+      if(!proceed){schLog('info','已取消，請確認檔案是否選錯（例如誤選了哨表檔案）');schClearAll();return;}
+      schLog('info','已確認略過內容比對警示，繼續使用此檔案');
+    }
     document.getElementById('sch-preview-area').style.display='block';document.getElementById('sch-clear-row').style.display='flex';schLog('info','請確認預覽後按「更新線上班表」');
   };
   reader.readAsDataURL(file);
