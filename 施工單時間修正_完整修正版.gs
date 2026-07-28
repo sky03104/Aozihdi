@@ -168,6 +168,15 @@ function onOpen() {
 // mode='opening'（開店工具早上用）：dayA=昨天 dayB=今天 → tonight=昨晚(含跨夜) morning=今天
 //   開店前查的是「早上開門前」，需要的是今天白天(08:00~20:00)要進場的施工單，
 //   若沿用 closing 的 dayA=今天/dayB=明天，今天白天的資料會兩邊都比對不到、永遠看不到。
+//
+// 2026-07-30 健檢補修（跟 tool_work.html 的 dedupeRows/jobRange 邏輯比照，同一套判斷方向）：
+//   ① 只用單一天的 D/E 欄比對，長期授權（如 6/1~6/30）中間日完全不顯示 → 改用
+//      L(施工日期)/M(退場日期) 區間涵蓋 dayA/dayB 判斷，L/M 缺資料時退回原本的 D/E 精確比對。
+//   ② 進場時間空白/爛資料的列，三種時段判斷都不命中 → 整筆靜默消失 → 改成落入符合的分頁，
+//      標記 timeUnclear，不再無聲消失。
+//   ③ 完全沒套用模糊去重 → 同一施工單文字打法不同會顯示兩張重複卡片 → 補上跟 tool_work.html
+//      dedupeRows 同一套規則：監工+施工項目完全相同分桶，桶內廠商/地點寬鬆比對＋施工區間重疊
+//      才視為重複；拿不準的邊界案例一律不合併（漏抓比多顯示嚴重）。
 function getOrders(mode) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('施工單查詢');
@@ -183,22 +192,27 @@ function getOrders(mode) {
   var aM = dayA.getMonth() + 1, aD = dayA.getDate();
   var bM = dayB.getMonth() + 1, bD = dayB.getDate();
 
-  // ★ 改用 月/日 + 進場時間 判斷，不再依賴不可靠的分頁名
-  // 班別（天鷹定義）：早班 08:00~20:00、晚班 20:00~隔天 08:00
-  //   bucketA = dayA晚班(進場≥2000) ＋ dayB凌晨(進場<0800，屬跨夜段)
-  //   bucketB = dayB早班(進場 08:00~20:00)
   function toT(v) { var n = parseInt(String(v).replace(/\D/g, '')); return isNaN(n) ? -1 : n; }
+  function d0(dt) { var x = new Date(dt); x.setHours(0, 0, 0, 0); return x; }
+  function normLoose(s) { return String(s == null ? '' : s).trim().toLowerCase().replace(/\s+/g, ''); }
+  function looseTextMatch(a, b) {
+    var na = normLoose(a), nb = normLoose(b);
+    if (!na || !nb) return na === nb;
+    return na === nb || na.indexOf(nb) >= 0 || nb.indexOf(na) >= 0;
+  }
+  function rangesOverlap(g1, g2) { return g1.s <= g2.e && g2.s <= g1.e; }
 
-  var bucketA = [], bucketB = [];
-
+  // 1) 讀原始列，順便算出施工區間（L/M 欄），供分桶與去重共用
+  var rows = [];
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
     if (!row[1] && !row[2]) continue; // 空殼列略過
 
-    var m = parseInt(row[3]), d = parseInt(row[4]); // D月 E日
-    var t = toT(row[5]);                            // F進場時間（HHMM）
+    var jobDate = (row[11] instanceof Date) ? d0(row[11]) : null;   // L 施工日期
+    var exitDate = (row[12] instanceof Date) ? d0(row[12]) : jobDate; // M 退場日期，缺就當單日
+    if (jobDate && exitDate < jobDate) exitDate = jobDate;
 
-    var obj = {
+    rows.push({
       applicant:  String(row[1]  || ''),
       shop:       String(row[2]  || ''),
       month:      row[3],
@@ -209,18 +223,76 @@ function getOrders(mode) {
       supervisor: String(row[8]  || ''),
       location:   String(row[9]  || ''),
       workType:   String(row[10] || ''),
-      tabName:    String(row[13] || '')
-    };
+      tabName:    String(row[13] || ''),
+      _t:         toT(row[5]),
+      _jobStart:  jobDate,
+      _jobEnd:    exitDate
+    });
+  }
 
-    var isDayA = (m === aM && d === aD);
-    var isDayB = (m === bM && d === bD);
+  // 2) 模糊去重（比照 tool_work.html dedupeRows）
+  var buckets = {};
+  rows.forEach(function(r) {
+    var bkey = r.supervisor.trim() + '|' + r.workType.trim();
+    var bucket = buckets[bkey] || (buckets[bkey] = []);
+    var g = r._jobStart ? { s: r._jobStart, e: r._jobEnd } : null;
+    var matched = null;
+    for (var j = 0; j < bucket.length; j++) {
+      var slot = bucket[j];
+      if (!looseTextMatch(r.shop, slot.rep.shop)) continue;
+      if (!looseTextMatch(r.location, slot.rep.location)) continue;
+      // 兩邊都有合法區間才要求重疊；只要有一邊缺日期資料，沿用原設計靠廠商/地點/項目/監工判定重複
+      if (g && slot.range) { if (!rangesOverlap(g, slot.range)) continue; }
+      matched = slot; break;
+    }
+    if (!matched) {
+      bucket.push({ rep: r, range: g });
+    } else {
+      if (g && matched.range) {
+        matched.range = { s: g.s < matched.range.s ? g.s : matched.range.s, e: g.e > matched.range.e ? g.e : matched.range.e };
+      } else if (g && !matched.range) {
+        matched.range = g;
+      }
+      // 保留進場時間正常的那筆，都正常/都異常則保留先到的
+      if (r._t >= 0 && matched.rep._t < 0) matched.rep = r;
+    }
+  });
+  var deduped = [];
+  Object.keys(buckets).forEach(function(k) {
+    buckets[k].forEach(function(slot) { deduped.push(slot.rep); });
+  });
+
+  // 3) 分桶：有施工區間資料就用區間涵蓋 dayA/dayB 判斷（修正多天施工中間日不顯示），
+  //    沒有就退回原本的月/日精確比對。班別（天鷹定義）：早班 08:00~20:00、晚班 20:00~隔天 08:00
+  //      bucketA = dayA晚班(進場≥2000) ＋ dayB凌晨(進場<0800，屬跨夜段)
+  //      bucketB = dayB早班(進場 08:00~20:00)
+  var bucketA = [], bucketB = [];
+
+  deduped.forEach(function(obj) {
+    var isDayA, isDayB;
+    if (obj._jobStart) {
+      isDayA = obj._jobStart <= dayA && dayA <= obj._jobEnd;
+      isDayB = obj._jobStart <= dayB && dayB <= obj._jobEnd;
+    } else {
+      var m = parseInt(obj.month), d = parseInt(obj.day);
+      isDayA = (m === aM && d === aD);
+      isDayB = (m === bM && d === bD);
+    }
+    if (!isDayA && !isDayB) return;
+
+    var t = obj._t;
+    delete obj._t; delete obj._jobStart; delete obj._jobEnd;
 
     if ((isDayA && t >= 2000) || (isDayB && t >= 0 && t < 800)) {
       bucketA.push(obj);                  // 今晚/昨晚（含跨夜）
     } else if (isDayB && t >= 800 && t < 2000) {
       bucketB.push(obj);                  // 明早/今天
+    } else if (isDayA || isDayB) {
+      // 進場時間空白/爛資料：不再靜默消失，落到符合的天並標記待確認
+      obj.timeUnclear = true;
+      (isDayA ? bucketA : bucketB).push(obj);
     }
-  }
+  });
 
   return { status: 'ok', tonight: bucketA, morning: bucketB };
 }
