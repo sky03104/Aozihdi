@@ -169,12 +169,20 @@ function doPost(e) {
 
     // --- 功能 B: 資料登記到試算表 ---
     if (payload.action === 'vehicleReg') {
+      // 2026-07-30 健檢補：operator 完全沒驗證空值，未登入/session遺失時會直接寫入
+      // 「未登入」，造成查不到是誰登記的孤兒資料。工號必傳，比照 CLAUDE.md GAS 標準擋下。
+      var operator = String(payload.operator || '').trim();
+      if (!operator || operator === '未登入') {
+        return jsonOut({ success: false, error: '工號遺失，請重新整理頁面確認登入狀態後再登記' });
+      }
+
       var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       // 依類型名稱找對應分頁（原本寫死 getSheets()[0]永遠抓最左邊分頁，
       // 若有人在Sheets手動調過分頁順序，所有類型都會被寫到同一頁——
       // 2026-07-11踩過這坑）。找不到對應分頁時明確報錯，不要沉默寫錯地方。
       var sheet = ss.getSheetByName(payload.typeLabel);
       if (!sheet) return jsonOut({ success: false, error: '找不到「' + payload.typeLabel + '」分頁，請確認試算表分頁名稱是否與類型名稱一致' });
+      var plate = String(payload.plate || '').trim().toUpperCase();
       var timestamp = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss');
       // 上鎖：append+抓行號要當成一個原子操作，避免多支手機同時登記時，
       // 兩個請求的 getLastRow() 讀到彼此交錯後的行號，回傳給前端的 row 對不上實際寫入的那一列。
@@ -182,11 +190,30 @@ function doPost(e) {
       lock.waitLock(10000);
       var newRow;
       try {
+        // 2026-07-30 健檢補：連拍/網路重試/前端重入都可能讓同一台車在極短時間內送出兩次
+        // vehicleReg，原本完全沒有去重、永遠 appendRow。只查最近 20 筆（避免資料量大時整表
+        // 掃描太慢），同車牌在 2 分鐘內已存在就視為重複、不寫入，並明確告知（不是靜默略過）。
+        var lastRow = sheet.getLastRow();
+        if (lastRow >= 2) {
+          var checkFrom = Math.max(2, lastRow - 19);
+          var recent = sheet.getRange(checkFrom, 1, lastRow - checkFrom + 1, 3).getValues(); // A時間 B類型 C車牌
+          var now = new Date();
+          for (var ri = recent.length - 1; ri >= 0; ri--) {
+            if (String(recent[ri][2] || '').trim().toUpperCase() !== plate) continue;
+            var rTime = recent[ri][0];
+            var tDate = (rTime instanceof Date) ? rTime : new Date(String(rTime).replace(' ', 'T'));
+            if (isNaN(tDate.getTime())) continue;
+            if (now.getTime() - tDate.getTime() < 2 * 60 * 1000) {
+              return jsonOut({ success: false, duplicate: true, error: '⚠️ ' + plate + ' 2分鐘內已登記過，已略過避免重複寫入' });
+            }
+            break; // 同車牌最近一筆時間已在窗口外，不用再往前查更舊的
+          }
+        }
         sheet.appendRow([
           timestamp,
           payload.typeLabel,
-          payload.plate,
-          "'" + (payload.operator || '未登入')  // ' 前綴：工號純數字，防試算表吃掉開頭 0
+          plate,
+          "'" + operator  // ' 前綴：工號純數字，防試算表吃掉開頭 0
         ]);
         newRow = sheet.getLastRow();
       } finally {
