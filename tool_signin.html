@@ -128,11 +128,15 @@ function logWorkflow(tool,actionType,status){
     .wl-input,.wl-select{flex:1;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 10px;font-size:14px;color:#F5F5F5;font-family:inherit;outline:none}
     .wl-input.plate{text-transform:uppercase;font-weight:800;letter-spacing:1px}
     .wl-add-btn{background:linear-gradient(135deg,#6366F1,#818CF8);border:none;color:#fff;border-radius:8px;padding:10px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit}
+    .wl-cancel-edit-btn{background:transparent;border:none;color:#8A95A8;font-size:12px;cursor:pointer;font-family:inherit;padding:4px;text-decoration:underline}
     .wl-list{margin-bottom:16px}
     .wl-item{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:10px 14px;margin-bottom:8px}
-    .wl-item-plate{font-size:15px;font-weight:800;letter-spacing:1px;flex:1}
-    .wl-item-type{font-size:11px;color:#818CF8;background:rgba(129,140,248,.12);border-radius:6px;padding:3px 8px}
-    .wl-item-del{background:none;border:none;color:#F87171;font-size:16px;cursor:pointer;padding:6px}
+    .wl-item-main{flex:1;min-width:0}
+    .wl-item-plate{font-size:15px;font-weight:800;letter-spacing:1px}
+    .wl-item-note{font-size:11px;color:#8A95A8;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .wl-item-type{font-size:11px;color:#818CF8;background:rgba(129,140,248,.12);border-radius:6px;padding:3px 8px;flex-shrink:0}
+    .wl-item-edit{background:none;border:none;color:#4ADE80;font-size:16px;cursor:pointer;padding:6px;flex-shrink:0}
+    .wl-item-del{background:none;border:none;color:#F87171;font-size:16px;cursor:pointer;padding:6px;flex-shrink:0}
     .wl-save-btn{width:100%;background:linear-gradient(135deg,#16A34A,#22C55E);border:none;color:#fff;border-radius:12px;padding:14px;font-size:15px;font-weight:900;cursor:pointer;font-family:inherit}
     .wl-empty{font-size:13px;color:#4B5563;text-align:center;padding:20px 0}
   </style>
@@ -262,9 +266,11 @@ function logWorkflow(tool,actionType,status){
       </select>
       <input type="text" class="wl-input" id="wlNoteInp" placeholder="備註（選填）" autocomplete="off"/>
     </div>
-    <button class="wl-add-btn" onclick="addWhitelistRow()"><i class="ti ti-plus"></i> 新增一筆</button>
+    <button class="wl-add-btn" id="wlAddBtn" onclick="addWhitelistRow()"><i class="ti ti-plus"></i> <span id="wlAddBtnTxt">新增一筆</span></button>
+    <button class="wl-cancel-edit-btn" id="wlCancelEditBtn" onclick="cancelEditWhitelist()" style="display:none">取消編輯</button>
   </div>
 
+  <input type="text" class="wl-input" id="wlSearchInp" placeholder="🔍 搜尋車牌／備註" autocomplete="off" oninput="renderWhitelist()" style="margin-bottom:10px"/>
   <div class="wl-list" id="wlList"><div class="wl-empty">載入中…</div></div>
 
   <button class="wl-save-btn" onclick="saveWhitelist()"><i class="ti ti-device-floppy"></i> 儲存設定</button>
@@ -348,6 +354,9 @@ function showS(n){document.querySelectorAll('.screen').forEach(function(s){s.cla
 
 // ═══════ 特殊車輛設定（2026-07-30 新增，僅 canManage 能進入） ═══════
 var wlData=[]; // {plate,type,note}
+var wlEditIdx=-1; // -1=新增模式，否則是正在編輯 wlData 的第幾筆
+
+function escHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 
 function openSettings(){
   if(!canManage)return;
@@ -356,6 +365,7 @@ function openSettings(){
 }
 
 function loadWhitelist(){
+  cancelEditWhitelist();
   document.getElementById('wlList').innerHTML='<div class="wl-empty">載入中…</div>';
   fetch(PLATE_GAS_URL,{method:'POST',body:JSON.stringify({action:'getPlateWhitelist'})})
     .then(function(r){return r.json();})
@@ -368,25 +378,64 @@ function loadWhitelist(){
 
 function renderWhitelist(){
   var list=document.getElementById('wlList');
-  if(!wlData.length){list.innerHTML='<div class="wl-empty">尚未設定任何車牌</div>';return;}
-  list.innerHTML=wlData.map(function(item,i){
-    return '<div class="wl-item"><span class="wl-item-plate">'+item.plate+'</span><span class="wl-item-type">'+item.type+'</span><button class="wl-item-del" onclick="removeWhitelistRow('+i+')"><i class="ti ti-trash"></i></button></div>';
+  var kw=(document.getElementById('wlSearchInp').value||'').trim().toUpperCase();
+  var items=wlData.map(function(item,i){return {item:item,i:i};});
+  if(kw){
+    items=items.filter(function(o){
+      return o.item.plate.indexOf(kw)!==-1 || (o.item.note||'').toUpperCase().indexOf(kw)!==-1;
+    });
+  }
+  if(!items.length){list.innerHTML='<div class="wl-empty">'+(kw?'找不到符合「'+escHtml(kw)+'」的車牌':'尚未設定任何車牌')+'</div>';return;}
+  list.innerHTML=items.map(function(o){
+    var item=o.item, i=o.i;
+    return '<div class="wl-item"><div class="wl-item-main"><div class="wl-item-plate">'+escHtml(item.plate)+'</div>'+
+      (item.note?'<div class="wl-item-note">'+escHtml(item.note)+'</div>':'')+'</div>'+
+      '<span class="wl-item-type">'+escHtml(item.type)+'</span>'+
+      '<button class="wl-item-edit" onclick="editWhitelistRow('+i+')"><i class="ti ti-pencil"></i></button>'+
+      '<button class="wl-item-del" onclick="removeWhitelistRow('+i+')"><i class="ti ti-trash"></i></button></div>';
   }).join('');
 }
 
 function addWhitelistRow(){
   var plate=document.getElementById('wlPlateInp').value.trim().toUpperCase();
   if(!plate){showToast('⚠️ 請輸入車牌');return;}
-  if(wlData.some(function(w){return w.plate===plate;})){showToast('⚠️ 這個車牌已經在清單裡了');return;}
+  var dup=wlData.some(function(w,i){return w.plate===plate && i!==wlEditIdx;});
+  if(dup){showToast('⚠️ 這個車牌已經在清單裡了');return;}
   var type=document.getElementById('wlTypeInp').value;
   var note=document.getElementById('wlNoteInp').value.trim();
-  wlData.push({plate:plate,type:type,note:note});
-  document.getElementById('wlPlateInp').value='';
-  document.getElementById('wlNoteInp').value='';
+  if(wlEditIdx>=0){
+    wlData[wlEditIdx]={plate:plate,type:type,note:note};
+  }else{
+    wlData.push({plate:plate,type:type,note:note});
+  }
+  cancelEditWhitelist();
   renderWhitelist();
 }
 
+function editWhitelistRow(i){
+  var item=wlData[i];
+  if(!item)return;
+  wlEditIdx=i;
+  document.getElementById('wlPlateInp').value=item.plate;
+  document.getElementById('wlTypeInp').value=item.type;
+  document.getElementById('wlNoteInp').value=item.note||'';
+  document.getElementById('wlAddBtnTxt').textContent='更新這一筆';
+  document.getElementById('wlCancelEditBtn').style.display='block';
+  document.getElementById('wlPlateInp').scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+function cancelEditWhitelist(){
+  wlEditIdx=-1;
+  document.getElementById('wlPlateInp').value='';
+  document.getElementById('wlNoteInp').value='';
+  document.getElementById('wlTypeInp').value='公司車';
+  document.getElementById('wlAddBtnTxt').textContent='新增一筆';
+  document.getElementById('wlCancelEditBtn').style.display='none';
+}
+
 function removeWhitelistRow(i){
+  if(i===wlEditIdx)cancelEditWhitelist();
+  else if(wlEditIdx>i)wlEditIdx--; // 刪掉編輯中那筆前面的資料時，同步修正正在編輯的索引
   wlData.splice(i,1);
   renderWhitelist();
 }
