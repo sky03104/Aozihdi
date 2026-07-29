@@ -121,6 +121,20 @@ function logWorkflow(tool,actionType,status){
     .toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(30,34,42,.96);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px 20px;font-size:14px;font-weight:600;z-index:9000;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,.5);animation:toastIn .25s ease}
     @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-8px)}}
     .page-footer{font-size:10px;color:#4B5563;letter-spacing:1px;text-align:center;padding:8px 0 16px}
+    /* ── 特殊車輛設定（2026-07-30 新增） ── */
+    .wl-hint{font-size:12px;color:#8A95A8;margin-bottom:14px;line-height:1.6}
+    .wl-form{display:flex;flex-direction:column;gap:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;margin-bottom:16px}
+    .wl-row{display:flex;gap:8px}
+    .wl-input,.wl-select{flex:1;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 10px;font-size:14px;color:#F5F5F5;font-family:inherit;outline:none}
+    .wl-input.plate{text-transform:uppercase;font-weight:800;letter-spacing:1px}
+    .wl-add-btn{background:linear-gradient(135deg,#6366F1,#818CF8);border:none;color:#fff;border-radius:8px;padding:10px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit}
+    .wl-list{margin-bottom:16px}
+    .wl-item{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:10px 14px;margin-bottom:8px}
+    .wl-item-plate{font-size:15px;font-weight:800;letter-spacing:1px;flex:1}
+    .wl-item-type{font-size:11px;color:#818CF8;background:rgba(129,140,248,.12);border-radius:6px;padding:3px 8px}
+    .wl-item-del{background:none;border:none;color:#F87171;font-size:16px;cursor:pointer;padding:6px}
+    .wl-save-btn{width:100%;background:linear-gradient(135deg,#16A34A,#22C55E);border:none;color:#fff;border-radius:12px;padding:14px;font-size:15px;font-weight:900;cursor:pointer;font-family:inherit}
+    .wl-empty{font-size:13px;color:#4B5563;text-align:center;padding:20px 0}
   </style>
 </head>
 <body>
@@ -137,6 +151,7 @@ function logWorkflow(tool,actionType,status){
 <header class="app-hdr">
   <img id="hdrLogo" class="hdr-logo" src="" alt=""/>
   <div><div class="hdr-cn"><span style="color:#FFD700">天鷹</span>保全</div><div class="hdr-en">OVERNIGHT VEHICLE REGISTRATION</div></div>
+  <button id="settingsBtn" class="back-btn" style="margin-left:auto;display:none" onclick="openSettings()" title="特殊車輛設定"><i class="ti ti-settings"></i></button>
 </header>
 
 <!-- S0: 類型選擇 -->
@@ -230,6 +245,31 @@ function logWorkflow(tool,actionType,status){
   <div class="recent-list" id="recentList"></div>
 </div>
 
+<!-- S2: 特殊車輛設定（僅管理員/隊長可見，2026-07-30 新增） -->
+<div id="s2" class="screen">
+  <div class="scr-ttl">
+    <button class="back-btn" onclick="showS(0)"><i class="ti ti-arrow-left"></i></button>
+    <span class="scr-ttl-txt">特殊車輛設定</span>
+  </div>
+  <div class="wl-hint">設定公司車／月租車車牌。登記車輛時只要車牌符合這裡的設定，除了原本的分頁，也會多記一筆到「特殊車輛」分頁，並記錄停在哪個地點。</div>
+
+  <div class="wl-form">
+    <input type="text" class="wl-input plate" id="wlPlateInp" placeholder="車牌，例如 BNZ-5205" autocomplete="off" oninput="this.value=this.value.toUpperCase()"/>
+    <div class="wl-row">
+      <select class="wl-select" id="wlTypeInp">
+        <option value="公司車">公司車</option>
+        <option value="月租車">月租車</option>
+      </select>
+      <input type="text" class="wl-input" id="wlNoteInp" placeholder="備註（選填）" autocomplete="off"/>
+    </div>
+    <button class="wl-add-btn" onclick="addWhitelistRow()"><i class="ti ti-plus"></i> 新增一筆</button>
+  </div>
+
+  <div class="wl-list" id="wlList"><div class="wl-empty">載入中…</div></div>
+
+  <button class="wl-save-btn" onclick="saveWhitelist()"><i class="ti ti-device-floppy"></i> 儲存設定</button>
+</div>
+
 <input type="file" id="camInp" accept="image/*" capture="environment" style="display:none"/>
 <nav class="nav-bar"><button class="nav-btn" onclick="goBack()"><i class="ti ti-arrow-left"></i> 返回工具頁</button></nav>
 <div id="toast" class="toast" style="display:none"></div>
@@ -250,8 +290,13 @@ var TYPE_INFO={
 };
 var empId=new URLSearchParams(window.location.search).get('empId')||'';
 var empName=new URLSearchParams(window.location.search).get('empName')||'';
+var userRole=''; // 2026-07-30 新增：特殊車輛白名單設定只給管理員/隊長看，只能從登入態讀角色（URL不帶role）
 // srcDoc 內嵌時 iframe 網址無 ?empId= 參數 → 退回主程式登入態（同源 iframe 共用 localStorage）
-if(!empId||!empName){try{var _u=JSON.parse(localStorage.getItem('hsh_session_user')||'{}');if(!empId)empId=_u.empId||'';if(!empName)empName=_u.name||'';}catch(e){}}
+if(!empId||!empName){try{var _u=JSON.parse(localStorage.getItem('hsh_session_user')||'{}');if(!empId)empId=_u.empId||'';if(!empName)empName=_u.name||'';userRole=_u.role||'';}catch(e){}}
+else{try{userRole=(JSON.parse(localStorage.getItem('hsh_session_user')||'{}').role)||'';}catch(e){}}
+// 只有管理員／隊長能看到「特殊車輛設定」（比照 tool_emergency.html 的 CAN_EDIT 白名單模式）
+var CAN_MANAGE_WHITELIST=['admin','captain'];
+var canManage=CAN_MANAGE_WHITELIST.indexOf(userRole)!==-1;
 
 // ═══════ LIFF 整合（綁定 LINE 通知用，可選功能） ═══════
 // LIFF_ID：於 LINE Developers Console → LIFF → 新增 App 後取得
@@ -297,8 +342,64 @@ var cfmSubmitting=false; // 防連點/防重入：倒數自動送出跟手動按
 
 ['spLogo','hdrLogo'].forEach(function(id){var el=document.getElementById(id);if(el)el.src=LOGO_SRC;});
 window.addEventListener('load',function(){setTimeout(function(){var sp=document.getElementById('splash');if(sp){sp.classList.add('hide');setTimeout(function(){sp.style.display='none';},650);}},900);});
+if(canManage){var _sb=document.getElementById('settingsBtn');if(_sb)_sb.style.display='flex';}
 
 function showS(n){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});document.getElementById('s'+n).classList.add('active');}
+
+// ═══════ 特殊車輛設定（2026-07-30 新增，僅 canManage 能進入） ═══════
+var wlData=[]; // {plate,type,note}
+
+function openSettings(){
+  if(!canManage)return;
+  showS(2);
+  loadWhitelist();
+}
+
+function loadWhitelist(){
+  document.getElementById('wlList').innerHTML='<div class="wl-empty">載入中…</div>';
+  fetch(PLATE_GAS_URL,{method:'POST',body:JSON.stringify({action:'getPlateWhitelist'})})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      wlData=(j.success&&Array.isArray(j.list))?j.list:[];
+      renderWhitelist();
+    })
+    .catch(function(){document.getElementById('wlList').innerHTML='<div class="wl-empty">載入失敗，請重新整理</div>';});
+}
+
+function renderWhitelist(){
+  var list=document.getElementById('wlList');
+  if(!wlData.length){list.innerHTML='<div class="wl-empty">尚未設定任何車牌</div>';return;}
+  list.innerHTML=wlData.map(function(item,i){
+    return '<div class="wl-item"><span class="wl-item-plate">'+item.plate+'</span><span class="wl-item-type">'+item.type+'</span><button class="wl-item-del" onclick="removeWhitelistRow('+i+')"><i class="ti ti-trash"></i></button></div>';
+  }).join('');
+}
+
+function addWhitelistRow(){
+  var plate=document.getElementById('wlPlateInp').value.trim().toUpperCase();
+  if(!plate){showToast('⚠️ 請輸入車牌');return;}
+  if(wlData.some(function(w){return w.plate===plate;})){showToast('⚠️ 這個車牌已經在清單裡了');return;}
+  var type=document.getElementById('wlTypeInp').value;
+  var note=document.getElementById('wlNoteInp').value.trim();
+  wlData.push({plate:plate,type:type,note:note});
+  document.getElementById('wlPlateInp').value='';
+  document.getElementById('wlNoteInp').value='';
+  renderWhitelist();
+}
+
+function removeWhitelistRow(i){
+  wlData.splice(i,1);
+  renderWhitelist();
+}
+
+function saveWhitelist(){
+  showToast('儲存中…');
+  fetch(PLATE_GAS_URL,{method:'POST',body:JSON.stringify({action:'savePlateWhitelist',empId:empId,list:wlData})})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      showToast(j.success?'✅ 已儲存':('⚠️ 儲存失敗：'+(j.error||'')));
+    })
+    .catch(function(){showToast('⚠️ 網路錯誤，儲存失敗');});
+}
 
 function openCam(type){
   curType=type;
@@ -481,6 +582,7 @@ function doSubmit(plate){
         div.dataset.row=j.row; // 有row才能編輯，避免修改到還沒寫入成功的假資料
         addEditBtn(itemId);
         logWorkflow('signin','vehicle-reg','已完成');
+        if(j.specialVehicle)showToast('🅿️ '+plate+'（'+j.specialVehicle.type+'）已同步登記到特殊車輛');
       }else{
         if(st) st.innerHTML='<i class="ti ti-alert-triangle" style="color:#FB923C"></i>';
         showToast(j.duplicate ? j.error : ('⚠️ '+plate+' 寫入失敗'+(j.error?'：'+j.error:'')));

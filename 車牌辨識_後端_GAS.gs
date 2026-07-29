@@ -21,6 +21,108 @@
 var SPREADSHEET_ID   = '1K46ZEq2zbh7Jw5yv3X9aPgyjWZF43ZUJfjc-x-xunnQ'; // 車輛登記試算表
 var API_KEY_FALLBACK = ''; // ← 不想用指令碼屬性時，把 key 貼進引號內（僅限 GAS 編輯器，勿上傳 GitHub）
 
+// 2026-07-30 新增：特殊車輛白名單／長期停放偵測 用到的分頁名稱
+var WHITELIST_SHEET_NAME = '白名單設定';
+var SPECIAL_SHEET_NAME   = '特殊車輛';
+var LONGTERM_SHEET_NAME  = '長期停放紀錄';
+
+// 取分頁，不存在就自動建立＋補表頭樣式（比照 哨表產生_GAS.gs 的 getGuardPostConfig 模式）
+function getOrCreateSheet_(ss, name, headers) {
+  var sh = ss.getSheetByName(name);
+  if (sh) return sh;
+  sh = ss.insertSheet(name);
+  sh.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setBackground('#D4A800').setFontColor('#0A0C10').setFontWeight('bold');
+  return sh;
+}
+
+// 讀白名單設定，回傳 [{plate,type,note}]
+function getPlateWhitelist_(ss) {
+  var sh = getOrCreateSheet_(ss, WHITELIST_SHEET_NAME, ['車牌', '類型', '備註', '修改人', '修改時間']);
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return [];
+  var data = sh.getRange(2, 1, lastRow - 1, 3).getValues();
+  var list = [];
+  for (var i = 0; i < data.length; i++) {
+    var plate = String(data[i][0] || '').trim().toUpperCase();
+    if (!plate) continue;
+    list.push({ plate: plate, type: String(data[i][1] || ''), note: String(data[i][2] || '') });
+  }
+  return list;
+}
+
+// 車牌是否命中白名單，命中回傳該筆設定，沒命中回傳 null
+function matchWhitelist_(ss, plate) {
+  var list = getPlateWhitelist_(ss);
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].plate === plate) return list[i];
+  }
+  return null;
+}
+
+// 把 Sheets 讀回來的時間值統一轉成 Date（可能是 Date 物件也可能是純字串，兩種都要能處理）
+function toDate_(v) {
+  if (v instanceof Date) return v;
+  var d = new Date(String(v || '').replace(' ', 'T'));
+  return isNaN(d.getTime()) ? null : d;
+}
+function dateOnlyStr_(d) {
+  return Utilities.formatDate(d, 'Asia/Taipei', 'yyyy-MM-dd');
+}
+
+// 2026-07-30 新增：連續兩天以上在同一地點登記到同一車牌 → 記進「長期停放紀錄」，含起訖日與天數。
+// 三個地點（typeLabel）分開各自算，即時偵測（每次 vehicleReg 成功登記後呼叫）。
+function checkAndUpdateLongTermParking_(ss, sheet, typeLabel, plate, timestamp) {
+  var todayStr = dateOnlyStr_(timestamp);
+  var yesterdayStr = dateOnlyStr_(new Date(timestamp.getTime() - 86400000));
+
+  var ltSheet = getOrCreateSheet_(ss, LONGTERM_SHEET_NAME,
+    ['車牌', '地點', '起始日期', '最後更新日期', '已停放天數', '狀態', '建立時間']);
+  var lastRow = ltSheet.getLastRow();
+  var openRowIdx = -1; // 1-based 試算表列號
+  var openRowData = null;
+  if (lastRow >= 2) {
+    var data = ltSheet.getRange(2, 1, lastRow - 1, 6).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][0] || '').trim().toUpperCase() === plate &&
+          String(data[i][1] || '') === typeLabel &&
+          String(data[i][5] || '') === '進行中') {
+        openRowIdx = i + 2;
+        openRowData = data[i];
+        break;
+      }
+    }
+  }
+
+  if (openRowIdx > 0) {
+    var lastUpdateStr = dateOnlyStr_(toDate_(openRowData[3]));
+    if (lastUpdateStr === todayStr) return; // 今天已經更新過（同一天重複登記），不重複累加
+    if (lastUpdateStr === yesterdayStr) {
+      var newDays = Number(openRowData[4] || 1) + 1;
+      ltSheet.getRange(openRowIdx, 4).setValue(timestamp);
+      ltSheet.getRange(openRowIdx, 5).setValue(newDays);
+    } else {
+      // 中斷超過一天：舊的連續紀錄結束，天數凍結；今天是重新出現的第一天，還不到門檻，不新建列
+      ltSheet.getRange(openRowIdx, 6).setValue('已結束');
+    }
+    return;
+  }
+
+  // 沒有進行中的紀錄 → 查這個地點的分頁，昨天有沒有登記過這個車牌
+  var srcLastRow = sheet.getLastRow();
+  if (srcLastRow < 2) return;
+  var srcData = sheet.getRange(2, 1, srcLastRow - 1, 3).getValues(); // A時間 B類型 C車牌
+  var foundYesterday = false;
+  for (var j = srcData.length - 1; j >= 0; j--) {
+    if (String(srcData[j][2] || '').trim().toUpperCase() !== plate) continue;
+    var d = toDate_(srcData[j][0]);
+    if (d && dateOnlyStr_(d) === yesterdayStr) { foundYesterday = true; break; }
+  }
+  if (foundYesterday) {
+    ltSheet.appendRow([plate, typeLabel, yesterdayStr, timestamp, 2, '進行中', timestamp]);
+  }
+}
+
 // 取金鑰清單：GEMINI_API_KEYS（多把逗號分隔）> GEMINI_API_KEY（單把舊名）> 備用常數
 // 注意：免費額度是算「Google Cloud 專案」不是算金鑰，多把 key 要來自不同專案才有加乘效果
 function getApiKeys_() {
@@ -183,12 +285,15 @@ function doPost(e) {
       var sheet = ss.getSheetByName(payload.typeLabel);
       if (!sheet) return jsonOut({ success: false, error: '找不到「' + payload.typeLabel + '」分頁，請確認試算表分頁名稱是否與類型名稱一致' });
       var plate = String(payload.plate || '').trim().toUpperCase();
-      var timestamp = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss');
+      var now2 = new Date();
+      var timestamp = Utilities.formatDate(now2, 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss');
       // 上鎖：append+抓行號要當成一個原子操作，避免多支手機同時登記時，
       // 兩個請求的 getLastRow() 讀到彼此交錯後的行號，回傳給前端的 row 對不上實際寫入的那一列。
+      // 2026-07-30 新增的白名單比對／長期停放偵測也包在同一個鎖裡，維持單一原子操作。
       var lock = LockService.getScriptLock();
       lock.waitLock(10000);
       var newRow;
+      var specialVehicle = null;
       try {
         // 2026-07-30 健檢補：連拍/網路重試/前端重入都可能讓同一台車在極短時間內送出兩次
         // vehicleReg，原本完全沒有去重、永遠 appendRow。只查最近 20 筆（避免資料量大時整表
@@ -216,11 +321,69 @@ function doPost(e) {
           "'" + operator  // ' 前綴：工號純數字，防試算表吃掉開頭 0
         ]);
         newRow = sheet.getLastRow();
+
+        // 2026-07-30 新增①：白名單比對——命中就額外多寫一份到「特殊車輛」，原本的分頁照樣寫，不受影響
+        var wl = matchWhitelist_(ss, plate);
+        if (wl) {
+          specialVehicle = wl;
+          var specialSheet = getOrCreateSheet_(ss, SPECIAL_SHEET_NAME,
+            ['時間', '地點', '車牌', '登記人', '白名單類型', '備註']);
+          specialSheet.appendRow([timestamp, payload.typeLabel, plate, "'" + operator, wl.type, wl.note]);
+        }
+
+        // 2026-07-30 新增②：連續兩天以上在同一地點登記到同一車牌 → 記進「長期停放紀錄」
+        checkAndUpdateLongTermParking_(ss, sheet, payload.typeLabel, plate, now2);
       } finally {
         lock.releaseLock();
       }
       // row 回傳給前端：辨識錯誤時前端可用這個列號呼叫 updatePlate 就地修正，不用手動開試算表改。
-      return jsonOut({ success: true, row: newRow });
+      return jsonOut({ success: true, row: newRow, specialVehicle: specialVehicle });
+    }
+
+    // --- 功能 D: 白名單設定（公司車/月租車）讀取／儲存 ---
+    // 2026-07-30 補：讀取也包進同一把鎖再讀，避免「白名單設定」分頁還沒建立時，
+    // 讀取跟寫入（或跟 vehicleReg 的白名單比對）幾乎同時觸發 getOrCreateSheet_，
+    // Sheets 對重名分頁會自動改名成「白名單設定 2」而非報錯，資料因此分裂成兩份。
+    if (payload.action === 'getPlateWhitelist') {
+      var ssW = SpreadsheetApp.openById(SPREADSHEET_ID);
+      var lockR = LockService.getScriptLock();
+      lockR.waitLock(10000);
+      var listR;
+      try {
+        listR = getPlateWhitelist_(ssW);
+      } finally {
+        lockR.releaseLock();
+      }
+      return jsonOut({ success: true, list: listR });
+    }
+    if (payload.action === 'savePlateWhitelist') {
+      var empIdW = String(payload.empId || '').trim();
+      if (!empIdW) return jsonOut({ success: false, error: '工號遺失，請重新整理頁面確認登入狀態' });
+      var listW = Array.isArray(payload.list) ? payload.list : [];
+
+      var ssW2 = SpreadsheetApp.openById(SPREADSHEET_ID);
+      var lockW = LockService.getScriptLock();
+      lockW.waitLock(10000);
+      try {
+        var whSheet = getOrCreateSheet_(ssW2, WHITELIST_SHEET_NAME, ['車牌', '類型', '備註', '修改人', '修改時間']);
+        var lastRowW = whSheet.getLastRow();
+        if (lastRowW >= 2) whSheet.getRange(2, 1, lastRowW - 1, 5).clearContent();
+        var nowW = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss');
+        // 車牌去重（保留清單中最後一筆），避免前端沒防到／多人同時編輯造成同車牌存成兩筆，
+        // matchWhitelist_ 之後永遠只認得到第一筆，重複的那筆形同垃圾資料。
+        var seenPlates = {};
+        var rowsW = [];
+        for (var wi = listW.length - 1; wi >= 0; wi--) {
+          var plate = String(listW[wi].plate || '').trim().toUpperCase();
+          if (!plate || seenPlates[plate]) continue;
+          seenPlates[plate] = true;
+          rowsW.unshift([plate, String(listW[wi].type || ''), String(listW[wi].note || ''), "'" + empIdW, nowW]);
+        }
+        if (rowsW.length) whSheet.getRange(2, 1, rowsW.length, 5).setValues(rowsW);
+      } finally {
+        lockW.releaseLock();
+      }
+      return jsonOut({ success: true });
     }
 
     // --- 功能 C: 修正已登記的車牌（辨識錯誤但已送出時，前端「最近登記」列表可就地編輯）---
