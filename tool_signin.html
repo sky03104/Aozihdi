@@ -293,6 +293,7 @@ var curType='moto';
 var sessCount=0;
 var cfmTimer=null, cfmDeadline=0;
 var curThumbUrl='';
+var cfmSubmitting=false; // 防連點/防重入：倒數自動送出跟手動按「立即登記」可能在同一輪事件觸發兩次
 
 ['spLogo','hdrLogo'].forEach(function(id){var el=document.getElementById(id);if(el)el.src=LOGO_SRC;});
 window.addEventListener('load',function(){setTimeout(function(){var sp=document.getElementById('splash');if(sp){sp.classList.add('hide');setTimeout(function(){sp.style.display='none';},650);}},900);});
@@ -345,6 +346,11 @@ function compressImg(file){
 
 // ═══════ AI 辨識（Gemini via GAS）═══════
 async function startOCR(file){
+  // 連拍下一張時，若上一筆還在等待確認/倒數，直接視同「立即登記」先送出，
+  // 不要被 hideAllCards() 靜默清掉——那筆資料會無聲遺失且毫無提示。
+  if(document.getElementById('cfmCard').classList.contains('show')){
+    confirmNow();
+  }
   hideAllCards();
   var proc=document.getElementById('procCard');
   proc.classList.add('show');
@@ -378,6 +384,7 @@ function setLbl(t){document.getElementById('procLbl').textContent=t;}
 
 // ═══════ 確認卡：3秒自動送出 ═══════
 function showCfm(plate){
+  cfmSubmitting=false; // 新的一張照片，重置重入鎖
   document.getElementById('cfmThumb').src=curThumbUrl;
   document.getElementById('cfmPlate').value=plate;
   document.getElementById('cfmCard').classList.add('show');
@@ -412,9 +419,11 @@ function cancelCfm(){
   showToast('已取消本筆');
 }
 function confirmNow(){
+  if(cfmSubmitting)return; // 已經送出過這張，倒數計時器跟手動按鈕不會重複送出
+  cfmSubmitting=true;
   clearCfmTimer();
   var plate=document.getElementById('cfmPlate').value.trim().toUpperCase();
-  if(!plate){showToast('⚠️ 車牌為空');return;}
+  if(!plate){showToast('⚠️ 車牌為空');cfmSubmitting=false;return;}
   document.getElementById('cfmCard').classList.remove('show');
   doSubmit(plate);
 }
@@ -474,7 +483,7 @@ function doSubmit(plate){
         logWorkflow('signin','vehicle-reg','已完成');
       }else{
         if(st) st.innerHTML='<i class="ti ti-alert-triangle" style="color:#FB923C"></i>';
-        showToast('⚠️ '+plate+' 寫入失敗');
+        showToast(j.duplicate ? j.error : ('⚠️ '+plate+' 寫入失敗'+(j.error?'：'+j.error:'')));
       }
     })
     .catch(function(){
