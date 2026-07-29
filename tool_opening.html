@@ -2043,7 +2043,7 @@ function renderConBody() {
     var shopTxt      = x(o.shop || '');
     var locTxt       = o.location ? x(o.location) : '—';
     html += '<div class="con-card">' +
-      '<div class="con-card-date">\uD83D\uDCC5 ' + dateTxt + '</div>' +
+      '<div class="con-card-date">\uD83D\uDCC5 ' + dateTxt + (o.timeUnclear ? ' <span style="color:#FB923C">\u26A0\uFE0F \u9032\u5834\u6642\u9593\u5F85\u78BA\u8A8D</span>' : '') + '</div>' +
       '<div class="con-card-header">' +
         '<div class="con-card-applicant-col">' + applicantTxt + '</div>' +
         '<div class="con-card-shop-col">' + shopTxt + '</div>' +

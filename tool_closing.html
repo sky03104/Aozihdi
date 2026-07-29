@@ -1226,6 +1226,16 @@ function doPost(e) {
       return updateExitTime(e);
     }
 
+    // 「今日」分頁編輯整筆
+    if (action === 'updateRow') {
+      return updateRow(e);
+    }
+
+    // 「今日」分頁刪除整筆
+    if (action === 'deleteRow') {
+      return deleteRow(e);
+    }
+
     // 一般進出資料寫入
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheetNm = e.parameter.sheetName || '進出資料表';
@@ -1235,12 +1245,13 @@ function doPost(e) {
     var rows = JSON.parse(e.parameter.rows);
     var now = new Date();
     var added = 0;
+    var nextId = nextRecordId_(sheet);
 
     rows.forEach(function(r) {
       var shopCode = getOrCreateShopCode(ss, r.shop, r.floor);
       var nextRow = sheet.getLastRow() + 1;
       sheet.getRange(nextRow, 1, 1, 12).setValues([[
-        genId(),
+        nextId++,
         shopCode,
         r.floor || '',
         r.shop || '',
@@ -1374,6 +1385,57 @@ function updateExitTime(e) {
   }
 }
 
+// ============================
+// 「今日」分頁編輯／刪除整筆（2026-07-30 補：原本只有前端送 action=updateRow/deleteRow，
+// 後端沒有對應分支，一定會落到最後的預設寫入邏輯 JSON.parse(undefined) 直接拋錯，
+// 導致「今日」分頁編輯/刪除 100% 失敗）
+// ============================
+function updateRow(e) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetNm = e.parameter.sheet || '進出資料表';
+    var sheet = ss.getSheetByName(sheetNm);
+    if (!sheet) return jsonRes({status:'error', msg:'找不到分頁: '+sheetNm});
+
+    var rowNum = parseInt(e.parameter.rowNum);
+    if (isNaN(rowNum) || rowNum < 2) return jsonRes({status:'error', msg:'列號無效'});
+
+    // C~K 欄：樓層/廠商/人數/監工/進場/施工地點/施工項目/退場/檢查者（A id、B專櫃代碼、L建立時間不動）
+    sheet.getRange(rowNum, 3, 1, 9).setValues([[
+      e.parameter.floor || '',
+      e.parameter.shop || '',
+      parseInt(e.parameter.count) || 1,
+      e.parameter.supervisor || '',
+      e.parameter.entryTime || '',
+      e.parameter.location || '',
+      e.parameter.workType || '',
+      e.parameter.exitTime || '',
+      e.parameter.inspector || ''
+    ]]);
+
+    return jsonRes({status:'ok'});
+  } catch(err) {
+    return jsonRes({status:'error', msg:err.toString()});
+  }
+}
+
+function deleteRow(e) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetNm = e.parameter.sheet || '進出資料表';
+    var sheet = ss.getSheetByName(sheetNm);
+    if (!sheet) return jsonRes({status:'error', msg:'找不到分頁: '+sheetNm});
+
+    var rowNum = parseInt(e.parameter.rowNum);
+    if (isNaN(rowNum) || rowNum < 2) return jsonRes({status:'error', msg:'列號無效'});
+
+    sheet.deleteRow(rowNum);
+    return jsonRes({status:'ok'});
+  } catch(err) {
+    return jsonRes({status:'error', msg:err.toString()});
+  }
+}
+
 // 格式化時間欄位（可能是字串 "HH:MM:SS" 或空白）
 function fmtTimeVal(val) {
   if (!val) return '';
@@ -1450,10 +1512,18 @@ function getOrCreateShopCode(ss, name, floor) {
 // ============================
 // 工具函式
 // ============================
-function genId() {
-  var c = '0123456789abcdef', id = '';
-  for (var i = 0; i < 8; i++) id += c[Math.floor(Math.random() * 16)];
-  return id;
+// 純數字流水號主鍵（CLAUDE.md 規範：禁用 UUID/隨機英數）。
+// 掃描 A 欄既有最大數字值 +1；舊資料若殘留隨機英數 id 會被忽略跳過，不影響新流水號。
+function nextRecordId_(sheet) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 1;
+  var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  var max = 0;
+  for (var i = 0; i < ids.length; i++) {
+    var n = Number(ids[i][0]);
+    if (!isNaN(n) && n > max) max = n;
+  }
+  return max + 1;
 }
 
 function jsonRes(obj) {

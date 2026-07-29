@@ -2491,7 +2491,7 @@ function App() {
                         const d = await callAuthApi('verifySession', { token: token });
                         if (d && d.status === 'ok' && d.user) {
                             const u = d.user;
-                            sessionUser = { name: u.name, role: u.role, dept: u.dept, empId: u.empId };
+                            sessionUser = { name: u.name, role: u.role, dept: u.dept, empId: u.empId, shift: u.shift };
                         } else {
                             // 通行證過期或帳號已停用 → 清掉，讓使用者重新登入
                             setAuthToken('');
@@ -2570,7 +2570,7 @@ function App() {
             return;
         }
         const rec = d.user;
-        const sessionUser = { name: rec.name, role: rec.role, dept: rec.dept, empId: rec.empId };
+        const sessionUser = { name: rec.name, role: rec.role, dept: rec.dept, empId: rec.empId, shift: rec.shift };
         setCurrentUser(sessionUser);
         /* 寫入 localStorage 讓 iframe 工具（緊急聯絡清單等）能讀到目前登入者角色 */
         localStorage.setItem('hsh_session_user', JSON.stringify(sessionUser));
@@ -3824,6 +3824,7 @@ function App() {
                                 empId: currentUser.empId,
                                 name: currentUser.name,
                                 dept: currentUser.dept,
+                                shift: currentUser.shift === '早班' ? '早班' : '晚班',
                                 type: leaveForm.type,
                                 dates: dates,
                                 startDate: dates[0],

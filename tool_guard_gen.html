@@ -376,9 +376,15 @@ function buildGuardMatrix(opts) {
 
   // ── 漢來飯店 H/H2 代號：直接指定同一人早晚班都是他，時間用實際班別時段
   // （不是通用早/晚班預設時間），優先於下面的一般 linked 連動邏輯 ──
-  const hanlaiForced = earlyHanlai[0]; // 同一天只會有一位（H/H2互斥），多位算異常資料，不特別擋
+  const hanlaiForced = earlyHanlai[0]; // 同一天只會有一位（H/H2互斥），多位算異常資料
+  if (earlyHanlai.length > 1) {
+    forcedWarnings.push('月班表代號 H/H2（漢來飯店）當天有不只一人：' + earlyHanlai.map(p => p.name).join('、') + '，僅自動帶入「' + hanlaiForced.name + '」，其餘的人（' + earlyHanlai.slice(1).map(p => p.name).join('、') + '）尚未被排入本次哨表，請確認');
+  }
   if (hanlaiForced) {
     const t = HANLAI_CODE_TIME[hanlaiForced.code];
+    if (hanlaiForced.name === leaderEarly || hanlaiForced.name === leaderLate) {
+      forcedWarnings.push(hanlaiForced.name + ' 月班表代號是漢來飯店（H/H2），但同天又被選為帶隊幹部，兩邊都已填入同一人，請確認是否有人力衝突');
+    }
     rows[4][2] = hanlaiForced.name + '\n' + t;
     rows[3][12] = hanlaiForced.name + '\n' + t;
   }
@@ -403,6 +409,10 @@ function buildGuardMatrix(opts) {
     if (def.conditional === 'southGate' && !southGate) return; // 沒勾選，forcedWarnings 已經點名，這裡不寫入
     if (def.conditional) rows[def.row][def.col - 1] = def.label;
     if (matches.length > 1) warnings.push('「' + def.key + '」代號吻合（' + def.forcedCode + '班）的候選不只一位：' + matches.map(p => p.name).join('、') + '，僅自動帶入第一位，請確認');
+    const leaderName = def.shift === 'early' ? leaderEarly : leaderLate;
+    if (matches[0].name === leaderName) {
+      forcedWarnings.push(matches[0].name + ' 月班表代號是「' + def.forcedCode + '」，但同天又被選為帶隊幹部，兩邊都已填入同一人，請確認是否有人力衝突');
+    }
     rows[def.row][def.col] = matches[0].name + '\n' + DEFAULT_TIME[def.shift];
   });
 
