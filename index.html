@@ -3697,6 +3697,8 @@ function App() {
                             const daysInMonth = new Date(year, month + 1, 0).getDate();
                             const today = new Date();
                             const todayStr = today.toLocaleDateString('sv-SE'); // YYYY-MM-DD
+                            const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+                            const tomorrowStr = tomorrow.toLocaleDateString('sv-SE');
                             // 計算每天已有多少人申請（已核准 + 待審核），分早晚班
                             const dayCount = { '早班': {}, '晚班': {} };
                             leaveRequests.forEach(req => {
@@ -3722,13 +3724,15 @@ function App() {
                                         return React.createElement("div", { key: i });
                                     const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                                     const isPast = dStr < todayStr;
+                                    const isTooSoon = dStr === todayStr || dStr === tomorrowStr; // 當天/隔天不開放申請
                                     const isSel = leaveForm.selectedDates.includes(dStr);
                                     const usedM = dayCount['早班'][dStr] || 0;
                                     const usedN = dayCount['晚班'][dStr] || 0;
                                     const fullM = usedM >= leaveCapMorning;
                                     const fullN = usedN >= leaveCapNight;
                                     const isFull = fullM && fullN; // 早晚都滿才視為該日額滿
-                                    const canPick = !isPast && (!isFull || isSel);
+                                    const isBlocked = isPast || isTooSoon;
+                                    const canPick = !isBlocked && (!isFull || isSel);
                                     return (React.createElement("button", { key: i, disabled: !canPick, onClick: () => {
                                             if (isFull && !isSel) {
                                                 showToast(`⚠️ ${dStr} 早晚班皆已額滿`);
@@ -3745,11 +3749,11 @@ function App() {
                                             background: isSel
                                                 ? 'linear-gradient(135deg,#D4A800,#FFD700)'
                                                 : isFull ? 'rgba(248,113,113,.1)'
-                                                    : isPast ? 'rgba(255,255,255,.02)'
+                                                    : isBlocked ? 'rgba(255,255,255,.02)'
                                                         : 'rgba(255,255,255,.06)',
                                             color: isSel ? '#0A0C10'
                                                 : isFull ? '#F87171'
-                                                    : isPast ? 'var(--muted2)'
+                                                    : isBlocked ? 'var(--muted2)'
                                                         : 'var(--text)',
                                             border: isSel
                                                 ? '1px solid var(--gold)'
@@ -3759,7 +3763,7 @@ function App() {
                                             fontSize: 12,
                                             fontWeight: isSel ? 900 : 500,
                                             cursor: canPick ? 'pointer' : 'not-allowed',
-                                            opacity: isPast ? 0.4 : 1,
+                                            opacity: isBlocked ? 0.4 : 1,
                                             fontFamily: "'Microsoft JhengHei',sans-serif",
                                             position: 'relative',
                                             display: 'flex',
@@ -3788,7 +3792,8 @@ function App() {
                                                 background: 'rgba(248,113,113,.2)',
                                                 borderRadius: 3, verticalAlign: 'middle' } }),
                                         " \u5DF2\u6EFF"),
-                                    React.createElement("span", null, "\u65E9/\u665A = \u65E9\u73ED\u00B7\u665A\u73ED\u7533\u8ACB\u4EBA\u6578/\u4E0A\u9650"))));
+                                    React.createElement("span", null, "\u65E9/\u665A = \u65E9\u73ED\u00B7\u665A\u73ED\u7533\u8ACB\u4EBA\u6578/\u4E0A\u9650"),
+                                    React.createElement("span", null, "\u7576\u5929\u3001\u9694\u5929\u4E0D\u958B\u653E\u7533\u8ACB"))));
                         })()),
                     ['captain', 'executive', 'admin'].includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role) && (React.createElement("div", { className: "input-group", style: { background: 'rgba(99,102,241,.08)',
                             border: '1px solid rgba(99,102,241,.25)', borderRadius: 8, padding: '10px 12px', marginBottom: 10 } },
