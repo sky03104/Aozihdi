@@ -2226,6 +2226,7 @@ function App() {
     const [leaveRequests, setLeaveRequests] = useState([]);
     const [editingLeave, setEditingLeave] = useState(null); // 管理員編輯請假申請中的暫存內容：{id,type,dates,reason}
     const [expandedLeaveNames, setExpandedLeaveNames] = useState(() => new Set()); // 請假紀錄依人摺疊：已展開的工號集合
+    const [leaveSearchDate, setLeaveSearchDate] = useState(''); // 「所有申請」查某天有誰請假，格式 yyyy-mm-dd
     const [pendingReports, setPendingReports] = useState([]);   // 事故報告清單（主管待審卡片）
     const [pendingFeedback, setPendingFeedback] = useState([]); // 匿名表揚/檢舉清單（主管待審卡片）
     const [leaveForm, setLeaveForm] = useState({
@@ -3982,9 +3983,13 @@ function App() {
                                 React.createElement("div", null, "\u76EE\u524D\u6C92\u6709\u8ACB\u5047\u7533\u8ACB"))),
                             myReqs.map(renderReqCard)));
                     }
+                    // 查某天有誰請假：只要那天在 req.dates 裡就算命中
+                    const filteredReqs = leaveSearchDate
+                        ? myReqs.filter(r => (r.dates || []).includes(leaveSearchDate))
+                        : myReqs;
                     // 主管視角：依姓名（工號）摺疊分組，組內展開後依最新排序（沿用上方 myReqs 已排序結果）
                     const leaveGroupsMap = new Map();
-                    myReqs.forEach(r => {
+                    filteredReqs.forEach(r => {
                         const gKey = r.empId || r.name;
                         if (!leaveGroupsMap.has(gKey)) leaveGroupsMap.set(gKey, { key: gKey, name: r.name, dept: r.dept, items: [] });
                         leaveGroupsMap.get(gKey).items.push(r);
@@ -3997,10 +4002,20 @@ function App() {
                     });
                     return (React.createElement("div", null,
                         React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: 'var(--muted)',
-                                letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' } }, `📋 所有申請（${myReqs.length} 筆．${leaveGroups.length} 人）`),
-                        myReqs.length === 0 && (React.createElement("div", { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } },
+                                letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' } }, `📋 所有申請（${filteredReqs.length} 筆．${leaveGroups.length} 人）`),
+                        React.createElement("div", { style: { display: 'flex', gap: 8, marginBottom: 12 } },
+                            React.createElement("input", { type: "date", value: leaveSearchDate,
+                                onChange: e => setLeaveSearchDate(e.target.value),
+                                style: { flex: 1, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.14)',
+                                    borderRadius: 8, padding: '9px 10px', fontSize: 13, color: 'var(--text)',
+                                    fontFamily: "'Microsoft JhengHei',sans-serif", colorScheme: 'dark' } }),
+                            leaveSearchDate && (React.createElement("button", { onClick: () => setLeaveSearchDate(''),
+                                style: { background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.14)',
+                                    borderRadius: 8, padding: '0 14px', fontSize: 12, fontWeight: 700, color: 'var(--muted)',
+                                    cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif" } }, "清除"))),
+                        filteredReqs.length === 0 && (React.createElement("div", { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } },
                             React.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "\uD83D\uDCED"),
-                            React.createElement("div", null, "\u76EE\u524D\u6C92\u6709\u8ACB\u5047\u7533\u8ACB"))),
+                            React.createElement("div", null, leaveSearchDate ? `${fmtLeaveDate(leaveSearchDate)} \u6C92\u6709\u4EBA\u8ACB\u5047` : "\u76EE\u524D\u6C92\u6709\u8ACB\u5047\u7533\u8ACB"))),
                         leaveGroups.map(g => {
                             const expanded = expandedLeaveNames.has(g.key);
                             const pendingCount = g.items.filter(r => r.status === 'pending').length;
