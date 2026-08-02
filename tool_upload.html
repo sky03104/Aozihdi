@@ -621,6 +621,9 @@ input[type=text]:focus{border-color:rgba(212,168,0,.5);box-shadow:0 0 0 3px rgba
 
 <script>
 const SCH_WEBAPP_URL="https://script.google.com/macros/s/AKfycbzs56InZLeaHiRJhy1alNfQwDyH0mXEV9t_WJxzfjTjIhf68DHgMiWVQvVG6vKrRZ2x1w/exec";
+// 2026-08-02 新增：上傳班表時比對已核准請假，用來查請假清單（跟 index.html 同一支帳號/請假 GAS）
+const ACCOUNT_GAS_URL="https://script.google.com/macros/s/AKfycbxEVBHseDpLWiWe4d8kLcCHbVFiKAK9wyoLwqNkt59PS4vPCY9QfG0_wiDJf2coO3zMcg/exec";
+const SCH_LEAVE_CODES=['排休','休','病','事']; // 咖哩指定：班表格子是這幾種代號才算「有照請假登記」
 const SCH_SHEET_URL="https://docs.google.com/spreadsheets/d/1hIbgESfLitqC3W9DuSFGMWEuFZKJFKzK8srorQMuia8/edit?gid=1144284018#gid=1144284018";
 const SCH_SHEET_NAME="晚班班表";
 
@@ -958,6 +961,49 @@ function schResolveSheet(wb){
   if(wb.SheetNames.length===1)return wb.SheetNames[0];
   return null;
 }
+// 2026-08-02 新增：比對已核准請假 vs 上傳班表——同一人同一天，請假已核准，但班表格子填的不是
+// 請假類代號（排休/休/病/事），代表班表上傳時漏掉了這筆假，跳出提醒（不強制擋，比照內容防呆的做法）。
+// mainData：schMainRows（A4:AG30，B欄姓名、C~AG欄對應1~31日代號）；monthNum：Z1讀到的月份；year：上傳年份。
+// 已知限制：只在「選檔案當下」查一次已核准請假，不是即時檢查——如果選檔之後、按下「更新線上班表」
+// 之前，主管才剛核准一筆新的假，這次比對不到，需要重新選檔一次才會抓到。
+async function checkLeaveConflicts_(mainData, monthNum, year){
+  if(!(monthNum>=1&&monthNum<=12))return []; // 月份讀不到就不比對，避免誤判
+  let list;
+  try{
+    const res=await fetch(ACCOUNT_GAS_URL+'?action=getLeaveRequests');
+    const j=await res.json();
+    if(j.status!=='ok'||!Array.isArray(j.list))return [];
+    list=j.list;
+  }catch(e){
+    schLog('info','⚠️ 請假比對略過：連不上請假清單（'+(e&&e.message?e.message:e)+'）');
+    return [];
+  }
+  const shiftLabel=SCH_SHIFTS[schShift].label; // 只比對同一班別（早/晚班）的請假紀錄，避免同名跨班誤判
+  const monthPrefix=year+'-'+String(monthNum).padStart(2,'0')+'-';
+  // 姓名 → 該人在 mainData 裡的整列（B欄姓名，C~AG對應1~31日）
+  const rowByName={};
+  mainData.forEach(function(r){
+    const n=String(r[1]||'').trim();
+    if(n)rowByName[n]=r;
+  });
+  const conflicts=[];
+  list.forEach(function(req){
+    if(req.status!=='approved')return;
+    if(req.shift!==shiftLabel)return;
+    const row=rowByName[String(req.name||'').trim()]; // 請假清單姓名可能有前後空白，這裡補trim避免明明是同一人卻查不到
+    if(!row)return; // 這份班表裡查不到這個人（可能不在這班別），不算衝突
+    (req.dates||[]).forEach(function(dStr){
+      if(!dStr.startsWith(monthPrefix))return; // 只比對這次上傳的月份
+      const day=parseInt(dStr.slice(8,10),10);
+      if(!(day>=1&&day<=31))return;
+      const code=String(row[2+day-1]==null?'':row[2+day-1]).trim();
+      if(code && SCH_LEAVE_CODES.indexOf(code)===-1){
+        conflicts.push(req.name+' '+monthNum+'/'+day+'：請假已核准（'+req.type+'），但班表填的是「'+code+'」');
+      }
+    });
+  });
+  return conflicts;
+}
 function schSetMask(url){const m=document.getElementById('sch-url-mask');if(!url){m.textContent='尚未設定';return;}m.textContent=url.length>40?url.slice(0,18)+'••••••'+url.slice(-10):url;}
 function schToggleUrl(){schUrlShowing=!schUrlShowing;document.getElementById('sch-url-view').style.display=schUrlShowing?'none':'flex';document.getElementById('sch-url-edit').style.display=schUrlShowing?'block':'none';document.getElementById('sch-btn-toggle-url').innerHTML=schUrlShowing?'<i class="ti ti-eye-off"></i> 隱藏網址':'<i class="ti ti-eye"></i> 顯示網址';}
 function schSaveUrl(){const url=document.getElementById('sch-webapp-url').value.trim();if(!url)return;try{localStorage.setItem('sch_webapp_url',url);schSetMask(url);document.getElementById('sch-saved-indicator').style.display='flex';schUrlShowing=false;document.getElementById('sch-url-view').style.display='flex';document.getElementById('sch-url-edit').style.display='none';document.getElementById('sch-btn-toggle-url').innerHTML='<i class="ti ti-eye"></i> 顯示網址';schLog('ok','網址已儲存');}catch(e){schLog('err','儲存失敗');}}
@@ -972,7 +1018,7 @@ function schHandleFile(file){
   document.getElementById('sch-dz-default').style.display='none';document.getElementById('sch-dz-file').style.display='block';document.getElementById('sch-file-name-txt').textContent=file.name;
   schSetStep(2);
   const reader=new FileReader();
-  reader.onload=function(ev){
+  reader.onload=async function(ev){
     schFileB64=ev.target.result.split(',')[1];
     const wb=XLSX.read(ev.target.result.split(',')[1],{type:'base64'});
     const resolved=schResolveSheet(wb);
@@ -991,6 +1037,14 @@ function schHandleFile(file){
       const proceed=window.confirm('⚠️ 這份檔案內容看起來不像「'+SCH_SHIFTS[schShift].label+'班表」：\n\n・'+contentCheck.reasons.join('\n・')+'\n\n若繼續，稍後按下「更新線上班表」會覆蓋整個月的線上班表資料。\n\n確定要繼續使用這份檔案嗎？');
       if(!proceed){schLog('info','已取消，請確認檔案是否選錯（例如誤選了哨表檔案）');schClearAll();return;}
       schLog('info','已確認略過內容比對警示，繼續使用此檔案');
+    }
+    schLog('info','比對已核准請假中…');
+    const leaveConflicts=await checkLeaveConflicts_(mainData,monthNum,new Date().getFullYear());
+    if(leaveConflicts.length){
+      schLog('err','⚠️ 發現 '+leaveConflicts.length+' 筆請假跟班表對不上：'+leaveConflicts.join('；'));
+      window.alert('⚠️ 以下已核准的請假，班表上看起來還是排班（不是請假代號）：\n\n・'+leaveConflicts.join('\n・')+'\n\n請確認是不是漏改班表，這裡不會擋你上傳，請自行確認後再按「更新線上班表」。');
+    }else{
+      schLog('ok','請假比對正常，沒有發現衝突');
     }
     document.getElementById('sch-preview-area').style.display='block';document.getElementById('sch-clear-row').style.display='flex';schLog('info','請確認預覽後按「更新線上班表」');
   };
