@@ -134,6 +134,7 @@ function doPost(e) {
 
     if (action === 'notifyScheduleChange')      return notifyScheduleChangeAction_(e);
     if (action === 'notifyScheduleChangeBatch') return notifyScheduleChangeBatchAction_(e);
+    if (action === 'notifyScheduleChangeBulk')  return notifyScheduleChangeBulkAction_(e);
     if (action === 'monthScheduleReleased')     return monthScheduleReleasedAction_(e);
     if (action === 'pushTomorrowPost')          return pushTomorrowPostAction_(e);
 
@@ -2461,6 +2462,31 @@ function notifyScheduleChangeBatchAction_(e) {
     }
 
     return jsonRes({status:'ok', pushed: pushed});
+  } catch (err) {
+    return jsonRes({status:'err', msg:err.toString()});
+  }
+}
+
+// 2026-08-02 新增：一次異動人數太多時（例如換月整批班表一起改），改群組推播一則就好，
+// 不要逐人各發一則——換月那天 149 人一次異動、逐人推播把當月免費額度一天燒光，就是這裡沒擋。
+// 個位數的一般小異動（平常補改一兩人班表）維持 notifyScheduleChangeBatchAction_ 的個人化推播，
+// 仍然便宜又有用（讓當事人知道自己哪幾天改了），只有大量異動才切換成這個群組版本。
+function notifyScheduleChangeBulkAction_(e) {
+  try {
+    var d = JSON.parse(e.parameter.data);
+    var shiftType = d.shiftType;
+    var count = Number(d.count) || 0;
+    var cfg = SCHEDULE_SHEETS_[shiftType];
+
+    var msg = '🔔 ' + (cfg ? cfg.label : '') + '班表大幅更新（本次共 ' + count + ' 人異動），請至 APP 或輸入「本月班表」查詢您的最新班表。';
+
+    var groupId = readSettingStr_('tomorrowPostGroupId', '');
+    if (!groupId) return jsonRes({status:'err', msg:'尚未設定群組ID，請先把機器人加入群組'});
+
+    var code = pushTextToGroup_(groupId, msg);
+    if (code !== 200) return jsonRes({status:'err', msg:'群組推播失敗 HTTP ' + code});
+
+    return jsonRes({status:'ok', shiftType: shiftType, count: count});
   } catch (err) {
     return jsonRes({status:'err', msg:err.toString()});
   }
