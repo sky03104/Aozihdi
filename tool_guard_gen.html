@@ -38,6 +38,9 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Noto Sans TC',
 .field{display:flex;flex-direction:column;gap:5px;}
 .field label{font-size:14px;color:var(--text-muted);}
 input[type=date],input[type=text],input[type=number],select{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:15px;outline:none;font-family:inherit;}
+/* 2026-08-04：日期選擇的行事曆小圖示在深色背景上預設是深色線條，看不見；color-scheme:dark
+   讓瀏覽器把圖示畫成淺色，適配這裡的深色輸入框（只有這個欄位需要，其他input沒有這個圖示問題）。 */
+input[type=date]{color-scheme:dark;}
 input:focus,select:focus{border-color:var(--gold);}
 .chk-row{display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;cursor:pointer;user-select:none;}
 .chk-row input{width:18px;height:18px;accent-color:var(--gold);}
@@ -53,18 +56,21 @@ input:focus,select:focus{border-color:var(--gold);}
 .warn-box.forced{background:rgba(248,113,113,.12);border:2px solid var(--danger);}
 .warn-box.forced .wtitle{color:var(--danger);font-size:14px;}
 .warn-box.forced li{font-size:13.5px;font-weight:600;}
-.prev-table{border-collapse:collapse;font-size:14px;white-space:pre-line;min-width:900px;}
-.prev-table td{border:1px solid rgba(255,255,255,.12);padding:6px 8px;text-align:center;vertical-align:middle;min-width:58px;}
-.prev-table td.has-val{color:var(--success);font-weight:600;}
+/* 2026-08-04：白底黑字＋黑框線，原本黑底綠字在手機戶外強光下太不明顯，改列印稿常見的白底樣式。
+   特殊哨別（南側門/巡檢增派/停巡增派/泊車增派/見習人員）用紅字標出，跟一般崗位分開一眼看出來。 */
+.prev-table{border-collapse:collapse;font-size:14px;white-space:pre-line;min-width:900px;background:#fff;color:#000;}
+.prev-table td{border:1px solid #000;padding:6px 8px;text-align:center;vertical-align:middle;min-width:58px;}
+.prev-table td.has-val{font-weight:600;}
+.prev-table td.special-val{color:#DC2626;font-weight:700;}
 .prev-table td.swap-cell{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
 .prev-table td.swap-dragging{opacity:.9;background:rgba(212,168,0,.28);box-shadow:0 8px 18px rgba(0,0,0,.4);transform:scale(1.08) translateY(-3px);cursor:grabbing;position:relative;z-index:5;}
 .prev-table td.swap-target{outline:2px dashed var(--gold2,#F0C040);outline-offset:-2px;background:rgba(212,168,0,.12);}
 .swap-hint{font-size:12px;color:var(--text-muted);margin:8px 0 2px;display:flex;align-items:center;gap:6px;}
 .prev-list{display:flex;flex-direction:column;gap:6px;}
-.prev-item{display:flex;justify-content:space-between;gap:10px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:14px;}
-.prev-item-label{color:var(--text-muted);white-space:pre-line;}
-.prev-item-val{white-space:pre-line;text-align:right;font-weight:600;}
-.prev-item-val.has-val{color:var(--success);}
+.prev-item{display:flex;justify-content:space-between;gap:10px;background:#fff;border:1px solid #000;border-radius:10px;padding:12px 14px;font-size:14px;}
+.prev-item-label{color:#4B5563;white-space:pre-line;}
+.prev-item-val{white-space:pre-line;text-align:right;font-weight:600;color:#000;}
+.prev-item-val.special-val{color:#DC2626;}
 .emp-list{display:flex;flex-direction:column;gap:6px;}
 .emp-card{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
 .emp-name{font-weight:700;font-size:14px;margin-bottom:8px;color:var(--gold2);}
@@ -229,7 +235,8 @@ function shuffle(arr) {
 
 function buildGuardMatrix(opts) {
   const { year, month, day, weekdayIdx, earlyRoster, lateRoster, postConfig,
-    southGate, patrolExtra, parkExtra, stopPatrolExtra, parkNames, leaderEarly, leaderLate } = opts;
+    southGate, patrolExtra, parkExtra, stopPatrolExtra, parkNames,
+    manualExtraPosts, leaderEarly, leaderLate } = opts;
   const rows = buildBaseRows();
   const warnings = [];
   const forcedWarnings = [];
@@ -443,11 +450,28 @@ function buildGuardMatrix(opts) {
     if (!parkNames[0] || !parkNames[1]) warnings.push('泊車增派姓名尚未填寫完整（需2位）');
   }
 
-  // ── 增派時數註記 ──
+  // ── 增派時數註記：先佔位，一定要寫在「手動增派哨點」迴圈之前——不然南側門/巡檢/泊車/
+  //    停巡任一勾選時，這裡會直接覆蓋掉迴圈剛寫進第16列的哨點姓名（2026-08-04健檢抓到）。
   if (southGate || patrolExtra || parkExtra || stopPatrolExtra) {
     rows[16][4] = '←';
     rows[16][5] = '1600-2000為增派時數';
   }
+
+  // ── 手動增派哨點（2026-08-04）：見習人員（早/晚班）＋咖哩用「+」自訂的任意哨點，
+  //    都是同一套「手動勾選+填姓名」模式，統一用這個迴圈找 11~16 列的空白列寫入，
+  //    必須寫在 placeTrainees() 呼叫之前，讓自動遞補的見習跳過這些列；也必須寫在
+  //    上面「增派時數註記」之後，讓 while 迴圈看到第16列已被註記佔用而跳過。
+  (manualExtraPosts || []).forEach(mp => {
+    let r = 11;
+    while (r <= 16 && rows[r][4] !== '') r++;
+    if (r <= 16) {
+      rows[r][4] = mp.label;
+      if (mp.name) rows[r][5] = mp.name + '\n' + mp.time;
+      else warnings.push(mp.label + '姓名尚未填寫');
+    } else {
+      warnings.push(mp.label + '：11~16列已滿，需手動處理');
+    }
+  });
 
   // ── 見習：早/晚班共用同一套「找第一個空白列」邏輯（跳過已被泊車/停巡增派佔用的列） ──
   function placeTrainees(trainees, labelCol, nameCol, shiftLabel, timeStr) {
@@ -560,19 +584,31 @@ async function downloadXlsx(rows, dateStr) {
 }
 try { if (typeof module !== 'undefined') Object.assign(module.exports, { downloadXlsx }); } catch (e) {}
 
+// 2026-08-04：「特殊哨別」（南側門/巡檢增派/停巡增派/泊車增派/見習人員，以及往後用「+」自訂的哨點）
+// 畫面上要用紅字標出。改用「位置」判斷而不是寫死標籤字串清單——col4/5(row10~16)這個「增派區」
+// 本來就是手動勾選觸發的專屬空間（自動分配的巡檢/停巡崗位用的是col2/col9，不會用到col4/5），
+// 只有自動遞補的「見習」(非「見習人員」)例外不算特殊哨別。這樣往後新增任何自訂哨點都不用再改這裡。
+function isSpecialGuardCell(rows, ri, ci) {
+  if (ci === 2 && rows[ri][1] === '南側門') return true;
+  // 排除「見習」(自動遞補，非特殊哨點) 跟「←」(第16列的「增派時數註記」提示文字，不是哨點)
+  if (ci === 5 && ri >= 10 && ri <= 16 && rows[ri][4] && rows[ri][4] !== '見習' && rows[ri][4] !== '←') return true;
+  return false;
+}
+
 // 18×14 原始表格在手機上要橫滑900px寬才看得完，字又小，改提供逐格清單檢視
 function flattenPreview(rows) {
   const items = [];
   items.push({ label: '早班帶隊幹部', value: rows[2][4] });
   items.push({ label: '晚班帶隊幹部', value: rows[2][11] });
-  POST_DEFS.forEach(def => { items.push({ label: def.key, value: rows[def.row][def.col] }); });
-  items.push({ label: '巡檢增派', value: rows[10][5] });
-  items.push({ label: '泊車增派①', value: rows[11][5] });
-  items.push({ label: '泊車增派②', value: rows[12][5] });
-  items.push({ label: '停巡增派', value: rows[13][5] });
-  for (let r = 11; r <= 16; r++) {
-    if (rows[r][4] === '見習') items.push({ label: '早班見習', value: rows[r][5] });
-    if (rows[r][11] === '見習') items.push({ label: '晚班見習', value: rows[r][12] });
+  POST_DEFS.forEach(def => { items.push({ label: def.key, value: rows[def.row][def.col], special: def.key === '南側門' }); });
+  // 增派區（col4/5）跟見習遞補（col4/5 或 col11/12）共用同一段列範圍，用標籤文字掃描，
+  // 涵蓋巡檢增派/停巡增派/泊車增派①②/見習人員（早/晚）/自訂哨點，不用寫死行號。
+  for (let r = 10; r <= 16; r++) {
+    const earlyLbl = rows[r][4];
+    if (earlyLbl === '見習') items.push({ label: '早班見習', value: rows[r][5] });
+    else if (earlyLbl && earlyLbl !== '←') items.push({ label: earlyLbl, value: rows[r][5], special: true });
+    const lateLbl = rows[r][11];
+    if (lateLbl === '見習') items.push({ label: '晚班見習', value: rows[r][12] });
   }
   return items;
 }
@@ -669,6 +705,42 @@ function GenerateTab({ postConfig }) {
   const [parkExtra, setParkExtra] = useState(false);
   const [stopPatrolExtra, setStopPatrolExtra] = useState(false);
   const [parkNames, setParkNames] = useState(['', '']);
+  // 2026-08-04 新增：見習人員（早/晚班兩種時段），特殊哨點，手動填1人，跟泊車增派同一套「找空白列」機制
+  const [traineeExtra, setTraineeExtra] = useState(false);
+  const [traineeExtraName, setTraineeExtraName] = useState('');
+  const [traineeExtraNight, setTraineeExtraNight] = useState(false);
+  const [traineeExtraNightName, setTraineeExtraNightName] = useState('');
+  // 2026-08-04 新增：「+」自訂特殊哨點——名稱/時段存在 localStorage（跨次使用免重填），
+  // 每次產生哨表要不要用、姓名填誰則是當次的暫存狀態，不持久化（跟見習人員/泊車增派一樣）。
+  const [customPostDefs, setCustomPostDefs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('guardgen_custom_posts') || '[]'); } catch (e) { return []; }
+  });
+  const [customPostState, setCustomPostState] = useState({}); // { [id]: {checked, name} }
+  const [showAddCustom, setShowAddCustom] = useState(false);
+  const [newCustomLabel, setNewCustomLabel] = useState('');
+  const [newCustomTime, setNewCustomTime] = useState('');
+  function saveCustomPostDefs(next) {
+    setCustomPostDefs(next);
+    try { localStorage.setItem('guardgen_custom_posts', JSON.stringify(next)); } catch (e) {}
+  }
+  function addCustomPost() {
+    const label = newCustomLabel.trim();
+    const time = newCustomTime.trim();
+    if (!label || !time) { showToast('請填寫哨點名稱與時段', 'err'); return; }
+    if (!/^\d{4}-\d{4}$/.test(time)) { showToast('時段格式需為4碼-4碼，例如 1000-1800', 'err'); return; }
+    saveCustomPostDefs([...customPostDefs, { id: 'c' + Date.now(), label, time }]);
+    setNewCustomLabel(''); setNewCustomTime(''); setShowAddCustom(false);
+  }
+  function removeCustomPost(id) {
+    saveCustomPostDefs(customPostDefs.filter(p => p.id !== id));
+    setCustomPostState(prev => { const next = Object.assign({}, prev); delete next[id]; return next; });
+  }
+  function toggleCustomPost(id) {
+    setCustomPostState(prev => Object.assign({}, prev, { [id]: Object.assign({}, prev[id], { checked: !(prev[id] && prev[id].checked) }) }));
+  }
+  function setCustomPostName(id, name) {
+    setCustomPostState(prev => Object.assign({}, prev, { [id]: Object.assign({}, prev[id], { name }) }));
+  }
   const [leaderEarly, setLeaderEarly] = useState('');
   const [leaderLate, setLeaderLate] = useState('');
   // 帶班幹部下拉選單：只列出「哨點設定」裡標記適任早班/晚班帶班的人
@@ -741,11 +813,20 @@ function GenerateTab({ postConfig }) {
       const r = await callGuardGas('getMonthlyRoster', { year: y, month: m, day: d });
       if (r.status !== 'ok') { showToast(r.msg || '讀取月班表失敗', 'err'); setBusy(false); return; }
       const weekdayIdx = new Date(y, m - 1, d).getDay();
+      // 2026-08-04：見習人員（早/晚班）＋咖哩自訂的哨點，整理成同一份清單交給 buildGuardMatrix，
+      // 之後再新增自訂哨點也不用改這裡的程式碼，跟著 customPostDefs 走就好。
+      const manualExtraPosts = [];
+      if (traineeExtra) manualExtraPosts.push({ label: '見習人員(早)', name: traineeExtraName.trim(), time: DEFAULT_TIME.early });
+      if (traineeExtraNight) manualExtraPosts.push({ label: '見習人員(晚)', name: traineeExtraNightName.trim(), time: '2000-0800' });
+      customPostDefs.forEach(p => {
+        const st = customPostState[p.id];
+        if (st && st.checked) manualExtraPosts.push({ label: p.label, name: ((st.name || '').trim()), time: p.time });
+      });
       const { rows, warnings, forcedWarnings } = buildGuardMatrix({
         year: y, month: m, day: d, weekdayIdx,
         earlyRoster: r.data.early || [], lateRoster: r.data.late || [],
         postConfig, southGate, patrolExtra, parkExtra, stopPatrolExtra,
-        parkNames, leaderEarly, leaderLate
+        parkNames, manualExtraPosts, leaderEarly, leaderLate
       });
       const dateLabel = y + '/' + String(m).padStart(2, '0') + '/' + String(d).padStart(2, '0') + ' 星期' + WEEKDAY_ZH[weekdayIdx];
       setResult({ rows, warnings, forcedWarnings, dateLabel, year: y, month: m, day: d, weekday: WEEKDAY_ZH[weekdayIdx] });
@@ -803,7 +884,29 @@ function GenerateTab({ postConfig }) {
         h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: southGate, onChange: e => setSouthGate(e.target.checked) }), h('span', null, '南側門')),
         h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: patrolExtra, onChange: e => setPatrolExtra(e.target.checked) }), h('span', null, '巡檢增派')),
         h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: parkExtra, onChange: e => setParkExtra(e.target.checked) }), h('span', null, '泊車增派')),
-        h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: stopPatrolExtra, onChange: e => setStopPatrolExtra(e.target.checked) }), h('span', null, '停巡增派'))
+        h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: stopPatrolExtra, onChange: e => setStopPatrolExtra(e.target.checked) }), h('span', null, '停巡增派')),
+        h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: traineeExtra, onChange: e => setTraineeExtra(e.target.checked) }), h('span', null, '見習人員（早班）')),
+        h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: traineeExtraNight, onChange: e => setTraineeExtraNight(e.target.checked) }), h('span', null, '見習人員（晚班）')),
+        customPostDefs.map(p => h('label', { className: 'chk-row', key: p.id },
+          h('input', {
+            type: 'checkbox', checked: !!(customPostState[p.id] && customPostState[p.id].checked),
+            onChange: () => toggleCustomPost(p.id)
+          }),
+          h('span', null, p.label + '（' + p.time + '）'),
+          h('i', {
+            className: 'ti ti-x', style: { marginLeft: '4px', color: 'var(--danger)', cursor: 'pointer' },
+            onClick: e => { e.preventDefault(); e.stopPropagation(); removeCustomPost(p.id); }
+          })
+        )),
+        h('button', { className: 'btn btn-ghost', onClick: () => setShowAddCustom(!showAddCustom) },
+          h('i', { className: 'ti ti-plus' }), '自訂哨點')
+      ),
+      showAddCustom && h('div', { className: 'row' },
+        h('div', { className: 'field' }, h('label', null, '哨點名稱'),
+          h('input', { type: 'text', value: newCustomLabel, placeholder: '例如：機動巡邏', onChange: e => setNewCustomLabel(e.target.value) })),
+        h('div', { className: 'field' }, h('label', null, '時段（4碼-4碼）'),
+          h('input', { type: 'text', value: newCustomTime, placeholder: '例如 1000-1800', onChange: e => setNewCustomTime(e.target.value) })),
+        h('button', { className: 'btn btn-primary', onClick: addCustomPost }, h('i', { className: 'ti ti-check' }), '新增')
       ),
       parkExtra && h('div', { className: 'row' },
         h('div', { className: 'field' }, h('label', null, '泊車增派人員1'),
@@ -811,6 +914,18 @@ function GenerateTab({ postConfig }) {
         h('div', { className: 'field' }, h('label', null, '泊車增派人員2'),
           h('input', { type: 'text', value: parkNames[1], placeholder: '姓名', onChange: e => setParkNames([parkNames[0], e.target.value]) }))
       ),
+      traineeExtra && h('div', { className: 'row' },
+        h('div', { className: 'field' }, h('label', null, '見習人員（早班）姓名'),
+          h('input', { type: 'text', value: traineeExtraName, placeholder: '姓名', onChange: e => setTraineeExtraName(e.target.value) }))
+      ),
+      traineeExtraNight && h('div', { className: 'row' },
+        h('div', { className: 'field' }, h('label', null, '見習人員（晚班）姓名'),
+          h('input', { type: 'text', value: traineeExtraNightName, placeholder: '姓名', onChange: e => setTraineeExtraNightName(e.target.value) }))
+      ),
+      customPostDefs.filter(p => customPostState[p.id] && customPostState[p.id].checked).map(p => h('div', { className: 'row', key: p.id },
+        h('div', { className: 'field' }, h('label', null, p.label + '姓名'),
+          h('input', { type: 'text', value: (customPostState[p.id] && customPostState[p.id].name) || '', placeholder: '姓名', onChange: e => setCustomPostName(p.id, e.target.value) }))
+      )),
       h('button', { className: 'btn btn-primary', onClick: handleGenerate, disabled: busy },
         h('i', { className: 'ti ti-wand' }), busy ? '產生中…' : '產生預覽')
     ),
@@ -855,6 +970,7 @@ function GenerateTab({ postConfig }) {
                   const isDragging = dragState && dragState.from.ri === ri && dragState.from.ci === ci;
                   const isTarget = dragState && dragState.overKey === key;
                   let cls = cell ? 'has-val' : '';
+                  if (cell && isSpecialGuardCell(result.rows, ri, ci)) cls += ' special-val';
                   if (draggable) cls += ' swap-cell';
                   if (isDragging) cls += ' swap-dragging';
                   if (isTarget) cls += ' swap-target';
@@ -870,7 +986,7 @@ function GenerateTab({ postConfig }) {
         : h('div', { className: 'prev-list' },
             flattenPreview(result.rows).map((it, i) => h('div', { className: 'prev-item', key: i },
               h('span', { className: 'prev-item-label' }, it.label),
-              h('span', { className: 'prev-item-val' + (it.value ? ' has-val' : '') }, it.value || '未排')
+              h('span', { className: 'prev-item-val' + (it.value && it.special ? ' special-val' : '') }, it.value || '未排')
             ))
           ),
       h('div', { className: 'row', style: { marginTop: '14px' } },
