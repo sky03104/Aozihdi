@@ -226,7 +226,12 @@ function handleUpdate(payload) {
         }
       }
 
-      if (allDiffs.length > 0) {
+      // 2026-08-02：一次異動達門檻（換月、整批調整）改群組發一則，個位數的一般小異動
+      // 仍走個人化推播（讓當事人清楚知道自己哪幾天改了），兩種情境門檻分開處理。
+      var BULK_DIFF_THRESHOLD = 10;
+      if (allDiffs.length >= BULK_DIFF_THRESHOLD) {
+        notifyScheduleChangeBulkToLine_(notifyShiftType, allDiffs.length);
+      } else if (allDiffs.length > 0) {
         notifyScheduleChangeBatchToLine_(allDiffs);
       }
     }
@@ -362,6 +367,24 @@ function notifyScheduleChangeBatchToLine_(items) {
     });
   } catch (err) {
     console.error('notifyScheduleChangeBatchToLine_ 失敗：' + err.toString());
+  }
+}
+
+// 2026-08-02 新增：一次異動人數太多（例如換月整批班表一起改）改群組發一則，不逐人各發一則，
+// 避免像 8/1 換月那次一天燒掉149則個人推播、把當月免費額度吃光。
+function notifyScheduleChangeBulkToLine_(shiftType, count) {
+  try {
+    if (!NOTIFY_GAS_URL || NOTIFY_GAS_URL.indexOf('請填入') === 0) return;
+    UrlFetchApp.fetch(NOTIFY_GAS_URL, {
+      method: 'post',
+      payload: {
+        action: 'notifyScheduleChangeBulk',
+        data: JSON.stringify({ shiftType: shiftType, count: count })
+      },
+      muteHttpExceptions: true
+    });
+  } catch (err) {
+    console.error('notifyScheduleChangeBulkToLine_ 失敗：' + err.toString());
   }
 }
 
