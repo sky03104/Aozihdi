@@ -38,6 +38,9 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Noto Sans TC',
 .field{display:flex;flex-direction:column;gap:5px;}
 .field label{font-size:14px;color:var(--text-muted);}
 input[type=date],input[type=text],input[type=number],select{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:15px;outline:none;font-family:inherit;}
+/* 2026-08-04：日期選擇的行事曆小圖示在深色背景上預設是深色線條，看不見；color-scheme:dark
+   讓瀏覽器把圖示畫成淺色，適配這裡的深色輸入框（只有這個欄位需要，其他input沒有這個圖示問題）。 */
+input[type=date]{color-scheme:dark;}
 input:focus,select:focus{border-color:var(--gold);}
 .chk-row{display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;cursor:pointer;user-select:none;}
 .chk-row input{width:18px;height:18px;accent-color:var(--gold);}
@@ -53,18 +56,21 @@ input:focus,select:focus{border-color:var(--gold);}
 .warn-box.forced{background:rgba(248,113,113,.12);border:2px solid var(--danger);}
 .warn-box.forced .wtitle{color:var(--danger);font-size:14px;}
 .warn-box.forced li{font-size:13.5px;font-weight:600;}
-.prev-table{border-collapse:collapse;font-size:14px;white-space:pre-line;min-width:900px;}
-.prev-table td{border:1px solid rgba(255,255,255,.12);padding:6px 8px;text-align:center;vertical-align:middle;min-width:58px;}
-.prev-table td.has-val{color:var(--success);font-weight:600;}
+/* 2026-08-04：白底黑字＋黑框線，原本黑底綠字在手機戶外強光下太不明顯，改列印稿常見的白底樣式。
+   特殊哨別（南側門/巡檢增派/停巡增派/泊車增派/見習人員）用紅字標出，跟一般崗位分開一眼看出來。 */
+.prev-table{border-collapse:collapse;font-size:14px;white-space:pre-line;min-width:900px;background:#fff;color:#000;}
+.prev-table td{border:1px solid #000;padding:6px 8px;text-align:center;vertical-align:middle;min-width:58px;}
+.prev-table td.has-val{font-weight:600;}
+.prev-table td.special-val{color:#DC2626;font-weight:700;}
 .prev-table td.swap-cell{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
 .prev-table td.swap-dragging{opacity:.9;background:rgba(212,168,0,.28);box-shadow:0 8px 18px rgba(0,0,0,.4);transform:scale(1.08) translateY(-3px);cursor:grabbing;position:relative;z-index:5;}
 .prev-table td.swap-target{outline:2px dashed var(--gold2,#F0C040);outline-offset:-2px;background:rgba(212,168,0,.12);}
 .swap-hint{font-size:12px;color:var(--text-muted);margin:8px 0 2px;display:flex;align-items:center;gap:6px;}
 .prev-list{display:flex;flex-direction:column;gap:6px;}
-.prev-item{display:flex;justify-content:space-between;gap:10px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:14px;}
-.prev-item-label{color:var(--text-muted);white-space:pre-line;}
-.prev-item-val{white-space:pre-line;text-align:right;font-weight:600;}
-.prev-item-val.has-val{color:var(--success);}
+.prev-item{display:flex;justify-content:space-between;gap:10px;background:#fff;border:1px solid #000;border-radius:10px;padding:12px 14px;font-size:14px;}
+.prev-item-label{color:#4B5563;white-space:pre-line;}
+.prev-item-val{white-space:pre-line;text-align:right;font-weight:600;color:#000;}
+.prev-item-val.special-val{color:#DC2626;}
 .emp-list{display:flex;flex-direction:column;gap:6px;}
 .emp-card{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
 .emp-name{font-weight:700;font-size:14px;margin-bottom:8px;color:var(--gold2);}
@@ -229,7 +235,8 @@ function shuffle(arr) {
 
 function buildGuardMatrix(opts) {
   const { year, month, day, weekdayIdx, earlyRoster, lateRoster, postConfig,
-    southGate, patrolExtra, parkExtra, stopPatrolExtra, parkNames, leaderEarly, leaderLate } = opts;
+    southGate, patrolExtra, parkExtra, stopPatrolExtra, parkNames,
+    traineeExtra, traineeExtraName, leaderEarly, leaderLate } = opts;
   const rows = buildBaseRows();
   const warnings = [];
   const forcedWarnings = [];
@@ -443,6 +450,21 @@ function buildGuardMatrix(opts) {
     if (!parkNames[0] || !parkNames[1]) warnings.push('泊車增派姓名尚未填寫完整（需2位）');
   }
 
+  // ── 見習人員（2026-08-04新增特殊哨點，手動輸入1人，跟泊車增派/停巡增派共用同一段
+  //    11~16列「增派區」空間，用「找第一個空白列」避免跟其他手填哨或見習自動遞補衝突，
+  //    必須寫在 placeTrainees() 呼叫之前，讓自動遞補的見習跳過這一列）──
+  if (traineeExtra) {
+    let r = 11;
+    while (r <= 16 && rows[r][4] !== '') r++;
+    if (r <= 16) {
+      rows[r][4] = '見習人員';
+      if (traineeExtraName) rows[r][5] = traineeExtraName + '\n' + DEFAULT_TIME.early;
+      else warnings.push('見習人員姓名尚未填寫');
+    } else {
+      warnings.push('見習人員：11~16列已滿，需手動處理');
+    }
+  }
+
   // ── 增派時數註記 ──
   if (southGate || patrolExtra || parkExtra || stopPatrolExtra) {
     rows[16][4] = '←';
@@ -560,19 +582,30 @@ async function downloadXlsx(rows, dateStr) {
 }
 try { if (typeof module !== 'undefined') Object.assign(module.exports, { downloadXlsx }); } catch (e) {}
 
+// 2026-08-04：咖哩指定的「特殊哨別」清單，畫面上要用紅字標出（跟一般崗位分開一眼看出來）。
+// 用「值格對應的標籤文字」判斷，不用寫死行號——南側門是POST_DEFS的conditional崗位（col-1放標籤），
+// 巡檢增派/停巡增派/泊車增派/見習人員都是手動勾選觸發、共用col4放標籤、col5放姓名值的「增派區」。
+const SPECIAL_POST_LABELS = ['巡檢增派', '停巡增派', '泊車增派', '見習人員'];
+function isSpecialGuardCell(rows, ri, ci) {
+  if (ci === 2 && rows[ri][1] === '南側門') return true;
+  if (ci === 5 && SPECIAL_POST_LABELS.indexOf(rows[ri][4]) !== -1) return true;
+  return false;
+}
+
 // 18×14 原始表格在手機上要橫滑900px寬才看得完，字又小，改提供逐格清單檢視
 function flattenPreview(rows) {
   const items = [];
   items.push({ label: '早班帶隊幹部', value: rows[2][4] });
   items.push({ label: '晚班帶隊幹部', value: rows[2][11] });
-  POST_DEFS.forEach(def => { items.push({ label: def.key, value: rows[def.row][def.col] }); });
-  items.push({ label: '巡檢增派', value: rows[10][5] });
-  items.push({ label: '泊車增派①', value: rows[11][5] });
-  items.push({ label: '泊車增派②', value: rows[12][5] });
-  items.push({ label: '停巡增派', value: rows[13][5] });
+  POST_DEFS.forEach(def => { items.push({ label: def.key, value: rows[def.row][def.col], special: def.key === '南側門' }); });
+  items.push({ label: '巡檢增派', value: rows[10][5], special: true });
+  items.push({ label: '泊車增派①', value: rows[11][5], special: true });
+  items.push({ label: '泊車增派②', value: rows[12][5], special: true });
+  items.push({ label: '停巡增派', value: rows[13][5], special: true });
   for (let r = 11; r <= 16; r++) {
     if (rows[r][4] === '見習') items.push({ label: '早班見習', value: rows[r][5] });
     if (rows[r][11] === '見習') items.push({ label: '晚班見習', value: rows[r][12] });
+    if (rows[r][4] === '見習人員') items.push({ label: '見習人員', value: rows[r][5], special: true });
   }
   return items;
 }
@@ -669,6 +702,8 @@ function GenerateTab({ postConfig }) {
   const [parkExtra, setParkExtra] = useState(false);
   const [stopPatrolExtra, setStopPatrolExtra] = useState(false);
   const [parkNames, setParkNames] = useState(['', '']);
+  const [traineeExtra, setTraineeExtra] = useState(false); // 2026-08-04 新增：見習人員（特殊哨點，手動填1人，跟泊車增派同一套「找空白列」機制）
+  const [traineeExtraName, setTraineeExtraName] = useState('');
   const [leaderEarly, setLeaderEarly] = useState('');
   const [leaderLate, setLeaderLate] = useState('');
   // 帶班幹部下拉選單：只列出「哨點設定」裡標記適任早班/晚班帶班的人
@@ -745,7 +780,7 @@ function GenerateTab({ postConfig }) {
         year: y, month: m, day: d, weekdayIdx,
         earlyRoster: r.data.early || [], lateRoster: r.data.late || [],
         postConfig, southGate, patrolExtra, parkExtra, stopPatrolExtra,
-        parkNames, leaderEarly, leaderLate
+        parkNames, traineeExtra, traineeExtraName, leaderEarly, leaderLate
       });
       const dateLabel = y + '/' + String(m).padStart(2, '0') + '/' + String(d).padStart(2, '0') + ' 星期' + WEEKDAY_ZH[weekdayIdx];
       setResult({ rows, warnings, forcedWarnings, dateLabel, year: y, month: m, day: d, weekday: WEEKDAY_ZH[weekdayIdx] });
@@ -803,13 +838,18 @@ function GenerateTab({ postConfig }) {
         h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: southGate, onChange: e => setSouthGate(e.target.checked) }), h('span', null, '南側門')),
         h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: patrolExtra, onChange: e => setPatrolExtra(e.target.checked) }), h('span', null, '巡檢增派')),
         h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: parkExtra, onChange: e => setParkExtra(e.target.checked) }), h('span', null, '泊車增派')),
-        h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: stopPatrolExtra, onChange: e => setStopPatrolExtra(e.target.checked) }), h('span', null, '停巡增派'))
+        h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: stopPatrolExtra, onChange: e => setStopPatrolExtra(e.target.checked) }), h('span', null, '停巡增派')),
+        h('label', { className: 'chk-row' }, h('input', { type: 'checkbox', checked: traineeExtra, onChange: e => setTraineeExtra(e.target.checked) }), h('span', null, '見習人員'))
       ),
       parkExtra && h('div', { className: 'row' },
         h('div', { className: 'field' }, h('label', null, '泊車增派人員1'),
           h('input', { type: 'text', value: parkNames[0], placeholder: '姓名', onChange: e => setParkNames([e.target.value, parkNames[1]]) })),
         h('div', { className: 'field' }, h('label', null, '泊車增派人員2'),
           h('input', { type: 'text', value: parkNames[1], placeholder: '姓名', onChange: e => setParkNames([parkNames[0], e.target.value]) }))
+      ),
+      traineeExtra && h('div', { className: 'row' },
+        h('div', { className: 'field' }, h('label', null, '見習人員姓名'),
+          h('input', { type: 'text', value: traineeExtraName, placeholder: '姓名', onChange: e => setTraineeExtraName(e.target.value) }))
       ),
       h('button', { className: 'btn btn-primary', onClick: handleGenerate, disabled: busy },
         h('i', { className: 'ti ti-wand' }), busy ? '產生中…' : '產生預覽')
@@ -855,6 +895,7 @@ function GenerateTab({ postConfig }) {
                   const isDragging = dragState && dragState.from.ri === ri && dragState.from.ci === ci;
                   const isTarget = dragState && dragState.overKey === key;
                   let cls = cell ? 'has-val' : '';
+                  if (cell && isSpecialGuardCell(result.rows, ri, ci)) cls += ' special-val';
                   if (draggable) cls += ' swap-cell';
                   if (isDragging) cls += ' swap-dragging';
                   if (isTarget) cls += ' swap-target';
@@ -870,7 +911,7 @@ function GenerateTab({ postConfig }) {
         : h('div', { className: 'prev-list' },
             flattenPreview(result.rows).map((it, i) => h('div', { className: 'prev-item', key: i },
               h('span', { className: 'prev-item-label' }, it.label),
-              h('span', { className: 'prev-item-val' + (it.value ? ' has-val' : '') }, it.value || '未排')
+              h('span', { className: 'prev-item-val' + (it.value && it.special ? ' special-val' : '') }, it.value || '未排')
             ))
           ),
       h('div', { className: 'row', style: { marginTop: '14px' } },
