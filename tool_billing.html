@@ -272,10 +272,15 @@ function 收尾(ws, 範圍, merges) {
   }
   (merges || []).forEach(m => { try { ws.mergeCells(m); } catch (e) {} });
 }
-/* 'E4' 位移 (下dr, 右dc) → 'F4'。用來從計價區塊錨點推出各格位置 */
+/* 'E4' 位移 (下dr, 右dc) → 'F4'。用來從計價區塊錨點推出各格位置。
+   只支援單字母欄位（A~Z）——目前版面最遠用到 J 欄，夠用。超出範圍寧可直接報錯，
+   也不要回傳算出來的垃圾字元讓它默默寫進請款檔案。 */
 function 位移(addr, dr, dc) {
-  const m = String(addr).match(/^([A-Z]+)(\d+)$/);
-  return String.fromCharCode(m[1].charCodeAt(0) + dc) + (parseInt(m[2], 10) + dr);
+  const m = String(addr).match(/^([A-Z])(\d+)$/);
+  if (!m) throw new Error('位移() 只支援單字母欄位 A~Z，收到：' + addr);
+  const 新欄 = m[1].charCodeAt(0) + dc;
+  if (新欄 < 65 || 新欄 > 90) throw new Error('位移() 算出的欄位超出 A~Z：' + addr + ' 右移 ' + dc);
+  return String.fromCharCode(新欄) + (parseInt(m[2], 10) + dr);
 }
 const 下一欄 = ch => String.fromCharCode(ch.charCodeAt(0) + 1);
 
@@ -799,6 +804,10 @@ function App() {
           h('div', { className: 'item-amt' }, '$' + fmt(算項目(t.days).金額)),
           h('button', { className: 'del-btn', onClick: () => set臨時(臨時.filter((_, j) => j !== i)) }, '×')),
         h('div', { className: 'item-body' },
+          h('div', { className: 'alert alert-warn', style: { marginTop: '12px' } },
+            '⚠ 臨時項目只會出現在「總表」，不會產生對應的發票／明細／附表三頁。',
+            h('br'), '項次 1~7 每一項都有三層佐證，這一項只有一個金額數字，業主承辦人可能會要求補件。',
+            h('br'), '要用的話，明細與附表請自己另外附上。'),
           h(DayEditor, { 民國年, 月, days: t.days,
             onChange: nd => { const n = 臨時.slice(); n[i] = Object.assign({}, t, { days: nd }); set臨時(n); } })))),
       h('button', { className: 'btn btn-ghost btn-full btn-sm', style: { marginTop: '4px' }, onClick: 加臨時 },
