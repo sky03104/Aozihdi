@@ -133,7 +133,8 @@ async function callGuardGas(action, data) {
 ════════════════════════════════════════════════════════════════════ */
 const POST_DEFS = [
   { key: '警衛室',       label: '警衛室',           row: 3,  col: 2,  shift: 'early' },
-  { key: '漢來飯店',     label: '漢來\n飯店',       row: 4,  col: 2,  shift: 'early', forcedCodes: { 'H': '1100-2200', 'H2': '1100-2330' } },
+  // H2 收哨時間 2026-08-08 由咖哩確認為 2230（原本寫 2330 是錯的）。請款附表也是以 11:00-22:30＝11.5 小時計。
+  { key: '漢來飯店',     label: '漢來\n飯店',       row: 4,  col: 2,  shift: 'early', forcedCodes: { 'H': '1100-2200', 'H2': '1100-2230' } },
   { key: 'P3車道',       label: 'P3\n車道',         row: 6,  col: 2,  shift: 'early' },
   { key: '南側門',       label: '南側門',           row: 7,  col: 2,  shift: 'early', conditional: 'southGate', forcedCode: '南' },
   { key: 'B1F警衛室',    label: 'B1F\n警衛室',      row: 3,  col: 5,  shift: 'early' },
@@ -273,7 +274,10 @@ function buildGuardMatrix(opts) {
   const earlyLN = earlyRoster.filter(p => p.code === 'LN');
   const earlyN = earlyRoster.filter(p => p.code === 'N');
   const earlySouth = earlyRoster.filter(p => p.code === '南');
-  const HANLAI_CODE_TIME = { 'H': '1100-2200', 'H2': '1100-2330' }; // H/H2代號本身就代表早晚班漢來飯店同一人，兩者互斥（同一天只會有其中一種）
+  // H/H2代號本身就代表早晚班漢來飯店同一人，兩者互斥（同一天只會有其中一種）。
+  // 2026-08-08：原本這裡自己抄一份時間表，結果跟 POST_DEFS 的定義各改各的（H2 一邊 2230 一邊 2330），
+  // 改成直接引用 POST_DEFS 的 forcedCodes，時間只有一個地方能改，不會再改漏。
+  const HANLAI_CODE_TIME = POST_DEFS.find(d => d.key === '漢來飯店').forcedCodes;
   const earlyHanlai = earlyRoster.filter(p => HANLAI_CODE_TIME[p.code]);
   const earlyExclude = new Set(earlyTrainees.concat(earlyL, earlyLN, earlyN, earlySouth, earlyHanlai).map(p => p.name));
   if (leaderEarly) earlyExclude.add(leaderEarly); // 被排為早班帶班幹部的人，不再進入其他哨點的隨機分配池

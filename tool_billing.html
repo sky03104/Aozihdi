@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>天鷹保全 · 請款資料產生</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<!-- React 18.3.1（天鷹規範：禁止 19.x） -->
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<!-- ExcelJS：產生 xlsx（跟 tool_guard_gen.html 同一套，SheetJS 免費版不能寫樣式） -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+:root{
+  --bg:#0A0C10; --surface:#0D0F14; --card:rgba(255,255,255,.03);
+  --border:rgba(255,255,255,.08); --gold:#D4A800; --gold2:#FFD700;
+  --indigo:#818CF8; --indigo2:#6366F1;
+  --success:#4ADE80; --danger:#F87171; --warn:#FB923C; --text:#F5F5F5; --text-muted:#8A95A8;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;min-height:100vh;}
+.container{max-width:960px;margin:0 auto;padding:16px 14px 80px;}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:10px;flex-wrap:wrap;}
+.back-btn{background:var(--card);border:1px solid var(--border);color:var(--text);padding:13px 16px;border-radius:10px;text-decoration:none;display:flex;align-items:center;gap:6px;font-size:14px;min-height:44px;}
+.title-wrap{text-align:center;flex:1;min-width:200px;}
+.title-main{color:var(--gold);font-size:19px;font-weight:700;letter-spacing:1px;}
+.title-sub{color:var(--text-muted);font-size:11px;letter-spacing:2px;margin-top:2px;}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px;backdrop-filter:blur(10px);}
+.step-head{display:flex;align-items:center;gap:9px;margin-bottom:14px;}
+.step-no{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#D4A800,#FFD700);color:#0A0C10;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.step-title{font-size:16px;font-weight:700;color:var(--gold2);}
+
+label{display:block;font-size:13px;color:var(--text-muted);margin-bottom:5px;}
+.field{margin-bottom:12px;}
+.row{display:flex;gap:10px;flex-wrap:wrap;}
+.row>.field{flex:1;min-width:110px;}
+input[type=text],input[type=number],select{
+  width:100%;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);
+  padding:12px 12px;border-radius:9px;font-size:15px;font-family:inherit;min-height:46px;}
+input:focus,select:focus{outline:none;border-color:var(--gold);}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--text-muted) 50%),linear-gradient(135deg,var(--text-muted) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat;}
+
+.btn{border:none;border-radius:10px;padding:13px 18px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:48px;}
+.btn-pri{background:linear-gradient(135deg,#D4A800,#FFD700);color:#0A0C10;}
+.btn-sec{background:linear-gradient(135deg,#818CF8,#6366F1);color:#fff;}
+.btn-ghost{background:var(--card);border:1px solid var(--border);color:var(--text);}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+.btn-full{width:100%;}
+.btn-sm{padding:8px 12px;font-size:13px;min-height:38px;}
+
+.alert{border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.65;margin-bottom:12px;border:1px solid;}
+.alert-ok{background:rgba(74,222,128,.08);border-color:rgba(74,222,128,.35);color:var(--success);}
+.alert-err{background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.35);color:var(--danger);}
+.alert-warn{background:rgba(251,146,60,.08);border-color:rgba(251,146,60,.35);color:var(--warn);}
+.alert-info{background:rgba(129,140,248,.08);border-color:rgba(129,140,248,.35);color:var(--indigo);}
+
+/* 項目卡 */
+.item-card{border:1px solid var(--border);border-radius:12px;margin-bottom:11px;overflow:hidden;background:rgba(255,255,255,.02);}
+.item-head{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;}
+.item-no{width:24px;height:24px;border-radius:6px;background:rgba(129,140,248,.18);color:var(--indigo);font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.item-name{flex:1;font-size:14.5px;font-weight:700;min-width:0;}
+.item-amt{font-size:15px;font-weight:900;color:var(--gold2);white-space:nowrap;}
+.item-meta{font-size:11.5px;color:var(--text-muted);font-weight:400;margin-top:2px;}
+.item-body{padding:0 14px 14px;border-top:1px solid var(--border);}
+.src-tag{font-size:10.5px;padding:2px 7px;border-radius:5px;font-weight:700;white-space:nowrap;}
+.src-auto{background:rgba(74,222,128,.15);color:var(--success);}
+.src-man{background:rgba(251,146,60,.15);color:var(--warn);}
+
+/* 逐日表：手機不用橫向捲，改用網格 */
+.day-grid{display:grid;grid-template-columns:1fr 62px 68px 44px 40px;gap:6px;align-items:center;margin-top:10px;}
+.day-grid .gh{font-size:11px;color:var(--text-muted);text-align:center;padding-bottom:2px;}
+.day-grid input{padding:8px 6px;font-size:14px;min-height:40px;text-align:center;}
+.day-grid .dlabel{font-size:13.5px;padding-left:4px;}
+.day-grid .dlabel .wd{color:var(--text-muted);font-size:11.5px;margin-left:3px;}
+.chk{width:22px;height:22px;accent-color:var(--gold);margin:0 auto;display:block;}
+.del-btn{background:none;border:none;color:var(--danger);font-size:19px;cursor:pointer;padding:6px;line-height:1;}
+
+.sum-table{width:100%;border-collapse:collapse;font-size:14px;}
+.sum-table td{padding:9px 6px;border-bottom:1px solid var(--border);}
+.sum-table td:last-child{text-align:right;font-weight:700;white-space:nowrap;}
+.sum-table tr.total td{border-top:2px solid var(--gold);border-bottom:none;color:var(--gold2);font-size:16px;font-weight:900;padding-top:12px;}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;padding:13px 20px;border-radius:10px;font-size:14.5px;font-weight:700;z-index:99;max-width:90vw;text-align:center;}
+.toast-ok{background:#22C55E;color:#fff;} .toast-err{background:#E53E3E;color:#fff;}
+.empty-note{color:var(--text-muted);font-size:13px;text-align:center;padding:16px 8px;line-height:1.7;}
+.hint{font-size:12px;color:var(--text-muted);line-height:1.6;margin-top:6px;}
+
+@media(max-width:430px){
+  .container{padding:12px 10px 80px;}
+  .day-grid{grid-template-columns:1fr 54px 60px 40px 36px;gap:4px;}
+  .item-amt{font-size:14px;}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   天鷹保全 · 請款資料產生工具
+   ────────────────────────────────────────────────────────────────────
+   每月請款 Excel（20 分頁）自動產生。時數來源優先讀月班表代號，
+   讀不到或不適用的項目改手動輸入。
+
+   ⚠️ 這支工具算的是要跟業主請的錢，改任何計算相關的程式前，
+      務必先看懂下面「資料模型」那段註解，並跑 test/billing.test.js 對帳。
+   ════════════════════════════════════════════════════════════════════ */
+
+/* 班表 GAS（與 index.html 的 asUrl 同一支，action=getSchedule 可取整月班表） */
+const SCHEDULE_GAS_URL = 'https://script.google.com/macros/s/AKfycbzs56InZLeaHiRJhy1alNfQwDyH0mXEV9t_WJxzfjTjIhf68DHgMiWVQvVG6vKrRZ2x1w/exec';
+
+const 一般費率 = 270;
+const 假日費率 = 410;
+const WD = ['日','一','二','三','四','五','六'];
+
+/* ── 項目定義 ──────────────────────────────────────────────────
+   代號對應由咖哩 2026-08-08 親自確認：
+     海→2海底撈、N→3地下停車場、H/H2→4漢來VIP、L→5假日勤務、南→6其他(南側門)
+     7安全駕駛(VIP泊車) 不在月班表，手動輸入
+   班別：早班表 morning / 晚班表 night（海底撈的「海」在晚班表）
+   ──────────────────────────────────────────────────────────── */
+const ITEMS = [
+  { no:2, 代號:['海'], 班別:'night', 預設時:4,  預設人:1,
+    發票:'2海底撈發票', 明細:'海底撈明細', 附表:'海底撈附表一', 附表號:'一',
+    標題:'2.海底撈增派', 明細標題:'漢神巨蛋海底撈哨增派', 組別:'(一)保安組海底撈哨增派',
+    發票合計欄:'F', 發票標題合併:'A1:E1', 時數欄:'C', 計價:{一般:'E4',假日:'E7',共計:'E12'},
+    時段:{4:'06:00-10:00'} },
+  { no:3, 代號:['N'], 班別:'morning', 預設時:8, 預設人:1,
+    發票:'3停車場增派發票', 明細:'停車場增派明細', 附表:'停管附表二', 附表號:'二',
+    標題:'3.地下停車場增派', 明細標題:'漢神巨蛋地下停車場增派', 組別:'(一)停管組假日勤務支援增派',
+    發票合計欄:'F', 發票標題合併:'A1:E1', 時數欄:'C', 計價:{一般:'D6',假日:'D10',共計:'D8'},
+    時段:{8:'12:00-20:00',4:'16:00-20:00'} },
+  { no:4, 代號:['H','H2'], 班別:'morning', 代號時數:{'H':11,'H2':11.5}, 預設時:11, 預設人:1,
+    發票:'4漢來VIP發票', 明細:'漢來增派明細', 附表:'漢來增派明細附表三', 附表號:'三',
+    標題:'4.漢神巨蛋漢來前服務貴賓車增派', 明細標題:'漢神巨蛋漢來前服務貴賓車增派',
+    組別:'(一)漢來前服務貴賓車增派',
+    發票合計欄:'I', 發票標題合併:'A1:H1', 時數欄:'D', 有時數欄:true,
+    計價:{一般:'E7',假日:'E11',共計:'E9'},
+    時段:{11:'11:00-22:00',11.5:'11:00-22:30'} },
+  { no:5, 代號:['L'], 班別:'morning', 預設時:8, 預設人:1,
+    發票:'5.假日勤務支援發票', 明細:'假日勤務支援明細表', 附表:'假日勤務支援附表四', 附表號:'四',
+    標題:'5.假日勤務支援', 明細標題:'漢神巨蛋假日勤務支援', 組別:'(一)保安組假日勤務支援增派',
+    發票合計欄:'F', 發票標題合併:'A1:E1', 時數欄:'C', 計價:{一般:'E7',假日:'E11',共計:'E9'},
+    時段:{8:'12:00-20:00'} },
+  { no:6, 代號:['南'], 班別:'morning', 預設時:12, 預設人:1,
+    發票:'6.其他費用', 明細:'其他費用明細', 附表:'其他附表五', 附表號:'五',
+    標題:'6.其他費用', 明細標題:'其他費用', 組別:'(一)保安組南側門哨增派',
+    發票合計欄:'F', 發票標題合併:'A1:E1', 時數欄:'C', 計價:{一般:'D4',假日:'D8',共計:'D6'},
+    時段:{11:'南側門哨 12:00-23:00',12:'南側門哨 11:00-23:00'} },
+  { no:7, 代號:[], 班別:null, 預設時:8, 預設人:2, 手動:true,
+    發票:'7.安全駕駛費用(VIP泊車)', 明細:'安全駕駛費用(VIP泊車)明細',
+    附表:'安全駕駛費用(VIP泊車)附表六', 附表號:'六',
+    標題:'7.安全駕駛費用(VIP泊車)', 明細標題:'其他費用', 組別:'(一)安全駕駛費用(VIP泊車)哨增派',
+    發票合計欄:'F', 發票標題合併:'A1:E1', 時數欄:'C', 計價:{一般:'D4',假日:'D8',共計:'D6'},
+    時段:{8:'VIP泊車哨 12:30-20:30'} }
+];
+const ITEM_BY_NO = {}; ITEMS.forEach(it => ITEM_BY_NO[it.no] = it);
+
+const 總表項目名 = {
+  1:'保全固定每月合約費用', 2:'海底撈增派', 3:'地下停車場增派',
+  4:'漢來前服務\n貴賓車增派一人', 5:'假日勤務支援', 6:'其他增派費用',
+  7:'安全駕駛費用\n(VIP泊車)'
+};
+
+/* ════════════════════════════════════════════════════════════════
+   【資料模型 — 改動前務必看懂，這裡搞錯就會算錯錢】
+     days[] = [{ d:日, 人:當天人數, 時:每人時數, 假:是否國定假日 }]
+     每日小計H（實檔明細頁 C 欄，漢來是 D 欄）＝ 人 × 時
+       例：安全駕駛 2 人 × 8H ＝ 每日小計 16
+     金額 ＝ Σ每日小計 × 費率
+   誤把「時」當每日小計 → 2 人以上的項目少算一半
+   誤把每日小計再乘人數 → 多算一倍
+   ════════════════════════════════════════════════════════════════ */
+function 算項目(days) {
+  let 一般時 = 0, 假日時 = 0, 人次 = 0;
+  (days || []).forEach(x => {
+    const h = Number(x.時) || 0, p = Number(x.人) || 0;
+    const 小計 = h * p;
+    人次 += p;
+    if (x.假) 假日時 += 小計; else 一般時 += 小計;
+  });
+  return { 一般時, 假日時, 總時: 一般時 + 假日時, 人次,
+    一般金額: 一般時 * 一般費率, 假日金額: 假日時 * 假日費率,
+    金額: 一般時 * 一般費率 + 假日時 * 假日費率 };
+}
+
+/* 主合約：單價×人數 － 減班折抵。折抵時薪＝單價÷8÷30（照實檔算法） */
+function 算主合約(單價, 人數, 減班時數) {
+  const 基礎 = (Number(單價)||0) * (Number(人數)||0);
+  const 時薪 = (Number(單價)||0) / 8 / 30;
+  const 折抵 = Math.round(時薪 * (Number(減班時數) || 0));
+  return { 基礎, 時薪, 折抵, 金額: 基礎 - 折抵 };
+}
+
+/* 從月班表 rows 撈出某代號出現的日期。
+   rows = [{ name, shifts:[31天代號] }]，shifts[0] 是 1 號 */
+function 撈代號日期(rows, 代號清單, 天數) {
+  const 結果 = [];
+  for (let d = 1; d <= 天數; d++) {
+    const 命中 = [];
+    (rows || []).forEach(p => {
+      const code = String((p.shifts || [])[d - 1] || '').trim();
+      if (code && 代號清單.indexOf(code) >= 0) 命中.push({ name: p.name, code });
+    });
+    if (命中.length) 結果.push({ d, 命中 });
+  }
+  return 結果;
+}
+
+/* 附表用：日期列舉，每行 7 天，最後一行補「日」 */
+function 日期分行(days, 月) {
+  const ds = days.map(x => String(x.d).padStart(2, '0'));
+  const 行 = [];
+  for (let i = 0; i < ds.length; i += 7) 行.push(ds.slice(i, i + 7));
+  return 行.map((g, i) => {
+    const 尾 = (i === 行.length - 1) ? '日' : '';
+    const 前綴 = (i === 0) ? (String(月).padStart(2,'0') + '月 ') : '      ';
+    return 前綴 + g.join('、') + 尾;
+  });
+}
+
+/* 附表要把同時數的日期歸成一組（南側門那種同月有 11H 和 12H 的） */
+function 依時數分組(days) {
+  const m = new Map();
+  (days || []).forEach(x => {
+    const k = x.時 + '|' + x.人 + '|' + (x.假 ? '假' : '般');
+    if (!m.has(k)) m.set(k, { 時: x.時, 人: x.人, 假: !!x.假, days: [] });
+    m.get(k).days.push(x);
+  });
+  return Array.from(m.values()).sort((a, b) => a.days[0].d - b.days[0].d);
+}
+
+const fmt = n => Number(n || 0).toLocaleString('en-US');
+const 月天數 = (西元年, 月) => new Date(西元年, 月, 0).getDate();
+
+/* ════════════════════════════════════════════════════════════════
+   xlsx 產生（ExcelJS）— 分頁順序照 115年7、8月實檔的 20 分頁標準結構
+   ────────────────────────────────────────────────────────────────
+   兩個踩過的坑（沿用 tool_guard_gen.html 的經驗）：
+     1. mergeCells 一定要在逐格設定樣式「之後」，否則合併範圍最後一格的
+        樣式會蓋掉 anchor 格（標題靠左會被中間格的置中蓋掉）。
+     2. pageSetup 要一併寫入，否則每次列印都要重設橫向/縮放。
+   另：ExcelJS 的 formula 欄位「不要」寫開頭的等號，寫了會變成 ==SUM(...)。
+   ════════════════════════════════════════════════════════════════ */
+const 細線 = { style: 'thin' };
+const 四邊 = { top: 細線, bottom: 細線, left: 細線, right: 細線 };
+const 字型 = (size, bold) => ({ name: '微軟正黑體', size: size || 12, bold: !!bold });
+/* 公式一律走這個 helper：自動去掉多寫的等號，並強制帶 result
+   （ExcelJS 不會自己算，沒帶 result 別的程式讀這個檔會拿不到值） */
+const 公式 = (f, result) => ({ formula: String(f).replace(/^=+/, ''), result: result });
+
+function 建頁(wb, name, opt) {
+  return wb.addWorksheet(name, { pageSetup: {
+    paperSize: 9, orientation: (opt && opt.landscape) ? 'landscape' : 'portrait',
+    fitToPage: true, fitToWidth: 1, fitToHeight: 1, horizontalCentered: true,
+    margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0, footer: 0 }
+  }});
+}
+function 收尾(ws, 範圍, merges) {
+  for (let r = 範圍.r1; r <= 範圍.r2; r++) {
+    for (let c = 範圍.c1; c <= 範圍.c2; c++) {
+      const cell = ws.getCell(r, c);
+      cell.border = 四邊;
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      if (!cell.font) cell.font = 字型(12);
+    }
+  }
+  (merges || []).forEach(m => { try { ws.mergeCells(m); } catch (e) {} });
+}
+/* 'E4' 位移 (下dr, 右dc) → 'F4'。用來從計價區塊錨點推出各格位置 */
+function 位移(addr, dr, dc) {
+  const m = String(addr).match(/^([A-Z]+)(\d+)$/);
+  return String.fromCharCode(m[1].charCodeAt(0) + dc) + (parseInt(m[2], 10) + dr);
+}
+const 下一欄 = ch => String.fromCharCode(ch.charCodeAt(0) + 1);
+
+function 建總表(wb, cfg, 結果) {
+  const ws = 建頁(wb, '總表');
+  [14, 24, 14, 14, 46].forEach((w, i) => ws.getColumn(i + 1).width = w);
+  ws.getCell('A1').value = '天鷹保全駐警保全服務費用' + cfg.民國年 + ' 年 ' + String(cfg.月).padStart(2,'0') + ' 月(未稅)';
+  ws.getCell('A1').font = 字型(14, true);
+  ['項次','內容','預估金額','金額','撙節(增加)經費原因'].forEach((t, i) => {
+    ws.getCell(2, i + 1).value = t; ws.getCell(2, i + 1).font = 字型(12, true);
+  });
+  const mc = 算主合約(cfg.主合約.單價, cfg.主合約.人數, cfg.主合約.減班時數);
+  ws.getCell('A3').value = 1;
+  ws.getCell('B3').value = 總表項目名[1];
+  ws.getCell('C3').value = mc.基礎;
+  ws.getCell('D3').value = mc.金額;
+  ws.getCell('E3').value = 主合約說明(cfg, mc);
+  ws.getRow(3).height = 92;
+
+  let r = 4;
+  ITEMS.forEach(it => {
+    const ref = "'" + it.發票 + "'!" + it.發票合計欄 + '1';
+    ws.getCell(r, 1).value = it.no;
+    ws.getCell(r, 2).value = 總表項目名[it.no];
+    ws.getCell(r, 3).value = 公式(ref, 結果[it.no].金額);
+    ws.getCell(r, 4).value = 公式(ref, 結果[it.no].金額);
+    r++;
+  });
+  (cfg.臨時項目 || []).forEach((it, i) => {
+    const res = 算項目(it.days);
+    ws.getCell(r, 1).value = 8 + i;
+    ws.getCell(r, 2).value = it.名稱;
+    ws.getCell(r, 3).value = res.金額;
+    ws.getCell(r, 4).value = res.金額;
+    r++;
+  });
+  const 末 = r;
+  const 增派總 = ITEMS.reduce((s, it) => s + 結果[it.no].金額, 0)
+    + (cfg.臨時項目 || []).reduce((s, it) => s + 算項目(it.days).金額, 0);
+  ws.getCell(末, 1).value = '總計';
+  ws.getCell(末, 1).font = 字型(12, true);
+  ws.getCell(末, 3).value = 公式('SUM(C3:C' + (末-1) + ')', mc.基礎 + 增派總);
+  ws.getCell(末, 4).value = 公式('SUM(D3:D' + (末-1) + ')', mc.金額 + 增派總);
+  收尾(ws, { r1:1, r2:末, c1:1, c2:5 }, ['A1:E1', 'A'+末+':B'+末]);
+  ws.getCell('E3').alignment = { horizontal:'left', vertical:'middle', wrapText:true };
+}
+
+function 主合約說明(cfg, mc) {
+  const M = String(cfg.月).padStart(2, '0');
+  const 末日 = 月天數(cfg.民國年 + 1911, cfg.月);
+  if (!Number(cfg.主合約.減班時數)) return cfg.民國年 + '年合約人數' + cfg.主合約.人數 + '人。';
+  return '1.' + cfg.民國年 + '年合約人數' + cfg.主合約.人數 + '人。\n'
+    + '2.' + M + '月01至' + M + '月' + 末日 + '日因人力效率化減班，縮減合約時數共' + cfg.主合約.減班時數 + '小時。\n'
+    + '3.' + fmt(cfg.主合約.單價) + '÷8÷30＝' + mc.時薪 + '元。\n'
+    + '4.' + mc.時薪 + '×' + cfg.主合約.減班時數 + '=' + mc.折抵 + '元。\n'
+    + fmt(mc.基礎) + '-' + mc.折抵 + '=' + fmt(mc.金額) + '元。';
+}
+
+function 建主合約頁(wb, cfg) {
+  const ws = 建頁(wb, '1主合約發票');
+  for (let c = 1; c <= 9; c++) ws.getColumn(c).width = 13;
+  const M = String(cfg.月).padStart(2, '0');
+  const 末日 = 月天數(cfg.民國年 + 1911, cfg.月);
+  const mc = 算主合約(cfg.主合約.單價, cfg.主合約.人數, cfg.主合約.減班時數);
+  ws.getCell('A1').value = '漢神巨蛋' + cfg.民國年 + '年 ' + M + ' 月份服務費用請款明細表(主合約)';
+  ws.getCell('A1').font = 字型(16, true);
+  ws.getCell('A2').value = M + '月01日至' + M + '月' + 末日 + '日保全固定每月合約費用';
+  ws.getCell('A2').font = 字型(14);
+  ws.getCell('A3').value = fmt(cfg.主合約.單價) + '元 × ' + cfg.主合約.人數 + '人 = ' + fmt(mc.基礎) + '元(未稅)';
+  ws.getCell('A3').font = 字型(14);
+  const merges = ['A1:I1','A2:I2','A3:I3'];
+  if (Number(cfg.主合約.減班時數)) {
+    [ '1.' + M + '月01至' + M + '月' + 末日 + '日因人力效率化減班\n   縮減合約時數共為' + cfg.主合約.減班時數 + '小時。',
+      '2.' + fmt(cfg.主合約.單價) + '÷8÷30=' + mc.時薪 + '元。',
+      '3.' + mc.時薪 + '×' + cfg.主合約.減班時數 + '=' + mc.折抵 + '元。',
+      '4.' + fmt(mc.基礎) + '－' + mc.折抵 + '=' + fmt(mc.金額) + '元'
+    ].forEach((t, i) => {
+      const r = 29 + i;
+      ws.getCell(r, 3).value = t;
+      ws.getCell(r, 3).alignment = { horizontal:'left', vertical:'middle', wrapText:true };
+      ws.getCell(r, 3).font = 字型(12);
+      merges.push('C' + r + ':I' + r);
+    });
+  }
+  merges.forEach(m => { try { ws.mergeCells(m); } catch (e) {} });
+}
+
+function 建發票頁(wb, it, 結果) {
+  const ws = 建頁(wb, it.發票);
+  for (let c = 1; c <= 10; c++) ws.getColumn(c).width = 13;
+  ws.getCell('A1').value = it.標題;
+  ws.getCell('A1').font = 字型(16, true);
+  ws.getCell('A1').alignment = { horizontal:'left', vertical:'middle', wrapText:true };
+  const 一般格 = 位移(it.計價.一般, 1, 4), 假日格 = 位移(it.計價.假日, 1, 4);
+  ws.getCell(it.發票合計欄 + '1').value =
+    公式("'" + it.明細 + "'!" + 一般格 + "+'" + it.明細 + "'!" + 假日格, 結果.金額);
+  ws.getCell(it.發票合計欄 + '1').font = 字型(14, true);
+  ws.getCell(下一欄(it.發票合計欄) + '1').value = '元';
+  try { ws.mergeCells(it.發票標題合併); } catch (e) {}
+}
+
+function 建明細頁(wb, it, cfg, days) {
+  const ws = 建頁(wb, it.明細);
+  for (let c = 1; c <= 10; c++) ws.getColumn(c).width = 12;
+  const M = String(cfg.月).padStart(2, '0');
+  ws.getCell('A1').value = it.明細標題;      ws.getCell('A1').font = 字型(14, true);
+  ws.getCell('A2').value = cfg.民國年 + '年' + M + '月服務費請款時數明細表';
+  ws.getCell('A2').font = 字型(13, true);
+  // 漢來明細的欄序與其他頁不同：B時數 C人數 D小計（實檔如此，不要「統一」掉）
+  const 表頭 = it.有時數欄 ? ['日期','時數','人數','每日小計H'] : ['日期','人數','每日小計H'];
+  表頭.forEach((t, i) => { ws.getCell(3, i+1).value = t; ws.getCell(3, i+1).font = 字型(12, true); });
+
+  days.forEach((x, i) => {
+    const r = 4 + i;
+    ws.getCell(r, 1).value = new Date(cfg.民國年 + 1911, cfg.月 - 1, x.d);
+    ws.getCell(r, 1).numFmt = 'yyyy/m/d';
+    if (it.有時數欄) {
+      ws.getCell(r, 2).value = x.時;
+      ws.getCell(r, 3).value = x.人;
+      ws.getCell(r, 4).value = 公式('B'+r+'*C'+r, x.時 * x.人);
+    } else {
+      ws.getCell(r, 2).value = x.人;
+      ws.getCell(r, 3).value = x.時 * x.人;
+    }
+  });
+
+  // 總計固定第 35 列（資料 R4:R34 剛好容納 31 天）。
+  // 實檔有幾頁放 R34 且 SUM 只加到第 33 列，滿月會漏算最後一天，這裡統一修正。
+  const res = 算項目(days), 總 = 35, 時欄 = it.時數欄;
+  ws.getCell(總, 1).value = '總計'; ws.getCell(總, 1).font = 字型(12, true);
+  const 時數和 = days.reduce((s, x) => s + (Number(x.時) || 0), 0);
+  ws.getCell(總, 2).value = 公式('SUM(B4:B34)', it.有時數欄 ? 時數和 : res.人次);
+  if (it.有時數欄) ws.getCell(總, 3).value = 公式('SUM(C4:C34)', res.人次);
+  ws.getCell(時欄 + 總).value = 公式('SUM(' + 時欄 + '4:' + 時欄 + '34)', res.總時);
+  寫計價(ws, it, 總, res);
+  ws.getCell(37, 1).value = '※時數明細請參閱附表' + it.附表號;
+  收尾(ws, { r1:3, r2:總, c1:1, c2: it.有時數欄 ? 4 : 3 }, ['A37:G37']);
+}
+
+/* 計價區塊：(一)一般270 (二)國定假日410 (共計)。錨點逐項不同，見 ITEMS.計價 */
+function 寫計價(ws, it, 總列, res) {
+  const p = it.計價, 時欄 = it.時數欄;
+  const put = (addr, v, f) => { const c = ws.getCell(addr); c.value = v; c.font = f || 字型(12); };
+  put(p.一般, '(一)');
+  put(位移(p.一般, 0, 1), '一般增派(每小時' + 一般費率 + '元)');
+  const r1 = 位移(p.一般, 1, 0);
+  put(r1, 一般費率);
+  put(位移(r1, 0, 1), '元×');
+  ws.getCell(位移(r1, 0, 2)).value = 公式(時欄 + 總列, res.一般時);
+  put(位移(r1, 0, 3), '小時=');
+  ws.getCell(位移(r1, 0, 4)).value = 公式(位移(r1,0,0) + '*' + 位移(r1,0,2), res.一般金額);
+  put(位移(r1, 0, 5), '元');
+
+  put(p.假日, '(二)');
+  put(位移(p.假日, 0, 1), '國定假日增派(每小時' + 假日費率 + '元)');
+  const r2 = 位移(p.假日, 1, 0);
+  put(r2, 假日費率);
+  put(位移(r2, 0, 1), '元×');
+  put(位移(r2, 0, 2), res.假日時);
+  put(位移(r2, 0, 3), '小時=');
+  ws.getCell(位移(r2, 0, 4)).value = 公式(位移(r2,0,0) + '*' + 位移(r2,0,2), res.假日金額);
+  put(位移(r2, 0, 5), '元');
+
+  put(p.共計, '共計:', 字型(12, true));
+  ws.getCell(位移(p.共計, 0, 1)).value = 公式(位移(r1,0,4) + '+' + 位移(r2,0,4), res.金額);
+  ws.getCell(位移(p.共計, 0, 1)).font = 字型(13, true);
+  put(位移(p.共計, 0, 3), '元(未稅)');
+}
+
+function 建附表(wb, it, cfg, days) {
+  const ws = 建頁(wb, it.附表);
+  for (let c = 1; c <= 12; c++) ws.getColumn(c).width = 11;
+  ws.getCell('B1').value = '附表' + it.附表號; ws.getCell('B1').font = 字型(16, true);
+  ws.getCell('B2').value = '    ' + it.組別;   ws.getCell('B2').font = 字型(13, true);
+  ws.getCell('B2').alignment = { horizontal:'left', vertical:'middle' };
+  const merges = ['B1:L1','B2:F2'];
+  const 靠左 = r => { ws.getCell(r,2).alignment = { horizontal:'left', vertical:'middle' }; ws.getCell(r,2).font = 字型(12); };
+  let r = 3, 總時 = 0;
+  依時數分組(days).forEach(g => {
+    日期分行(g.days, cfg.月).forEach(t => {
+      ws.getCell(r, 2).value = t; 靠左(r); merges.push('B'+r+':E'+r); r++;
+    });
+    const 小時 = g.時 * g.人 * g.days.length;
+    總時 += 小時;
+    ws.getCell(r, 2).value = '        ' + ((it.時段 && it.時段[g.時]) || (g.時 + '小時時段'))
+      + '(' + g.時 + '小時) ×' + g.人 + '人' + (g.假 ? '【國定假日】' : '');
+    靠左(r);
+    ws.getCell(r, 6).value = 小時 + '小時';
+    merges.push('B'+r+':E'+r); r++;
+    ws.getCell(r,3).value='每日共計'; ws.getCell(r,4).value=g.時*g.人; ws.getCell(r,5).value='小時'; r++;
+    ws.getCell(r,3).value='共小計';   ws.getCell(r,4).value=小時;      ws.getCell(r,5).value='小時'; r++;
+    r++;
+  });
+  const 末 = Math.max(30, r + 1);
+  ws.getCell(末,3).value = '以上共計'; ws.getCell(末,3).font = 字型(12, true);
+  ws.getCell(末,4).value = 總時;       ws.getCell(末,4).font = 字型(12, true);
+  ws.getCell(末,5).value = '小時';
+  merges.forEach(m => { try { ws.mergeCells(m); } catch (e) {} });
+}
+
+function buildWorkbook(ExcelJSLib, cfg) {
+  const wb = new ExcelJSLib.Workbook();
+  const 結果 = {};
+  ITEMS.forEach(it => { 結果[it.no] = 算項目((cfg.items[it.no] || {}).days || []); });
+  建總表(wb, cfg, 結果);
+  建主合約頁(wb, cfg);
+  ITEMS.forEach(it => {
+    const days = (cfg.items[it.no] || {}).days || [];
+    建發票頁(wb, it, 結果[it.no]);
+    建明細頁(wb, it, cfg, days);
+    建附表(wb, it, cfg, days);
+  });
+  return wb;
+}
+
+try { if (typeof module !== 'undefined') Object.assign(module.exports, {
+  一般費率, 假日費率, ITEMS, ITEM_BY_NO, 總表項目名,
+  算項目, 算主合約, 撈代號日期, 日期分行, 依時數分組, 月天數,
+  buildWorkbook, 位移, 公式
+}); } catch (e) {}
+
+/* ════════════════════════════════════════════════════════════════
+   以下為畫面（React 18.3.1，不經 Babel，統一用 h() 建元素）
+   ════════════════════════════════════════════════════════════════ */
+if (typeof window !== 'undefined' && window.React) {
+const { useState, useEffect, useMemo } = React;
+const h = React.createElement;
+
+/* 工號沿用主控台傳來的 ?empId=，返回時要帶回去（天鷹規範：工號不可遺失） */
+const EMP_ID = new URLSearchParams(location.search).get('empId') || '';
+const 返回網址 = 'index.html' + (EMP_ID ? ('?empId=' + encodeURIComponent(EMP_ID)) : '');
+
+function Toast({ msg }) {
+  if (!msg) return null;
+  return h('div', { className: 'toast toast-' + msg.type }, msg.text);
+}
+
+/* 逐日編輯表。手機優先：用網格排版，不做橫向捲動 */
+function DayEditor({ 民國年, 月, days, onChange, 預設時, 預設人 }) {
+  const 西元 = 民國年 + 1911;
+  const 天數 = 月天數(西元, 月);
+  const 已用 = days.map(x => x.d);
+  const 可加 = [];
+  for (let d = 1; d <= 天數; d++) if (已用.indexOf(d) < 0) 可加.push(d);
+  const [新日, set新日] = useState('');
+
+  const 改 = (i, k, v) => {
+    const n = days.slice();
+    n[i] = Object.assign({}, n[i], { [k]: v });
+    onChange(n);
+  };
+  const 刪 = i => onChange(days.filter((_, j) => j !== i));
+  const 加 = () => {
+    const d = parseInt(新日, 10);
+    if (!d) return;
+    // 新增的一天沿用「最後一天」的人數時數（同項目通常一樣），
+    // 表是空的才退回該項目的預設值（海底撈4H、泊車8H×2人…），不要一律給8
+    const 樣本 = days[days.length - 1] || {};
+    const n = days.concat([{
+      d,
+      人: 樣本.人 != null ? 樣本.人 : (預設人 || 1),
+      時: 樣本.時 != null ? 樣本.時 : (預設時 || 8),
+      假: false
+    }]);
+    n.sort((a, b) => a.d - b.d);
+    onChange(n); set新日('');
+  };
+
+  return h('div', null,
+    days.length === 0
+      ? h('div', { className: 'empty-note' }, '這個項目本月沒有資料。如果實際有，用下面的「新增日期」加進來。')
+      : h('div', { className: 'day-grid' },
+          h('div', { className: 'gh' }, '日期'),
+          h('div', { className: 'gh' }, '人數'),
+          h('div', { className: 'gh' }, '每人時數'),
+          h('div', { className: 'gh' }, '國定\n假日'),
+          h('div', { className: 'gh' }, ''),
+          ...days.map((x, i) => [
+            h('div', { key: 'd' + i, className: 'dlabel' },
+              String(x.d) + '日',
+              h('span', { className: 'wd' }, '(' + WD[new Date(西元, 月 - 1, x.d).getDay()] + ')')),
+            h('input', { key: 'p' + i, type: 'number', min: '0', step: '1', value: x.人,
+              onChange: e => 改(i, '人', parseFloat(e.target.value) || 0) }),
+            h('input', { key: 'h' + i, type: 'number', min: '0', step: '0.5', value: x.時,
+              onChange: e => 改(i, '時', parseFloat(e.target.value) || 0) }),
+            h('input', { key: 'f' + i, type: 'checkbox', className: 'chk', checked: !!x.假,
+              onChange: e => 改(i, '假', e.target.checked) }),
+            h('button', { key: 'x' + i, className: 'del-btn', title: '刪除這天',
+              onClick: () => 刪(i) }, '×')
+          ]).reduce((a, b) => a.concat(b), [])
+        ),
+    h('div', { className: 'row', style: { marginTop: '10px', alignItems: 'flex-end' } },
+      h('div', { className: 'field', style: { marginBottom: 0 } },
+        h('label', null, '新增日期'),
+        h('select', { value: 新日, onChange: e => set新日(e.target.value) },
+          h('option', { value: '' }, '選擇…'),
+          ...可加.map(d => h('option', { key: d, value: d },
+            d + '日 (' + WD[new Date(西元, 月 - 1, d).getDay()] + ')')))),
+      h('button', { className: 'btn btn-ghost btn-sm', onClick: 加, disabled: !新日 }, '＋ 加入'))
+  );
+}
+
+function ItemCard({ it, 民國年, 月, data, onChange, 展開, setToggle, 來源 }) {
+  const res = 算項目(data.days);
+  return h('div', { className: 'item-card' },
+    h('div', { className: 'item-head', onClick: setToggle },
+      h('div', { className: 'item-no' }, it.no),
+      h('div', { className: 'item-name' },
+        總表項目名[it.no].replace('\n', ''),
+        h('div', { className: 'item-meta' },
+          data.days.length + ' 天 · ' + res.總時 + ' 小時',
+          res.假日時 ? ('（含假日 ' + res.假日時 + 'H）') : '')),
+      h('span', { className: 'src-tag ' + (來源 === 'auto' ? 'src-auto' : 'src-man') },
+        來源 === 'auto' ? ('班表 ' + it.代號.join('/')) : '手動'),
+      h('div', { className: 'item-amt' }, '$' + fmt(res.金額)),
+      h('i', { className: 'ti ti-chevron-' + (展開 ? 'up' : 'down'), style: { color: '#8A95A8' } })),
+    展開 && h('div', { className: 'item-body' },
+      h(DayEditor, { 民國年, 月, days: data.days, 預設時: it.預設時, 預設人: it.預設人,
+        onChange: nd => onChange(Object.assign({}, data, { days: nd })) }),
+      h('div', { className: 'hint' },
+        '一般 ' + res.一般時 + 'H × ' + 一般費率 + ' = $' + fmt(res.一般金額) +
+        (res.假日時 ? ('　假日 ' + res.假日時 + 'H × ' + 假日費率 + ' = $' + fmt(res.假日金額)) : '')))
+  );
+}
+
+function App() {
+  const 今 = new Date();
+  const [民國年, set民國年] = useState(今.getFullYear() - 1911);
+  const [月, set月] = useState(今.getMonth() + 1);
+  const [主合約, set主合約] = useState({ 單價: 55200, 人數: 38, 減班時數: 0 });
+  const [items, setItems] = useState(() => {
+    const o = {}; ITEMS.forEach(it => o[it.no] = { days: [] }); return o;
+  });
+  const [來源, set來源] = useState({});      // {項次: 'auto'|'manual'}
+  const [臨時, set臨時] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [班表狀態, set班表狀態] = useState(null);
+  const [展開, set展開] = useState(null);
+  const [toast, setToast] = useState(null);
+  const 提示 = (text, type) => { setToast({ text, type: type || 'ok' }); setTimeout(() => setToast(null), 2600); };
+
+  const 結果 = useMemo(() => {
+    const o = {}; ITEMS.forEach(it => o[it.no] = 算項目(items[it.no].days)); return o;
+  }, [items]);
+  const mc = 算主合約(主合約.單價, 主合約.人數, 主合約.減班時數);
+  const 臨時金額 = 臨時.reduce((s, t) => s + 算項目(t.days).金額, 0);
+  const 總金額 = mc.金額 + ITEMS.reduce((s, it) => s + 結果[it.no].金額, 0) + 臨時金額;
+
+  /* 讀月班表 → 依代號自動帶出各項日期。
+     線上班表只有「當月」一份，月份不符時一律不套用——寧可讓咖哩手動輸入，
+     也不能拿錯月份的資料去請款。 */
+  async function 讀班表() {
+    setBusy(true); set班表狀態(null);
+    try {
+      const 期望 = 民國年 + 1911 + '/' + String(月).padStart(2, '0');
+      const 資料 = {};
+      for (const shift of ['morning', 'night']) {
+        const res = await fetch(SCHEDULE_GAS_URL + '?action=getSchedule&shift=' + shift);
+        const d = await res.json();
+        if (!d.success || !Array.isArray(d.rows)) throw new Error('班表回應異常（' + shift + '）');
+        資料[shift] = d;
+      }
+      const 月份們 = ['morning', 'night'].map(s => String(資料[s].ym || '').trim());
+      const 不符 = 月份們.filter(y => y && y !== 期望);
+      if (不符.length) {
+        set班表狀態({ ok: false,
+          msg: '線上班表目前是 ' + 月份們.join(' / ') + ' 的資料，你要做的是 ' + 期望 +
+               '。線上班表只保留當月一份，沒有歷史月份，所以這個月的日期請手動輸入，' +
+               '我不會拿別的月份的資料填進去。' });
+        setBusy(false); return;
+      }
+      const 天數 = 月天數(民國年 + 1911, 月);
+      const 新items = {}, 新來源 = {};
+      ITEMS.forEach(it => {
+        if (it.手動 || !it.代號.length) { 新items[it.no] = items[it.no]; 新來源[it.no] = 'manual'; return; }
+        const rows = 資料[it.班別 === 'night' ? 'night' : 'morning'].rows;
+        const 命中 = 撈代號日期(rows, it.代號, 天數);
+        新items[it.no] = { days: 命中.map(x => ({
+          d: x.d,
+          人: x.命中.length,
+          // 同一代號可能對應不同時數（漢來 H=11、H2=11.5），以當天第一個人的代號為準
+          時: (it.代號時數 && it.代號時數[x.命中[0].code]) || it.預設時,
+          假: false
+        })) };
+        新來源[it.no] = 'auto';
+      });
+      setItems(新items); set來源(新來源);
+      const 抓到 = ITEMS.filter(it => !it.手動).reduce((s, it) => s + 新items[it.no].days.length, 0);
+      set班表狀態({ ok: true, msg: '已讀取 ' + 期望 + ' 月班表，自動帶出 ' + 抓到 +
+        ' 天的增派紀錄。請逐項確認時數與人數，國定假日要自己勾（系統不會自己判斷）。' });
+      提示('班表讀取完成');
+    } catch (e) {
+      set班表狀態({ ok: false, msg: '讀取失敗：' + e.message + '。可以改用手動輸入，不影響產生檔案。' });
+      提示('讀取失敗', 'err');
+    }
+    setBusy(false);
+  }
+
+  async function 下載() {
+    setBusy(true);
+    try {
+      const cfg = { 民國年, 月, 主合約, items, 臨時項目: 臨時 };
+      const wb = buildWorkbook(ExcelJS, cfg);
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '115_' + String(月).padStart(2, '0') + '月漢神巨蛋請款資料.xlsx';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      提示('已下載');
+    } catch (e) { 提示('產生失敗：' + e.message, 'err'); }
+    setBusy(false);
+  }
+
+  const 加臨時 = () => set臨時(臨時.concat([{ 名稱: '', days: [] }]));
+
+  return h('div', { className: 'container' },
+    h('div', { className: 'header' },
+      h('a', { className: 'back-btn', href: 返回網址 }, h('i', { className: 'ti ti-arrow-left' }), '返回'),
+      h('div', { className: 'title-wrap' },
+        h('div', { className: 'title-main' }, '請款資料產生'),
+        h('div', { className: 'title-sub' }, 'TIANYING SECURITY · BILLING')),
+      h('div', { style: { width: '86px' } })),
+
+    /* 步驟一 */
+    h('div', { className: 'card' },
+      h('div', { className: 'step-head' },
+        h('div', { className: 'step-no' }, '1'),
+        h('div', { className: 'step-title' }, '基本設定')),
+      h('div', { className: 'row' },
+        h('div', { className: 'field' }, h('label', null, '民國年'),
+          h('input', { type: 'number', value: 民國年, onChange: e => set民國年(parseInt(e.target.value) || 0) })),
+        h('div', { className: 'field' }, h('label', null, '月份'),
+          h('select', { value: 月, onChange: e => set月(parseInt(e.target.value)) },
+            ...Array.from({ length: 12 }, (_, i) => h('option', { key: i, value: i + 1 }, (i + 1) + ' 月'))))),
+      h('div', { className: 'row' },
+        h('div', { className: 'field' }, h('label', null, '合約單價'),
+          h('input', { type: 'number', value: 主合約.單價,
+            onChange: e => set主合約(Object.assign({}, 主合約, { 單價: parseFloat(e.target.value) || 0 })) })),
+        h('div', { className: 'field' }, h('label', null, '合約人數'),
+          h('input', { type: 'number', value: 主合約.人數,
+            onChange: e => set主合約(Object.assign({}, 主合約, { 人數: parseFloat(e.target.value) || 0 })) })),
+        h('div', { className: 'field' }, h('label', null, '減班時數'),
+          h('input', { type: 'number', step: '0.5', value: 主合約.減班時數,
+            onChange: e => set主合約(Object.assign({}, 主合約, { 減班時數: parseFloat(e.target.value) || 0 })) }))),
+      h('div', { className: 'hint' },
+        '主合約 = ' + fmt(主合約.單價) + ' × ' + 主合約.人數 + '人 = ' + fmt(mc.基礎) + '元'
+        + (主合約.減班時數 ? ('，減班折抵 ' + mc.時薪 + '元 × ' + 主合約.減班時數 + '小時 = ' + fmt(mc.折抵) + '元 → 實收 ' + fmt(mc.金額) + '元') : '')),
+      h('button', { className: 'btn btn-sec btn-full', style: { marginTop: '12px' }, onClick: 讀班表, disabled: busy },
+        h('i', { className: 'ti ti-cloud-download' }), busy ? '讀取中…' : '讀取月班表，自動帶入時數'),
+      班表狀態 && h('div', { className: 'alert ' + (班表狀態.ok ? 'alert-ok' : 'alert-warn'), style: { marginTop: '12px', marginBottom: 0 } }, 班表狀態.msg)),
+
+    /* 步驟二 */
+    h('div', { className: 'card' },
+      h('div', { className: 'step-head' },
+        h('div', { className: 'step-no' }, '2'),
+        h('div', { className: 'step-title' }, '各項確認')),
+      ...ITEMS.map(it => h(ItemCard, {
+        key: it.no, it, 民國年, 月, data: items[it.no],
+        來源: 來源[it.no] || (it.手動 ? 'manual' : 'manual'),
+        展開: 展開 === it.no,
+        setToggle: () => set展開(展開 === it.no ? null : it.no),
+        onChange: nd => setItems(Object.assign({}, items, { [it.no]: nd }))
+      })),
+      ...臨時.map((t, i) => h('div', { key: 'x' + i, className: 'item-card' },
+        h('div', { className: 'item-head' },
+          h('div', { className: 'item-no' }, 8 + i),
+          h('div', { className: 'item-name', style: { paddingRight: '8px' } },
+            h('input', { type: 'text', placeholder: '臨時項目名稱（例：週年慶增派）', value: t.名稱,
+              onChange: e => { const n = 臨時.slice(); n[i] = Object.assign({}, t, { 名稱: e.target.value }); set臨時(n); } })),
+          h('div', { className: 'item-amt' }, '$' + fmt(算項目(t.days).金額)),
+          h('button', { className: 'del-btn', onClick: () => set臨時(臨時.filter((_, j) => j !== i)) }, '×')),
+        h('div', { className: 'item-body' },
+          h(DayEditor, { 民國年, 月, days: t.days,
+            onChange: nd => { const n = 臨時.slice(); n[i] = Object.assign({}, t, { days: nd }); set臨時(n); } })))),
+      h('button', { className: 'btn btn-ghost btn-full btn-sm', style: { marginTop: '4px' }, onClick: 加臨時 },
+        h('i', { className: 'ti ti-plus' }), '新增臨時項目')),
+
+    /* 步驟三 */
+    h('div', { className: 'card' },
+      h('div', { className: 'step-head' },
+        h('div', { className: 'step-no' }, '3'),
+        h('div', { className: 'step-title' }, '總表預覽')),
+      h('table', { className: 'sum-table' }, h('tbody', null,
+        h('tr', null, h('td', null, '1. ' + 總表項目名[1]), h('td', null, fmt(mc.金額))),
+        ...ITEMS.map(it => h('tr', { key: it.no },
+          h('td', null, it.no + '. ' + 總表項目名[it.no].replace('\n', '')),
+          h('td', null, fmt(結果[it.no].金額)))),
+        ...臨時.map((t, i) => h('tr', { key: 'x' + i },
+          h('td', null, (8 + i) + '. ' + (t.名稱 || '（未命名）')),
+          h('td', null, fmt(算項目(t.days).金額)))),
+        h('tr', { className: 'total' }, h('td', null, '總計（未稅）'), h('td', null, fmt(總金額))))),
+      h('button', { className: 'btn btn-pri btn-full', style: { marginTop: '14px' }, onClick: 下載, disabled: busy },
+        h('i', { className: 'ti ti-file-spreadsheet' }), '產生 xlsx 下載'),
+      h('div', { className: 'hint' },
+        '產生的檔案是 20 分頁的完整請款資料（總表＋主合約＋各項發票/明細/附表），列印格式已內建橫向縮一頁。')),
+
+    h(Toast, { msg: toast })
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+}
+</script>
+</body>
+</html>
