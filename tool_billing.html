@@ -186,11 +186,14 @@ function 算項目(days) {
     金額: 一般時 * 一般費率 + 假日時 * 假日費率 };
 }
 
-/* 主合約：單價×人數 － 減班折抵。折抵時薪＝單價÷8÷30（照實檔算法） */
+/* 主合約：單價×人數 － 減班折抵。折抵時薪＝單價÷8÷30（照實檔算法）
+   時薪先四捨五入成整數再乘時數：實檔 55,200÷8÷30 剛好＝230 整數，但單價一改成
+   非 240 倍數就會變成 229.16666…，說明欄印出來的算式會跟折抵金額對不起來
+   （業主看的是那行算式，數字要能自己乘得出來）。 */
 function 算主合約(單價, 人數, 減班時數) {
   const 基礎 = (Number(單價)||0) * (Number(人數)||0);
-  const 時薪 = (Number(單價)||0) / 8 / 30;
-  const 折抵 = Math.round(時薪 * (Number(減班時數) || 0));
+  const 時薪 = Math.round((Number(單價)||0) / 8 / 30);
+  const 折抵 = 時薪 * (Number(減班時數) || 0);
   return { 基礎, 時薪, 折抵, 金額: 基礎 - 折抵 };
 }
 
@@ -275,6 +278,15 @@ function 位移(addr, dr, dc) {
   return String.fromCharCode(m[1].charCodeAt(0) + dc) + (parseInt(m[2], 10) + dr);
 }
 const 下一欄 = ch => String.fromCharCode(ch.charCodeAt(0) + 1);
+
+/* ⚠️ 以下版面常數「只能有這一份定義」。
+   發票頁要「引用」金額格、明細頁要「寫入」金額格，兩邊算出來的位置必須一致；
+   一旦各寫一份，改了一邊就會變成發票抓到空格。
+   （這個 repo 2026-08-08 才因為 H2 時間寫在兩處而改漏一邊，同一種坑不要再踩。） */
+const 金額格 = 錨點 => 位移(錨點, 1, 4);   // 計價區塊：(一)/(二) 錨點往下1列、往右4欄
+const 資料首列 = 4;                        // 明細頁逐日資料起始列
+const 資料末列 = 34;                       // 4~34 剛好容納 31 天
+const 總計列 = 35;
 
 function 建總表(wb, cfg, 結果) {
   const ws = 建頁(wb, '總表');
@@ -366,7 +378,7 @@ function 建發票頁(wb, it, 結果) {
   ws.getCell('A1').value = it.標題;
   ws.getCell('A1').font = 字型(16, true);
   ws.getCell('A1').alignment = { horizontal:'left', vertical:'middle', wrapText:true };
-  const 一般格 = 位移(it.計價.一般, 1, 4), 假日格 = 位移(it.計價.假日, 1, 4);
+  const 一般格 = 金額格(it.計價.一般), 假日格 = 金額格(it.計價.假日);
   ws.getCell(it.發票合計欄 + '1').value =
     公式("'" + it.明細 + "'!" + 一般格 + "+'" + it.明細 + "'!" + 假日格, 結果.金額);
   ws.getCell(it.發票合計欄 + '1').font = 字型(14, true);
@@ -386,7 +398,7 @@ function 建明細頁(wb, it, cfg, days) {
   表頭.forEach((t, i) => { ws.getCell(3, i+1).value = t; ws.getCell(3, i+1).font = 字型(12, true); });
 
   days.forEach((x, i) => {
-    const r = 4 + i;
+    const r = 資料首列 + i;
     ws.getCell(r, 1).value = new Date(cfg.民國年 + 1911, cfg.月 - 1, x.d);
     ws.getCell(r, 1).numFmt = 'yyyy/m/d';
     if (it.有時數欄) {
@@ -399,14 +411,15 @@ function 建明細頁(wb, it, cfg, days) {
     }
   });
 
-  // 總計固定第 35 列（資料 R4:R34 剛好容納 31 天）。
-  // 實檔有幾頁放 R34 且 SUM 只加到第 33 列，滿月會漏算最後一天，這裡統一修正。
-  const res = 算項目(days), 總 = 35, 時欄 = it.時數欄;
+  // 總計列與 SUM 範圍一律走上面的版面常數，不要在這裡寫死數字。
+  // （實檔有幾頁把總計放 R34 且 SUM 只加到第 33 列，滿月會漏算最後一天，這裡統一修正。）
+  const res = 算項目(days), 總 = 總計列, 時欄 = it.時數欄;
+  const 範圍 = 欄 => 'SUM(' + 欄 + 資料首列 + ':' + 欄 + 資料末列 + ')';
   ws.getCell(總, 1).value = '總計'; ws.getCell(總, 1).font = 字型(12, true);
   const 時數和 = days.reduce((s, x) => s + (Number(x.時) || 0), 0);
-  ws.getCell(總, 2).value = 公式('SUM(B4:B34)', it.有時數欄 ? 時數和 : res.人次);
-  if (it.有時數欄) ws.getCell(總, 3).value = 公式('SUM(C4:C34)', res.人次);
-  ws.getCell(時欄 + 總).value = 公式('SUM(' + 時欄 + '4:' + 時欄 + '34)', res.總時);
+  ws.getCell(總, 2).value = 公式(範圍('B'), it.有時數欄 ? 時數和 : res.人次);
+  if (it.有時數欄) ws.getCell(總, 3).value = 公式(範圍('C'), res.人次);
+  ws.getCell(時欄 + 總).value = 公式(範圍(時欄), res.總時);
   寫計價(ws, it, 總, res);
   ws.getCell(37, 1).value = '※時數明細請參閱附表' + it.附表號;
   收尾(ws, { r1:3, r2:總, c1:1, c2: it.有時數欄 ? 4 : 3 }, ['A37:G37']);
@@ -421,9 +434,17 @@ function 寫計價(ws, it, 總列, res) {
   const r1 = 位移(p.一般, 1, 0);
   put(r1, 一般費率);
   put(位移(r1, 0, 1), '元×');
-  ws.getCell(位移(r1, 0, 2)).value = 公式(時欄 + 總列, res.一般時);
+  /* 🔴 2026-08-08 修：這格原本一律寫公式「=C35」（總計欄）。但 C35 是「一般＋假日」
+     的總時數，明細表沒有欄位可以標記哪天是國定假日，公式沒辦法只加一般日。
+     結果是：畫面預覽用的是正確的一般時數，Excel 開檔重算卻抓到總時數 → 只要該月
+     有國定假日，送出去的檔案金額就會比畫面多（多請錢）。
+     修法：沒有假日時 C35 剛好等於一般時數，維持公式（跟實檔長相一致）；
+     一有假日就改寫純數值，正確性優先於形式。 */
+  ws.getCell(位移(r1, 0, 2)).value = res.假日時
+    ? res.一般時
+    : 公式(時欄 + 總列, res.一般時);
   put(位移(r1, 0, 3), '小時=');
-  ws.getCell(位移(r1, 0, 4)).value = 公式(位移(r1,0,0) + '*' + 位移(r1,0,2), res.一般金額);
+  ws.getCell(金額格(p.一般)).value = 公式(位移(r1,0,0) + '*' + 位移(r1,0,2), res.一般金額);
   put(位移(r1, 0, 5), '元');
 
   put(p.假日, '(二)');
@@ -433,11 +454,11 @@ function 寫計價(ws, it, 總列, res) {
   put(位移(r2, 0, 1), '元×');
   put(位移(r2, 0, 2), res.假日時);
   put(位移(r2, 0, 3), '小時=');
-  ws.getCell(位移(r2, 0, 4)).value = 公式(位移(r2,0,0) + '*' + 位移(r2,0,2), res.假日金額);
+  ws.getCell(金額格(p.假日)).value = 公式(位移(r2,0,0) + '*' + 位移(r2,0,2), res.假日金額);
   put(位移(r2, 0, 5), '元');
 
   put(p.共計, '共計:', 字型(12, true));
-  ws.getCell(位移(p.共計, 0, 1)).value = 公式(位移(r1,0,4) + '+' + 位移(r2,0,4), res.金額);
+  ws.getCell(位移(p.共計, 0, 1)).value = 公式(金額格(p.一般) + '+' + 金額格(p.假日), res.金額);
   ws.getCell(位移(p.共計, 0, 1)).font = 字型(13, true);
   put(位移(p.共計, 0, 3), '元(未稅)');
 }
@@ -625,6 +646,9 @@ function App() {
      線上班表只有「當月」一份，月份不符時一律不套用——寧可讓咖哩手動輸入，
      也不能拿錯月份的資料去請款。 */
   async function 讀班表() {
+    // 已經有資料才問：重讀會整批覆蓋，手動改過的時數/假日勾選都會不見
+    const 已有 = ITEMS.some(it => (items[it.no].days || []).length);
+    if (已有 && !window.confirm('重新讀取會覆蓋掉目前所有項目的資料，包含你手動改過的時數和國定假日勾選。要繼續嗎？')) return;
     setBusy(true); set班表狀態(null);
     try {
       const 期望 = 民國年 + 1911 + '/' + String(月).padStart(2, '0');
@@ -636,33 +660,54 @@ function App() {
         資料[shift] = d;
       }
       const 月份們 = ['morning', 'night'].map(s => String(資料[s].ym || '').trim());
-      const 不符 = 月份們.filter(y => y && y !== 期望);
+      /* 🔴 2026-08-08 修：原本寫 filter(y => y && y !== 期望)，那個 `y &&` 會把「空字串」
+         當成通過。班表的月份是試算表 Z1 手打的格子，一旦沒填就回空字串 → 不符清單為空
+         → 直接把線上那份（很可能是別的月份）的班表套進來請款。
+         保護機制不能 fail-open：讀不到月份就是不能確認，一律當作不符、拒絕套用。 */
+      const 不符 = 月份們.filter(y => y !== 期望);
       if (不符.length) {
+        const 顯示 = 月份們.map(y => y || '（班表沒填月份）').join(' / ');
         set班表狀態({ ok: false,
-          msg: '線上班表目前是 ' + 月份們.join(' / ') + ' 的資料，你要做的是 ' + 期望 +
-               '。線上班表只保留當月一份，沒有歷史月份，所以這個月的日期請手動輸入，' +
-               '我不會拿別的月份的資料填進去。' });
+          msg: '線上班表目前是 ' + 顯示 + '，你要做的是 ' + 期望 +
+               '。兩邊對不起來，我不會把資料填進去——線上班表只保留當月一份，' +
+               '拿錯月份的班表請款會出大事。這個月的日期請手動輸入。' });
         setBusy(false); return;
       }
       const 天數 = 月天數(民國年 + 1911, 月);
-      const 新items = {}, 新來源 = {};
+      const 新items = {}, 新來源 = {}, 警語 = [];
       ITEMS.forEach(it => {
         if (it.手動 || !it.代號.length) { 新items[it.no] = items[it.no]; 新來源[it.no] = 'manual'; return; }
         const rows = 資料[it.班別 === 'night' ? 'night' : 'morning'].rows;
         const 命中 = 撈代號日期(rows, it.代號, 天數);
-        新items[it.no] = { days: 命中.map(x => ({
-          d: x.d,
-          人: x.命中.length,
-          // 同一代號可能對應不同時數（漢來 H=11、H2=11.5），以當天第一個人的代號為準
-          時: (it.代號時數 && it.代號時數[x.命中[0].code]) || it.預設時,
-          假: false
-        })) };
+        新items[it.no] = { days: 命中.map(x => {
+          const codes = x.命中.map(c => c.code).filter((v, i, a) => a.indexOf(v) === i);
+          // H/H2 實務上互斥（同一天只會有一種），真的同時出現代表班表有問題：
+          // 時數只能取其中一個，會少算或多算，所以一定要吐警告讓咖哩自己核。
+          if (codes.length > 1) {
+            警語.push(月 + '/' + x.d + ' 同時出現「' + codes.join('、') + '」代號（'
+              + x.命中.map(c => c.name).join('、') + '），時數只能取一種，已用「' + codes[0]
+              + '」計算，請自己核對這天');
+          }
+          return {
+            d: x.d,
+            人: x.命中.length,
+            時: (it.代號時數 && it.代號時數[codes[0]]) || it.預設時,
+            假: false
+          };
+        }) };
         新來源[it.no] = 'auto';
       });
       setItems(新items); set來源(新來源);
       const 抓到 = ITEMS.filter(it => !it.手動).reduce((s, it) => s + 新items[it.no].days.length, 0);
-      set班表狀態({ ok: true, msg: '已讀取 ' + 期望 + ' 月班表，自動帶出 ' + 抓到 +
-        ' 天的增派紀錄。請逐項確認時數與人數，國定假日要自己勾（系統不會自己判斷）。' });
+      // 有多種時數的項目（南側門 11/12H、停車場 8/4H）班表判斷不出來，一律帶預設值，
+      // 不明講的話咖哩會以為時數也是自動算好的。
+      const 需核對 = ITEMS.filter(it => !it.手動 && Object.keys(it.時段 || {}).length > 1
+        && !it.代號時數 && 新items[it.no].days.length)
+        .map(it => 總表項目名[it.no].replace('\n', ''));
+      set班表狀態({ ok: true, 警語, msg: '已讀取 ' + 期望 + ' 月班表，自動帶出 ' + 抓到
+        + ' 天的增派紀錄。\n※ 自動帶出的是「哪幾天」，時數一律先給預設值，請逐項核對。'
+        + (需核對.length ? ('\n※ ' + 需核對.join('、') + ' 同一個代號會有不同時數，班表判斷不出來，這幾項務必逐日確認。') : '')
+        + '\n※ 國定假日要自己勾，系統不會自動判斷。' });
       提示('班表讀取完成');
     } catch (e) {
       set班表狀態({ ok: false, msg: '讀取失敗：' + e.message + '。可以改用手動輸入，不影響產生檔案。' });
@@ -681,7 +726,7 @@ function App() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = '115_' + String(月).padStart(2, '0') + '月漢神巨蛋請款資料.xlsx';
+      a.download = 民國年 + '_' + String(月).padStart(2, '0') + '月漢神巨蛋請款資料.xlsx';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
       提示('已下載');
@@ -725,7 +770,13 @@ function App() {
         + (主合約.減班時數 ? ('，減班折抵 ' + mc.時薪 + '元 × ' + 主合約.減班時數 + '小時 = ' + fmt(mc.折抵) + '元 → 實收 ' + fmt(mc.金額) + '元') : '')),
       h('button', { className: 'btn btn-sec btn-full', style: { marginTop: '12px' }, onClick: 讀班表, disabled: busy },
         h('i', { className: 'ti ti-cloud-download' }), busy ? '讀取中…' : '讀取月班表，自動帶入時數'),
-      班表狀態 && h('div', { className: 'alert ' + (班表狀態.ok ? 'alert-ok' : 'alert-warn'), style: { marginTop: '12px', marginBottom: 0 } }, 班表狀態.msg)),
+      班表狀態 && h('div', { className: 'alert ' + (班表狀態.ok ? 'alert-ok' : 'alert-warn'),
+        style: { marginTop: '12px', marginBottom: 0, whiteSpace: 'pre-line' } }, 班表狀態.msg),
+      班表狀態 && 班表狀態.警語 && 班表狀態.警語.length
+        ? h('div', { className: 'alert alert-err', style: { marginTop: '10px', marginBottom: 0 } },
+            h('div', { style: { fontWeight: 700, marginBottom: '4px' } }, '⚠ 班表有這些狀況要你確認：'),
+            ...班表狀態.警語.map((w, i) => h('div', { key: i }, '· ' + w)))
+        : null),
 
     /* 步驟二 */
     h('div', { className: 'card' },
