@@ -1520,8 +1520,16 @@ function nextRecordId_(sheet) {
   var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
   var max = 0;
   for (var i = 0; i < ids.length; i++) {
-    var n = Number(ids[i][0]);
-    if (!isNaN(n) && n > max) max = n;
+    var raw = ids[i][0];
+    // 2026-08-08 修：舊版只用 !isNaN() 擋，但 isNaN(Infinity) 是 false ＝ Infinity 會被放行。
+    // 舊 genId() 產生的隨機碼有少數長得像科學記號（例如 948e0715 → 948×10^715），
+    // Sheets 讀進來會溢位成 Infinity，被誤當成「最大的 id」，導致 nextId = Infinity+1 = Infinity，
+    // 寫回試算表就顯示 #NUM!，而且 Infinity++ 永遠是 Infinity → 整批全壞、之後每批都壞。
+    if (typeof raw !== 'number' || !isFinite(raw)) continue; // 文字/錯誤值/無限大 一律跳過
+    var n = Math.floor(raw);
+    // 只採信「合理範圍的流水號」：正整數且不超過一千萬（實際筆數才數千，
+    // 上限用來擋掉舊隨機碼被誤讀成的巨大數字，例如 94800000）
+    if (n > 0 && n <= 10000000 && n > max) max = n;
   }
   return max + 1;
 }
