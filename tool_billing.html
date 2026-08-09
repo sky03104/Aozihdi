@@ -354,7 +354,14 @@ const 月天數 = (西元年, 月) => new Date(西元年, 月, 0).getDate();
      2. pageSetup 要一併寫入，否則每次列印都要重設橫向/縮放。
    另：ExcelJS 的 formula 欄位「不要」寫開頭的等號，寫了會變成 ==SUM(...)。
    ════════════════════════════════════════════════════════════════ */
-const 細線 = { style: 'thin' };
+/* ⚠️ 框線一定要連顏色一起指定。ExcelJS 的 { style:'thin' } 只寫粗細不寫顏色，
+   產出的 XML 是 <left style="thin"/>，Excel 遇到沒指定顏色的框線渲染行為不一致，
+   會出現「有些線畫得出來、有些不見」（2026-08-09 咖哩回報總表項次/內容右邊的
+   直線消失）。咖哩手工做的實檔是 <left style="thin"><color auto="1"/></left>。
+   這種問題用 ExcelJS 讀回來檢查抓不到（讀回來看起來完全正常），
+   只有拆開 xlsx 內部 XML 比對才看得出來。 */
+const 線色 = { argb: 'FF000000' };
+const 細線 = { style: 'thin', color: 線色 };
 const 四邊 = { top: 細線, bottom: 細線, left: 細線, right: 細線 };
 const 字型 = (size, bold) => ({ name: '微軟正黑體', size: size || 12, bold: !!bold });
 /* 金額一律套千分位。Excel 要靠 numFmt 才會顯示逗號，只寫數值會印出
@@ -406,7 +413,7 @@ function 畫發票位(ws, r1, c1, r2, c2) {
    Excel 不會顯示，反而會污染 master 格的樣式（實測 B1 會多出一條右框）。
    第 2 列起才分成兩個框。這是照咖哩實檔逐格量出來的畫法。 */
 function 附表框線(ws) {
-  const M = { style: 'medium' };
+  const M = { style: 'medium', color: 線色 };   // 顏色不可省，理由見檔頭 細線 的註解
   const 加 = (r, c, 邊) => {
     const cell = ws.getCell(r, c);
     cell.border = Object.assign({}, cell.border, 邊);
@@ -571,8 +578,11 @@ function 建發票頁(wb, it, 結果) {
   // 同主合約頁：下半部留白給實體發票，列印區域必須拉到 R42
   /* I 欄是漢來VIP 的合計欄（其餘項目用 F），14pt 粗體加千分位後 8.875 會爆成 ####，
      放寬到 14（2026-08-09 咖哩回報）。 */
+  /* 列印範圍要到 J：漢來VIP 的合計在 I 欄、「元」在 J 欄，原本框到 I 會把「元」
+     切掉印不出來（2026-08-09 咖哩回報）。其餘項目合計在 F、「元」在 G，本來就在範圍內，
+     統一到 J 對它們只是多一欄空白，不影響版面。 */
   const ws = 建頁(wb, it.發票, {
-    scale: 95, printArea: 'A1:I42',
+    scale: 95, printArea: 'A1:J42',
     cols: [8.875, 8.875, 8.875, 8.875, 8.875, 19.5, 11.375, 8.875, 14.0, 8.875],
     margins: { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 }
   });
@@ -582,13 +592,16 @@ function 建發票頁(wb, it, 結果) {
   for (let r = 5; r <= 22; r++) ws.getRow(r).height = 18;
   ws.getCell('A1').value = it.標題;
   ws.getCell('A1').font = 字型(16, true);
-  // 2026-08-09 咖哩回報發票頁上方文字沒置中，改成置中
-  ws.getCell('A1').alignment = { horizontal:'center', vertical:'middle', wrapText:true };
+  /* 標題靠右、金額置中（2026-08-09 咖哩指定）。原本標題置中、金額靠預設，
+     兩者中間會空一大片；標題靠右貼近金額欄就不會有那個空洞。 */
+  ws.getCell('A1').alignment = { horizontal:'right', vertical:'middle', wrapText:true };
   const 一般格 = 金額格(it.計價.一般), 假日格 = 金額格(it.計價.假日);
   金額(ws, it.發票合計欄 + '1',
     公式("'" + it.明細 + "'!" + 一般格 + "+'" + it.明細 + "'!" + 假日格, 結果.金額));
   ws.getCell(it.發票合計欄 + '1').font = 字型(14, true);
+  ws.getCell(it.發票合計欄 + '1').alignment = { horizontal: 'center', vertical: 'middle' };
   ws.getCell(下一欄(it.發票合計欄) + '1').value = '元';
+  ws.getCell(下一欄(it.發票合計欄) + '1').alignment = { horizontal: 'left', vertical: 'middle' };
   try { ws.mergeCells(it.發票標題合併); } catch (e) {}
   畫發票位(ws, 5, 4, 22, 6);   // D5:F22（列高已加到18，框比原本大約四成）
 }
