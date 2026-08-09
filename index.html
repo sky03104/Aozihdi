@@ -2239,6 +2239,12 @@ function App() {
         return [1, 2]; // 預設常用工具
     });
     const [editingTool, setEditingTool] = useState(null);
+    /* 明日哨點小卡（2026-08-09 取代原本的「常用工具數量」）。
+       資料來自現成的 getTomorrowPost，回傳每筆為 { loc, name, time, empId }。
+       ⚠️ 用「工號 或 姓名」雙重比對找出登入者：哨表上的姓名若沒在員工資料建檔，
+       回傳的 empId 會是空字串，只比工號會把「有排班」誤判成「休假」——
+       那是會害人漏班的假訊息，寧可多一個比對條件。 */
+    const [tomorrowPost, setTomorrowPost] = useState({ state: 'loading' });
     const [adminSubTab, setAdminSubTab] = useState("perms"); // perms | tools | users | approve
     const [activeToolId, setActiveToolId] = useState(null);
         /* 航海日誌：切換工具時回報（brain_map 即時人物移動用） */
@@ -2248,6 +2254,36 @@ function App() {
            跟班表無關的父層重新渲染，把這顆 callback 當成「props變了」逼 ScheduleApp 整個重跑，
            導致其內部 MonthView 等巢狀元件被判定為全新元件、砍掉重建（見月班表捲動抖動的修法說明） */
         const handleExternalApplied = useCallback(() => setExternalScheduleData(null), []);
+    /* 載入明日哨點（小卡用）。四種狀態：
+         loading  讀取中
+         notyet   哨表尚未更新／讀取失敗（不謊報成休假）
+         off      哨表有了但找不到這個人 → 休假
+         ok       找到，顯示哨點與時段 */
+    useEffect(() => {
+        if (!currentUser) return;
+        let 取消 = false;
+        (async () => {
+            try {
+                const res = await fetch(ACCOUNT_GAS_URL + '?action=getTomorrowPost');
+                const d = await res.json();
+                if (取消) return;
+                if (!d || d.status !== 'ok') { setTomorrowPost({ state: 'notyet' }); return; }
+                const 全部 = [].concat(d.early || [], d.late || []);
+                const 我的姓名 = String((currentUser.name || '')).trim();
+                const 我的工號 = String((currentUser.empId || '')).trim();
+                const 我的 = 全部.filter(x =>
+                    (我的工號 && String(x.empId || '').trim() === 我的工號) ||
+                    (我的姓名 && String(x.name || '').trim() === 我的姓名));
+                setTomorrowPost(我的.length
+                    ? { state: 'ok', loc: 我的[0].loc, time: 我的[0].time, count: 我的.length, date: d.date }
+                    : { state: 'off', date: d.date });
+            } catch (e) {
+                // 讀不到就說讀不到，不要顯示成「休假」害人漏班
+                if (!取消) setTomorrowPost({ state: 'notyet' });
+            }
+        })();
+        return () => { 取消 = true; };
+    }, [currentUser]);
     const [showBulletin, setShowBulletin] = useState(false);
     const [bulletinSearch, setBulletinSearch] = useState('');
     const [annReadId, setAnnReadId] = useState(0); // 已讀到的最大公告ID（依工號記錄，用於算未讀數）
@@ -3260,10 +3296,27 @@ function App() {
                     } } },
                     React.createElement("div", { style: { fontSize: 18, marginBottom: 2 } }, "\uD83D\uDCCB"),
                     React.createElement("div", { className: "stat-num", style: { color: pending.length > 0 ? '#F87171' : 'var(--muted)' } }, pending.length),
-                    React.createElement("div", { className: "stat-lbl" }, "\u5F85\u5BE9\u5E33\u865F"))) : (React.createElement("div", { className: "stat-card" },
-                    React.createElement("div", { style: { fontSize: 18, marginBottom: 2 } }, "\u2B50"),
-                    React.createElement("div", { className: "stat-num" }, tools.filter(t => favorites.includes(t.id) && userTools.includes(t.id)).length),
-                    React.createElement("div", { className: "stat-lbl" }, "\u5E38\u7528\u5DE5\u5177"))),
+                    React.createElement("div", { className: "stat-lbl" }, "\u5F85\u5BE9\u5E33\u865F"))) : (
+                /* \u660E\u65E5\u54E8\u9EDE\uFF082026-08-09 \u53D6\u4EE3\u539F\u672C\u7684\u300C\u5E38\u7528\u5DE5\u5177\u6578\u91CF\u300D\uFF09\u3002
+                   \u9EDE\u64CA\u76F4\u63A5\u958B\u300C\u4ECA/\u660E\u65E5\u54E8\u8868\u300D\u5DE5\u5177\u770B\u5B8C\u6574\u5167\u5BB9\u3002
+                   \u54E8\u9EDE\u540D\u7A31\u6700\u9577\u300CB1F\u8B66\u885B\u5BA4\u300D5 \u5B57\uFF0C\u5B57\u7D1A\u7E2E\u5230 16 \u624D\u4E0D\u6703\u64E0\u51FA\u5361\u7247\u3002 */
+                React.createElement("div", { className: "stat-card", style: { cursor: 'pointer' }, onClick: () => setActiveToolId('post') },
+                    React.createElement("div", { style: { fontSize: 18, marginBottom: 2 } },
+                        tomorrowPost.state === 'ok' ? "\uD83D\uDEE1\uFE0F"
+                        : tomorrowPost.state === 'off' ? "\uD83C\uDF34" : "\u23F3"),
+                    React.createElement("div", { className: "stat-num", style: {
+                            fontSize: tomorrowPost.state === 'ok' ? 16 : 17, marginTop: 2, lineHeight: 1.25,
+                            color: tomorrowPost.state === 'ok' ? 'var(--gold-bri, #FFD700)'
+                                 : tomorrowPost.state === 'off' ? 'var(--success, #4ADE80)' : 'var(--muted)'
+                        } },
+                        tomorrowPost.state === 'ok' ? tomorrowPost.loc
+                        : tomorrowPost.state === 'off' ? "\u4F11\u5047"
+                        : tomorrowPost.state === 'loading' ? "\u8B80\u53D6\u4E2D"
+                        : "\u5C1A\u672A\u66F4\u65B0"),
+                    React.createElement("div", { className: "stat-lbl" },
+                        tomorrowPost.state === 'ok' && tomorrowPost.count > 1
+                            ? ("\u660E\u65E5\u54E8\u9EDE\u30FB\u5171" + tomorrowPost.count + "\u8655")
+                            : "\u660E\u65E5\u54E8\u9EDE"))),
                 CAN_MANAGE_ROLES.includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role) ? (React.createElement("div", { className: "stat-card", style: { cursor: 'pointer' }, onClick: () => { setShowLeave(true); loadLeaveFromCloud(true); } },
                     React.createElement("div", { style: { fontSize: 18, marginBottom: 2 } }, "\uD83D\uDCDD"),
                     React.createElement("div", { className: "stat-num", style: {
