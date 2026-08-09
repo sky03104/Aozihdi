@@ -300,7 +300,7 @@ const NODES = [
   { id: 17, title: '主試算表', topic: 'data', pos: [-1.6891, 1.2961, -0.0], note: '事故報告 / 匿名表揚檢舉 分頁；主鍵純數字列號' },
   { id: 18, title: '打烊資料庫', topic: 'data', pos: [-0.8592, 1.9478, -0.6421], note: '廠商/監工/檢查者/施工類型（開店打烊共用）' },
   { id: 19, title: '開店試算表', topic: 'data', pos: [-0.5627, 1.138, -1.9043], note: '開店前/B1F餐廳/4F餐廳 分頁' },
-  { id: 20, title: '班表資料', topic: 'data', pos: [-1.0723, 1.8817, 0.8901], note: '班別代號 SHIFT_TYPES / WORK_SHIFT / OFF_TYPES' },
+  { id: 20, title: '班表資料', topic: 'data', pos: [-1.0723, 1.8817, 0.8901], note: '班別代號 SHIFT_TYPES / WORK_SHIFT / OFF_TYPES。線上班表分頁固定一份（當月），A4:AG30＝姓名+31天代號，Z1 存年月 yyyy/MM。2026-08-09 起換月覆蓋前會自動存成隱藏備份分頁 _備份_{分頁名}_{yyyy-MM}，歷史月份可經 getScheduleByMonth 取回（請款工具靠此讀上個月）' },
   { id: 21, title: 'localStorage 本地', topic: 'data', pos: [-2.2085, 0.8995, 0.1129], note: 'hsh_session_user / hsh_favs / hsh_shops 等' },
   { id: 22, title: 'Drive 公告資料夾', topic: 'data', pos: [-1.4062, 1.7406, -0.9428], note: '照片統一存放（1K_RR…）；共用政策可能擋公開連結' },
 
@@ -355,7 +355,7 @@ const NODES = [
   { id: 43, title: '交接事項 GAS', topic: 'backend', pos: [1.1915, 2.2311, -0.1222], note: '帶班交接_GAS.gs（獨立部署）；add/update/delete/getAll；建立人+建立時間、最後修改人+時間伺服器端蓋章，主鍵 max(ID)+1' },
   { id: 44, title: '哨表產生 GAS', topic: 'backend', pos: [1.8958, 1.2979, 1.1353], note: '哨表產生_GAS.gs（獨立部署）；getEmployeeNames/getGuardPostConfig/saveGuardPostConfig/getMonthlyRoster；讀早晚班月班表算當日在職名單、讀寫哨點設定分頁；上傳寫入哨表另沿用哨表上傳_GAS_v6.gs' },
   { id: 45, title: '缺班調班紀錄 GAS', topic: 'backend', pos: [0.5772, 2.099, 1.4062], note: '缺班調班紀錄_GAS.gs（獨立部署）；getRecords/addRecord/deleteRecord；每個 action 都驗登入通行證＋角色需隊長以上(captain/executive/admin)，才向主 App 打 verifySession；主鍵 max(ID)+1' },
-  { id: 46, title: '空節點 #46', topic: 'backend', pos: [1.6916, 1.0127, -1.7242], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
+  { id: 46, title: '班表管理 GAS', topic: 'backend', pos: [1.6916, 1.0127, -1.7242], note: '班表管理_後端_GAS_v2.13.gs（早晚班共用一支，靠 SHIFT_CONFIG / payload.shift 分流）。upload/update/updateSchedule/updateShiftSettings/deleteStaff（POST）＋ getSchedule/getScheduleByMonth/listScheduleMonths/getShiftSettings（GET）。線上班表分頁固定只有一份（早班班表／晚班班表），下月班表先進「_待生效」，每日00:00~01:00排程 checkAndSwitchMonth_ 於1號自動切換。⚠️2026-08-09 前切換時直接覆蓋、舊月班表永久消失；v2.13 起兩個覆蓋點（排程換月、上傳換月）覆蓋前先備份成隱藏分頁 _備份_{分頁名}_{yyyy-MM}——只新增不刪除、同月已存在則跳過保留最早那份、備份失敗只記log不中斷換月。備份僅對部署後的月份有效，部署當下需手動跑一次 手動備份目前班表()' },
   { id: 47, title: '空節點 #47', topic: 'backend', pos: [1.8028, 1.916, -0.2784], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 48, title: '空節點 #48', topic: 'backend', pos: [2.2774, 0.6941, 1.2103], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 49, title: '空節點 #49', topic: 'backend', pos: [0.8967, 1.686, 1.902], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
@@ -470,7 +470,7 @@ const NODES = [
   { id: 139, title: '缺班時數/調補班紀錄', topic: 'tools', pos: [2.3907, 0.0, -2.3907], note: 'tool_shift_adjust.html 獨立檔；主選單id21/人事管理分類/僅隊長以上(captain/executive/admin)可見，工具內 checkPermission() 二次把關＋GAS 每個 action 三次驗證(token+角色)；純手動輸入：選日期/員工/±時數/原因/備註(可空)；紀錄列表＋月彙總兩分頁，可匯出xlsx(SheetJS)' },
 
   // ── 請款資料產生（2026-08-08）── tools 第三圈續填
-  { id: 140, title: '請款資料產生工具', topic: 'tools', pos: [-2.3907, 0.0, -2.3907], note: 'tool_billing.html 獨立檔；主選單id22/人事管理分類/僅管理員可見(請款金額屬財務資料)。每月產生漢神巨蛋請款 xlsx（20分頁：總表＋主合約＋6項各自的發票/明細/附表）。時數優先自動讀月班表代號：海→2海底撈(4H)、N或LN→3地下停車場(8H)、H/H2→4漢來VIP(11H/11.5H)、L或LN→5假日勤務(8H)、南→6其他南側門(11或12H)；LN＝巡檢＋停巡同一人，項3與項5都會計入；7安全駕駛(VIP泊車)不在班表故手動輸入。費率一般270/國定假日410元每小時，假日需人工勾選不自動判斷。可自訂臨時項目(如週年慶增派)排在項次8起。讀 getScheduleByMonth（先找線上再翻歷史備份分頁），預設帶「上個月」因咖哩是次月初做上月請款；找不到該月班表時明確報錯要求手動輸入，不拿別月充數。金額模型：每日小計=人數×每人時數，金額=Σ每日小計×費率' },
+  { id: 140, title: '請款資料產生工具', topic: 'tools', pos: [-2.3907, 0.0, -2.3907], note: 'tool_billing.html 獨立檔；主選單id22/人事管理分類/僅管理員可見(請款金額屬財務資料)。每月產生漢神巨蛋請款 xlsx（20分頁：總表＋主合約＋6項各自的發票/明細/附表）。時數優先自動讀月班表代號：海→2海底撈(4H)、N或LN→3地下停車場(8H)、H/H2→4漢來VIP(11H/11.5H)、L或LN→5假日勤務(8H)、南→6其他南側門(11或12H)；LN＝巡檢＋停巡同一人，項3與項5都會計入；7安全駕駛(VIP泊車)不在班表故手動輸入。費率一般270/國定假日410元每小時，假日需人工勾選不自動判斷。可自訂臨時項目(如週年慶增派)排在項次8起。讀 getScheduleByMonth（先找線上再翻歷史備份分頁），預設帶「上個月」因咖哩是次月初做上月請款；找不到該月班表時明確報錯要求手動輸入，不拿別月充數。金額模型：每日小計=人數×每人時數，金額=Σ每日小計×費率（誤把每人時數當小計，2人以上項目會少算一半）。下載前可按「預覽內容」全螢幕核對總表/明細/附表，預覽與xlsx共用 附表內容_() 等同一套函式確保一致。LN一天在項3、項5各算8H合計16H是正確的：LN的1200-2000(8H)算項5、2000-2400(4H)算項3，項3另外4H來自假日S班(0800-1600)變A班(0800-2000)多出的1600-2000' },
 ];
 
 const EDGES = [
@@ -520,6 +520,8 @@ const EDGES = [
   [0, 139], [139, 45], [45, 67], [45, 1],
   // 請款資料產生：主控台→工具；時數來源是班表資料（同一批代號也餵給自動排哨工具）
   [0, 140], [140, 20], [140, 138],
+  // 班表管理 GAS：主控台讀班表、GAS 讀寫班表資料；請款工具靠它的 getScheduleByMonth 取歷史月份
+  [0, 46], [46, 20], [140, 46], [8, 46],
 ];
 
 // === BRAIN_MAP_DATA_END ===
