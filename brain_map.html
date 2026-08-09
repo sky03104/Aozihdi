@@ -274,7 +274,7 @@ const TOPICS = {
 const NODES = [
 
   // ── 主控台核心 ──
-  { id: 0, title: '主控台 index.html', topic: 'core', pos: [0.0, 0.0, 0.45], note: '主選單/登入/公告/工具權限/首頁卡片，編譯後 React.createElement（非 JSX）；首頁「宣導事項」按鈕(原可用工具卡)＋公告跑馬燈置頂輪播' },
+  { id: 0, title: '主控台 index.html', topic: 'core', pos: [0.0, 0.0, 0.45], note: '主選單/登入/公告/工具權限/首頁卡片，編譯後 React.createElement（非 JSX）；首頁「宣導事項」按鈕(原可用工具卡)＋公告跑馬燈置頂輪播；四張小卡左下角 2026-08-09 改為「明日哨點」（讀 getTomorrowPost，用工號或姓名雙重比對找出登入者——哨表姓名未建檔時 empId 會是空字串，只比工號會把有排班誤判成休假；讀取失敗一律顯示「尚未更新」不謊報休假），點擊帶 ?view=tomorrow 直接開明日分頁' },
   { id: 1, title: '登入與角色系統', topic: 'core', pos: [0.174, 0.0, -0.435], note: 'localStorage hsh_session_user；CAN_MANAGE_ROLES 控管理職可見（2026-07-15 咖哩手繪佈局微調：艾斯莫比迪克號往右移）' },
   { id: 2, title: '首頁待審卡片', topic: 'core', pos: [0.3897, -0.9, -0.225], note: '待審請假/帳號/報告/表揚反應；報告、表揚兩格限 executive/admin（2026-07-15 咖哩手繪佈局微調：薩波革命軍本部往下移）' },
 
@@ -283,7 +283,7 @@ const NODES = [
   { id: 4, title: '匿名表揚/反應', topic: 'tools', pos: [1.495, 0.52, 2.5895], note: 'tool_feedback.html；前台匿名，主管裁決寫「處置」欄（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
   { id: 5, title: '開店前進出登錄', topic: 'tools', pos: [-1.495, 0.52, 2.5895], note: 'tool_opening.html 獨立檔，雙 GAS（共用 _SharedDB）（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
   { id: 6, title: '打烊後快速登錄', topic: 'tools', pos: [-2.99, 0.52, 0.0], note: 'index 內嵌 tpl-closing（base64）（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
-  { id: 7, title: '今/明日哨表', topic: 'tools', pos: [-1.495, 0.52, -2.5895], note: 'post.html，iframe src 串接；今日/明日切換鈕，未更新顯示「尚未更新」；每日08:00自動快照明日哨表→今日哨表（gid不變、完全靜默）（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
+  { id: 7, title: '今/明日哨表', topic: 'tools', pos: [-1.495, 0.52, -2.5895], note: 'post.html，iframe src 串接；今日/明日切換鈕（支援 ?view=tomorrow 指定初始分頁，只認小寫其餘退回 today；分頁外觀由 applyViewStyle() 單一來源控制），未更新顯示「尚未更新」；每日08:00自動快照明日哨表→今日哨表（gid不變、完全靜默）（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
   { id: 8, title: '班表查詢', topic: 'tools', pos: [1.495, 0.52, -2.5895], note: 'ScheduleApp；SHIFT_TYPES 班別代號（早/晚班）（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
   { id: 9, title: '緊急聯絡清單', topic: 'tools', pos: [2.5895, -0.52, 1.495], note: 'tpl-emergency；normalizePhone 補回開頭 0（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
   { id: 10, title: '資料上傳工具', topic: 'tools', pos: [-3.864, 0.0, 1.035], note: 'tpl-upload（base64 內嵌）；施工單/班表/哨表，SheetJS 解析 Excel；獨立版見 cec-up(id32)（2026-07-15 咖哩手繪佈局微調：弗蘭奇工房往左移＋外圈整體拉開1.3倍間距；2026-07-15 再調：頂視圖角度轉到165°避開id5/id137同扇形擠壓）' },
