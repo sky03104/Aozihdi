@@ -126,7 +126,15 @@ body{font-family:'Microsoft JhengHei','PingFang TC',sans-serif;background:var(--
 // ★★★ 必填：與請假同一支「帳號+請假+LINE」GAS 的 /exec 網址 ★★★
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbxEVBHseDpLWiWe4d8kLcCHbVFiKAK9wyoLwqNkt59PS4vPCY9QfG0_wiDJf2coO3zMcg/exec';
 
-var currentView = 'today'; // 'today' | 'tomorrow'
+/* 預設分頁可用網址參數指定：?view=tomorrow 直接開明日哨表。
+   首頁的「明日哨點」小卡就是帶這個參數進來的，點進來要直接看到明日、
+   不用再按一次分頁（2026-08-09 咖哩要求）。參數不合法時一律退回 today。 */
+var currentView = (function(){
+  try {
+    var v = new URLSearchParams(location.search).get('view');
+    return v === 'tomorrow' ? 'tomorrow' : 'today';
+  } catch (e) { return 'today'; }
+})(); // 'today' | 'tomorrow'
 var VIEW_INFO = {
   today:    { action: 'getTodayPost',    label: '今日哨表', icon: '☀️' },
   tomorrow: { action: 'getTomorrowPost', label: '明日哨表', icon: '🌙' }
@@ -140,13 +148,20 @@ function showState(n){
   $('content').style.display = (n==='content') ? 'block' : 'none';
 }
 
-function switchView(view){
-  if (view === currentView) return;
-  currentView = view;
+/* 分頁的外觀（哪個鈕 active、標題文字）抽出來共用：
+   switchView 與「用網址參數指定初始分頁」都要套，各寫一套會不同步——
+   例如帶 ?view=tomorrow 進來卻還是亮著「今日」那顆鈕。 */
+function applyViewStyle(view){
   document.querySelectorAll('.tb-tab').forEach(function(btn){
     btn.classList.toggle('active', btn.getAttribute('data-view') === view);
   });
   $('tb-t1').textContent = VIEW_INFO[view].icon + ' ' + VIEW_INFO[view].label;
+}
+
+function switchView(view){
+  if (view === currentView) return;
+  currentView = view;
+  applyViewStyle(view);
   loadPost();
 }
 
@@ -193,6 +208,7 @@ function loadPost(){
 }
 
 window.addEventListener('load', function(){
+  applyViewStyle(currentView);   // 帶 ?view=tomorrow 進來時，分頁鈕與標題要跟著對
   setTimeout(function(){ $('splash').classList.add('hide'); loadPost(); }, 600);
 });
 </script>

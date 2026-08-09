@@ -2245,6 +2245,9 @@ function App() {
        回傳的 empId 會是空字串，只比工號會把「有排班」誤判成「休假」——
        那是會害人漏班的假訊息，寧可多一個比對條件。 */
     const [tomorrowPost, setTomorrowPost] = useState({ state: 'loading' });
+    /* 開啟「今/明日哨表」時要看哪一頁。從明日哨點小卡進來帶 'tomorrow'
+       （點小卡就是想看明天，不該再按一次分頁）；從工具選單進來維持預設的今日。 */
+    const [postView, setPostView] = useState(null);
     const [adminSubTab, setAdminSubTab] = useState("perms"); // perms | tools | users | approve
     const [activeToolId, setActiveToolId] = useState(null);
         /* 航海日誌：切換工具時回報（brain_map 即時人物移動用） */
@@ -3300,7 +3303,8 @@ function App() {
                 /* \u660E\u65E5\u54E8\u9EDE\uFF082026-08-09 \u53D6\u4EE3\u539F\u672C\u7684\u300C\u5E38\u7528\u5DE5\u5177\u6578\u91CF\u300D\uFF09\u3002
                    \u9EDE\u64CA\u76F4\u63A5\u958B\u300C\u4ECA/\u660E\u65E5\u54E8\u8868\u300D\u5DE5\u5177\u770B\u5B8C\u6574\u5167\u5BB9\u3002
                    \u54E8\u9EDE\u540D\u7A31\u6700\u9577\u300CB1F\u8B66\u885B\u5BA4\u300D5 \u5B57\uFF0C\u5B57\u7D1A\u7E2E\u5230 16 \u624D\u4E0D\u6703\u64E0\u51FA\u5361\u7247\u3002 */
-                React.createElement("div", { className: "stat-card", style: { cursor: 'pointer' }, onClick: () => setActiveToolId('post') },
+                React.createElement("div", { className: "stat-card", style: { cursor: 'pointer' },
+                    onClick: () => { setPostView('tomorrow'); setActiveToolId('post'); } },
                     React.createElement("div", { style: { fontSize: 18, marginBottom: 2 } },
                         tomorrowPost.state === 'ok' ? "\uD83D\uDEE1\uFE0F"
                         : tomorrowPost.state === 'off' ? "\uD83C\uDF34" : "\u23F3"),
@@ -3344,6 +3348,9 @@ function App() {
                     if (CAN_MANAGE_ROLES.includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role)) loadLeaveFromCloud(true);
                 }
                 else if (tool.toolId) {
+                    // 從工具選單進來一律用預設分頁；否則先點過明日哨點小卡之後，
+                    // 再從選單開「今/明日哨表」會還停在明日
+                    if (tool.toolId === 'post') setPostView(null);
                     setActiveToolId(tool.toolId);
                 }
                 else if (tool.externalUrl) {
@@ -3384,6 +3391,8 @@ function App() {
                                 if (CAN_MANAGE_ROLES.includes(currentUser === null || currentUser === void 0 ? void 0 : currentUser.role)) loadLeaveFromCloud(true);
                             }
                             else if (tool.toolId) {
+                                // 同上：從工具選單進來一律用預設分頁
+                                if (tool.toolId === 'post') setPostView(null);
                                 setActiveToolId(tool.toolId);
                             }
                             else if (tool.externalUrl) {
@@ -3739,7 +3748,7 @@ function App() {
             activeToolId === 'upload' && (React.createElement("iframe", { src: UPLOAD_PAGE_URL, style: { flex: 1, border: 'none', width: '100%', height: '100%' }, title: "\u8CC7\u6599\u4E0A\u50B3\u5DE5\u5177" })),
             activeToolId === 'emergency' && (React.createElement("iframe", { src: EMERGENCY_PAGE_URL, style: { flex: 1, border: 'none', width: '100%', height: '100%' }, title: "\u7DCA\u6025\u806F\u7D61\u6E05\u55AE" })),
             activeToolId === 'signin' && (React.createElement("iframe", { src: SIGNIN_PAGE_URL, style: { flex: 1, border: 'none', width: '100%', height: '100%' }, title: "\u904E\u591C\u8ECA\u8F1B\u767B\u8A18" })),
-            activeToolId === 'post' && (React.createElement("iframe", { src: POST_PAGE_URL, style: { flex: 1, border: 'none', width: '100%', height: '100%' }, title: "\u4ECA/\u660E\u65E5\u54E8\u8868" })),
+            activeToolId === 'post' && (React.createElement("iframe", { src: POST_PAGE_URL + (postView === 'tomorrow' ? '?view=tomorrow' : ''), key: postView || 'today', style: { flex: 1, border: 'none', width: '100%', height: '100%' }, title: "\u4ECA/\u660E\u65E5\u54E8\u8868" })),
             activeToolId === 'aichat' && (React.createElement("iframe", { src: AI_CHAT_URL, allow: "microphone", style: { flex: 1, border: 'none', width: '100%', height: '100%' }, title: "\u5929\u9DF9 AI \u5C0F\u52A9\u624B" })),
             activeToolId === 'logistics' && (React.createElement("iframe", { src: LOGISTICS_PAGE_URL, style: { flex: 1, border: 'none', width: '100%', height: '100%' }, title: "\u7269\u6D41\u8ECA\u8F1B\u7D71\u8A08" })),
             activeToolId === 'handover' && (React.createElement("iframe", { src: HANDOVER_PAGE_URL, style: { flex: 1, border: 'none', width: '100%', height: '100%' }, title: "\u5E36\u73ED\u4EA4\u63A5\u4E8B\u9805" })),
