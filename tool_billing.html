@@ -41,6 +41,11 @@ input[type=text],input[type=number],select{
   width:100%;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);
   padding:12px 12px;border-radius:9px;font-size:15px;font-family:inherit;min-height:46px;}
 input:focus,select:focus{outline:none;border-color:var(--gold);}
+/* 展開後的選項清單是瀏覽器另外畫的，不會繼承 select 的深色底 → 會變成白底配
+   淺色文字，等於看不見（2026-08-09 咖哩回報）。option 要自己指定顏色。
+   做法同 index.html:329 的 .select-inp option，全站保持一致。 */
+select option{background:#0D0F14;color:var(--text);}
+select option:disabled{color:var(--text-muted);}
 select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--text-muted) 50%),linear-gradient(135deg,var(--text-muted) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat;}
 
 .btn{border:none;border-radius:10px;padding:13px 18px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:48px;}

@@ -480,9 +480,21 @@ function listScheduleMonths_(e) {
       }
     });
     var liveYm = String(resolveTargetSheet(cfg).getRange('Z1').getValue() || '').trim();
-    if (liveYm && 月份.indexOf(liveYm) < 0) 月份.push(liveYm);
-    月份.sort();
-    return respond({ success: true, months: 月份, liveYm: liveYm });
+    /* 2026-08-09 修：原本只回一個混在一起的 months，備份分頁的月份和目前線上的月份
+       分不出來。當線上正好是 2026/08、備份也是 2026/08 時，回傳長得一模一樣——
+       「備份成功」和「備份根本沒建」無法區分，這種檢查等於沒檢查。
+       改成 backups 單獨回報，才驗得出備份到底有沒有建立。 */
+    var 備份月份 = 月份.slice().sort();
+    var 全部 = 月份.slice();
+    if (liveYm && 全部.indexOf(liveYm) < 0) 全部.push(liveYm);
+    全部.sort();
+    return respond({
+      success: true,
+      months: 全部,          // 可用月份（備份 ＋ 目前線上）
+      backups: 備份月份,     // 只有備份分頁的月份，用來確認備份機制有沒有真的在動
+      backupCount: 備份月份.length,
+      liveYm: liveYm
+    });
   } catch (err) {
     return respond({ success: false, error: err.message });
   }
