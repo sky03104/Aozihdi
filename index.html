@@ -842,7 +842,7 @@ function ok(obj) {
             : null;
         const [user, setUser] = useState(autoUser);
         /* ── 雙班別：目前檢視的班表（night=晚班 / morning=早班），各自獨立快取與雲端同步 ── */
-        const [curShift, setCurShift] = useState('night');
+        const [curShift, setCurShift] = useState('all'); /* 2026-08-09：預設開「案場班表」（早+晚合併），咖哩最常看的是全案場 */
         const SHED_CACHE_KEYS = { night: 'tianying_sched_v1', morning: 'tianying_sched_m1' };
         /* ── 班表/員工持久化：載入上次快取（員工名單跨月保留；班表僅同月份沿用） ── */
         const _schedCache = (() => {
@@ -863,7 +863,7 @@ function ok(obj) {
             }
             return buildSched(INIT_STAFF);
         });
-        const [view, setView] = useState("today");
+        const [view, setView] = useState("month"); /* 2026-08-09：預設開「月班表」分頁 */
         const [shiftVer, setShiftVer] = useState(0);
         const [selSt, setSelSt] = useState(null);
         const [editC, setEditC] = useState(null);
@@ -917,18 +917,22 @@ function ok(obj) {
         /* ── 共用：從線上班表（試算表）載入最新資料並套用 ──
            GAS v2.2 起會辨識紅字「休」並回傳「排休」，APP 內以獨立班別顯示；
            離線、GAS 尚未更新、或線上班表月份與當前月不符時回傳 0（沿用本機快取） ── */
-        const loadFromCloud = async (shiftArg, baseStaff, baseSched) => {
-            const shKey = shiftArg || curShift;
-            const bStaff = baseStaff || staffRef.current;
-            const bSched = baseSched || schedRef.current;
-            if (!asUrl) return 0;
+        /* 2026-08-09 抽出：只負責「向雲端要一份班表並解析」，不碰畫面狀態。
+           開啟時要一次備妥早、晚班兩份才能合併成案場班表；若靠 setCurShift 來回切換去載，
+           畫面會閃動、且持久化 effect 的寫入時機不可控。
+           解析規則只有這一份，loadFromCloud 也走它，不會兩處各寫一套。
+           回傳 { staff, sched, cnt }；讀不到／月份不符／離線一律回 null。 */
+        const 抓班表_ = async (shKey, baseStaff, baseSched) => {
+            const bStaff = baseStaff || [];
+            const bSched = baseSched || {};
+            if (!asUrl) return null;
             try {
                 const res = await fetch(asUrl + '?action=getSchedule&shift=' + shKey);
                 const d = await res.json();
-                if (!d.success || !Array.isArray(d.rows) || !d.rows.length) return 0;
+                if (!d.success || !Array.isArray(d.rows) || !d.rows.length) return null;
                 // 線上班表月份（Z1）需與當前月份相符才套用，避免換月初期載入舊月資料
                 const expectYm = `${Y}/${M < 10 ? '0' + M : M}`;
-                if (d.ym && String(d.ym).trim() !== expectYm) return 0;
+                if (d.ym && String(d.ym).trim() !== expectYm) return null;
                 const nStaff = [...bStaff];
                 const nSc = { ...bSched };
                 let cnt = 0;
@@ -960,45 +964,68 @@ function ok(obj) {
                     nSc[m.id] = { ...nSc[m.id], ...shifts };
                     cnt++;
                 });
-                if (!cnt) return 0;
+                if (!cnt) return null;
                 // 雲端試算表為員工名單真相來源：本機有、雲端已無的人（其他裝置刪除過）在此裝置也移除
                 const cloudNames = new Set(d.rows.map(r => String(r.name || '').trim()));
                 const finalStaff = nStaff.filter(s => cloudNames.has(s.name));
                 const finalSc = {};
                 finalStaff.forEach(s => { finalSc[s.id] = nSc[s.id]; });
-                setStaff(finalStaff);
-                setSched(finalSc);
-                return cnt;
+                return { staff: finalStaff, sched: finalSc, cnt: cnt };
             }
-            catch (e) { return 0; /* 離線或讀取失敗 → 沿用本機快取 */ }
+            catch (e) { return null; /* 離線或讀取失敗 → 沿用本機快取 */ }
+        };
+        /* 套用到畫面：抓班表_ 的結果直接進 state。回傳筆數（0＝沒套用，沿用本機快取）。 */
+        const loadFromCloud = async (shiftArg, baseStaff, baseSched) => {
+            const shKey = shiftArg || curShift;
+            const r = await 抓班表_(shKey, baseStaff || staffRef.current, baseSched || schedRef.current);
+            if (!r) return 0;
+            setStaff(r.staff);
+            setSched(r.sched);
+            return r.cnt;
+        };
+        /* 案場班表 ＝ 晚班 ＋ 早班合併。早班 id 一律加 ID_OFFSET，免得跟晚班的 id 撞號
+           （撞號會讓兩個人的班表互相蓋掉）。switchShift('all') 與開啟時的初始載入都走這裡，
+           合併規則只有這一份。 */
+        const 合併案場班表_ = (夜, 早) => {
+            const ID_OFFSET = 10000;
+            let nStaff = [], nSc = {};
+            if (夜 && Array.isArray(夜.staff) && 夜.staff.length) {
+                nStaff = [...夜.staff];
+                nSc = { ...(夜.sched || {}) };
+            }
+            if (早 && Array.isArray(早.staff) && 早.staff.length) {
+                const mStaff = 早.staff.map(ms => ({ ...ms, id: ms.id + ID_OFFSET }));
+                const mScOff = {};
+                Object.entries(早.sched || {}).forEach(([id, v]) => { mScOff[+id + ID_OFFSET] = v; });
+                nStaff = [...nStaff, ...mStaff];
+                nSc = { ...nSc, ...mScOff };
+            }
+            return { staff: nStaff, sched: nSc };
+        };
+        /* 從本機快取讀出某班別的 {staff, sched}；沒有或月份不符就回 null */
+        const 讀班表快取_ = (k) => {
+            try {
+                const c = JSON.parse(localStorage.getItem(SHED_CACHE_KEYS[k]) || 'null');
+                if (c && Array.isArray(c.staff) && c.staff.length) {
+                    return { staff: c.staff, sched: (c.ym === `${Y}-${M}` && c.sched) ? c.sched : buildSched(c.staff) };
+                }
+            } catch (e) { }
+            return null;
         };
         /* ── 切換班別：載入目標班別快取後再向雲端取最新（目前班別資料已由持久化 effect 寫入各自快取） ── */
         const switchShift = async (s) => {
             if (s === curShift) return;
             /* 案場班表：合併晚班 + 早班快取，唯讀不同步 */
             if (s === 'all') {
-                const ID_OFFSET = 10000;
-                let nStaff = [], nSc = {};
-                try {
-                    const nc = JSON.parse(localStorage.getItem(SHED_CACHE_KEYS['night']) || 'null');
-                    if (nc && Array.isArray(nc.staff) && nc.staff.length) {
-                        nStaff = [...nc.staff];
-                        nSc = nc.ym === `${Y}-${M}` && nc.sched ? { ...nc.sched } : buildSched(nc.staff);
-                    }
-                    const mc = JSON.parse(localStorage.getItem(SHED_CACHE_KEYS['morning']) || 'null');
-                    if (mc && Array.isArray(mc.staff) && mc.staff.length) {
-                        const mStaff = mc.staff.map(ms => ({ ...ms, id: ms.id + ID_OFFSET }));
-                        const mSc = mc.ym === `${Y}-${M}` && mc.sched ? mc.sched : buildSched(mc.staff);
-                        const mScOff = {};
-                        Object.entries(mSc).forEach(([id, v]) => { mScOff[+id + ID_OFFSET] = v; });
-                        nStaff = [...nStaff, ...mStaff];
-                        nSc = { ...nSc, ...mScOff };
-                    }
-                } catch(e) {}
+                const 夜 = 讀班表快取_('night'), 早 = 讀班表快取_('morning');
+                const 合 = 合併案場班表_(夜, 早);
                 setCurShift('all');
-                setStaff(nStaff);
-                setSched(nSc);
-                T('🏢 案場班表（晚班 + 早班全員，唯讀）');
+                setStaff(合.staff);
+                setSched(合.sched);
+                // 只讀得到其中一班時要講清楚，否則看到人數少會以為是班表出錯
+                if (夜 && 早) T('🏢 案場班表（晚班 + 早班全員，唯讀）');
+                else if (夜 || 早) T(`🏢 案場班表（目前只讀到${夜 ? '晚班' : '早班'}，另一班尚未載入）`);
+                else T('🏢 案場班表：本機還沒有班表資料，請先切到早班或晚班載入一次');
                 return;
             }
             let nStaff = [], nSc = {};
@@ -1018,11 +1045,26 @@ function ok(obj) {
             if (cnt) T(`📅 已載入${s === 'morning' ? '早班' : '晚班'}線上班表（${cnt} 人）`);
             else T(s === 'morning' ? '☀️ 已切換為早班班表' : '🌙 已切換為晚班班表');
         };
-        /* ── 開啟時自動載入線上班表（跨裝置同步） ── */
+        /* ── 開啟時自動載入線上班表（跨裝置同步） ──
+           2026-08-09：預設顯示「案場班表」（早＋晚合併）的月班表。
+           案場班表的 switchShift('all') 只讀本機快取，所以這裡一定要先把兩班都抓下來
+           寫進各自快取，否則第一次開啟或換手機時會是一片空白。
+           兩班平行抓，讀不到的那班退回本機快取，不要因為一班離線就整個空掉。 */
         useEffect(() => {
             (async () => {
-                const cnt = await loadFromCloud();
-                if (cnt) T(`📅 已載入線上班表最新資料（${cnt} 人）`);
+                const [夜, 早] = await Promise.all([抓班表_('night', [], {}), 抓班表_('morning', [], {})]);
+                const ym = `${Y}-${M}`;
+                try {
+                    if (夜) localStorage.setItem(SHED_CACHE_KEYS.night, JSON.stringify({ ym: ym, staff: 夜.staff, sched: 夜.sched }));
+                    if (早) localStorage.setItem(SHED_CACHE_KEYS.morning, JSON.stringify({ ym: ym, staff: 早.staff, sched: 早.sched }));
+                } catch (e) { }
+                const 合 = 合併案場班表_(夜 || 讀班表快取_('night'), 早 || 讀班表快取_('morning'));
+                if (合.staff.length) {
+                    setStaff(合.staff);
+                    setSched(合.sched);
+                    if (夜 && 早) T(`📅 已載入案場班表（早班＋晚班共 ${合.staff.length} 人）`);
+                    else T(`📅 案場班表：只讀到${夜 ? '晚班' : (早 ? '早班' : '本機快取')}（${合.staff.length} 人）`);
+                }
                 if (asUrl) {
                     try {
                         const r = await fetch(asUrl + '?action=getShiftSettings');
@@ -1749,7 +1791,17 @@ function ok(obj) {
                 React.createElement("button", { style: { flex: 1, padding: "8px 4px", borderRadius: 9, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", border: curShift === 'morning' ? `1.5px solid ${C.gold}` : `1px solid ${C.cardBd}`, background: curShift === 'morning' ? "rgba(212,168,0,0.18)" : C.card, color: curShift === 'morning' ? C.goldBri : C.textMute }, onClick: () => switchShift('morning') }, "☀️ 早班班表"),
                 React.createElement("button", { style: { flex: 1, padding: "8px 4px", borderRadius: 9, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", border: curShift === 'night' ? `1.5px solid ${C.gold}` : `1px solid ${C.cardBd}`, background: curShift === 'night' ? "rgba(212,168,0,0.18)" : C.card, color: curShift === 'night' ? C.goldBri : C.textMute }, onClick: () => switchShift('night') }, "🌙 晚班班表"),
                 React.createElement("button", { style: { flex: 1, padding: "8px 4px", borderRadius: 9, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", border: curShift === 'all' ? `1.5px solid ${C.indigo}` : `1px solid ${C.cardBd}`, background: curShift === 'all' ? "rgba(99,102,241,0.18)" : C.card, color: curShift === 'all' ? C.indigoBri : C.textMute }, onClick: () => switchShift('all') }, "🏢 案場班表")),
-            React.createElement("div", { style: { display: "flex", background: C.bg2, borderBottom: `1px solid ${C.cardBd}`, overflowX: "auto" } }, tabs.map(t => React.createElement("button", { key: t.k, style: { flex: "0 0 auto", padding: "11px 12px", background: "none", border: "none", whiteSpace: "nowrap", borderBottom: view === t.k ? `2px solid ${C.gold}` : "2px solid transparent", color: view === t.k ? C.goldBri : C.textMute, fontSize: 12, cursor: "pointer", fontWeight: view === t.k ? 700 : 400 }, onClick: () => setView(t.k) }, t.l))),
+            React.createElement("div", { style: { display: "flex", gap: 6, background: C.bg2, borderBottom: `1px solid ${C.cardBd}`, overflowX: "auto", padding: "8px 10px" } }, tabs.map(t => React.createElement("button", { key: t.k, style: {
+                /* 2026-08-09：原本是 background:none + border:none，只靠一條底線區分，
+                   現場有人看不出來這排可以按。改成跟上方班別切換鈕同一種膠囊樣式
+                   （有底色、有框、有圓角），一眼就知道是按鈕。 */
+                flex: "0 0 auto", padding: "9px 14px", borderRadius: 9, minHeight: 40,
+                whiteSpace: "nowrap", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5,
+                background: view === t.k ? "rgba(212,168,0,0.18)" : C.card,
+                border: view === t.k ? `1.5px solid ${C.gold}` : `1px solid ${C.cardBd}`,
+                color: view === t.k ? C.goldBri : C.text,
+                fontWeight: view === t.k ? 700 : 500
+            }, onClick: () => setView(t.k) }, t.l))),
             React.createElement("div", { style: { paddingBottom: 66 } },
                 view === "today" && React.createElement(DayView, { dayNum: TODAY }),
                 view === "tomorrow" && React.createElement(DayView, { dayNum: Math.min(TODAY + 1, DAYS) }),
