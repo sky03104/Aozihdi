@@ -305,6 +305,10 @@ const 月天數 = (西元年, 月) => new Date(西元年, 月, 0).getDate();
 const 細線 = { style: 'thin' };
 const 四邊 = { top: 細線, bottom: 細線, left: 細線, right: 細線 };
 const 字型 = (size, bold) => ({ name: '微軟正黑體', size: size || 12, bold: !!bold });
+/* 金額一律套千分位。Excel 要靠 numFmt 才會顯示逗號，只寫數值會印出
+   2097600 這種七位數，業主看請款單很難讀（2026-08-09 咖哩比對後提出）。 */
+const 金額格式 = '#,##0';
+const 金額 = (ws, addr, v) => { const c = ws.getCell(addr); c.value = v; c.numFmt = 金額格式; return c; };
 /* 公式一律走這個 helper：自動去掉多寫的等號，並強制帶 result
    （ExcelJS 不會自己算，沒帶 result 別的程式讀這個檔會拿不到值） */
 const 公式 = (f, result) => ({ formula: String(f).replace(/^=+/, ''), result: result });
@@ -328,6 +332,20 @@ function 建頁(wb, name, opt) {
   }});
   (opt.cols || []).forEach((w, i) => { if (w) ws.getColumn(i + 1).width = w; });
   return ws;
+}
+
+/* 發票頁中間的「發票位」框——實體發票要貼在這裡。
+   咖哩的實檔是用 Excel 的「文字方塊」（可拖曳的圖形物件）做的，ExcelJS 產不出
+   圖形物件，所以改用「合併儲存格＋外框＋直排文字」畫一個外觀接近的替代品。
+   ⚠️ 一定要先 mergeCells 再對 master 設 border：合併格的框線由 master 決定、
+   畫在整個合併範圍的外圍；若先逐格畫框再合併，框線會被合併行為吃掉。 */
+function 畫發票位(ws, r1, c1, r2, c2) {
+  try { ws.mergeCells(r1, c1, r2, c2); } catch (e) {}
+  const cell = ws.getCell(r1, c1);
+  cell.value = '發\n票\n位';
+  cell.font = { name: '微軟正黑體', size: 28 };
+  cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  cell.border = { top: 細線, bottom: 細線, left: 細線, right: 細線 };
 }
 
 /* 附表的框線：兩個並排的 medium 粗線方框（左 B~F、右 H~L），中間 G 欄當間隙。
@@ -400,8 +418,8 @@ function 建總表(wb, cfg, 結果) {
   const mc = 算主合約(cfg.主合約.單價, cfg.主合約.人數, cfg.主合約.減班時數);
   ws.getCell('A3').value = 1;
   ws.getCell('B3').value = 總表項目名[1];
-  ws.getCell('C3').value = mc.基礎;
-  ws.getCell('D3').value = mc.金額;
+  金額(ws, 'C3', mc.基礎);
+  金額(ws, 'D3', mc.金額);
   ws.getCell('E3').value = 主合約說明(cfg, mc);
   ws.getRow(3).height = 92;
 
@@ -410,16 +428,16 @@ function 建總表(wb, cfg, 結果) {
     const ref = "'" + it.發票 + "'!" + it.發票合計欄 + '1';
     ws.getCell(r, 1).value = it.no;
     ws.getCell(r, 2).value = 總表項目名[it.no];
-    ws.getCell(r, 3).value = 公式(ref, 結果[it.no].金額);
-    ws.getCell(r, 4).value = 公式(ref, 結果[it.no].金額);
+    金額(ws, 'C' + r, 公式(ref, 結果[it.no].金額));
+    金額(ws, 'D' + r, 公式(ref, 結果[it.no].金額));
     r++;
   });
   (cfg.臨時項目 || []).forEach((it, i) => {
     const res = 算項目(it.days);
     ws.getCell(r, 1).value = 8 + i;
     ws.getCell(r, 2).value = it.名稱;
-    ws.getCell(r, 3).value = res.金額;
-    ws.getCell(r, 4).value = res.金額;
+    金額(ws, 'C' + r, res.金額);
+    金額(ws, 'D' + r, res.金額);
     r++;
   });
   const 末 = r;
@@ -427,8 +445,8 @@ function 建總表(wb, cfg, 結果) {
     + (cfg.臨時項目 || []).reduce((s, it) => s + 算項目(it.days).金額, 0);
   ws.getCell(末, 1).value = '總計';
   ws.getCell(末, 1).font = 字型(12, true);
-  ws.getCell(末, 3).value = 公式('SUM(C3:C' + (末-1) + ')', mc.基礎 + 增派總);
-  ws.getCell(末, 4).value = 公式('SUM(D3:D' + (末-1) + ')', mc.金額 + 增派總);
+  金額(ws, 'C' + 末, 公式('SUM(C3:C' + (末-1) + ')', mc.基礎 + 增派總));
+  金額(ws, 'D' + 末, 公式('SUM(D3:D' + (末-1) + ')', mc.金額 + 增派總));
   收尾(ws, { r1:1, r2:末, c1:1, c2:5 }, ['A1:E1', 'A'+末+':B'+末]);
   ws.getCell('E3').alignment = { horizontal:'left', vertical:'middle', wrapText:true };
   /* 列高：靠這個把表格撐滿整張 A4（實檔 R1=30 R2=51.75 R3=140.45 其餘≈69.9）。
@@ -490,6 +508,8 @@ function 建主合約頁(wb, cfg) {
     });
   }
   merges.forEach(m => { try { ws.mergeCells(m); } catch (e) {} });
+  // 主合約頁的發票位：位置比各項發票頁再低一點，因為上面有三行標題
+  畫發票位(ws, 7, 4, 21, 6);   // D7:F21
 }
 
 function 建發票頁(wb, it, 結果) {
@@ -505,11 +525,12 @@ function 建發票頁(wb, it, 結果) {
   ws.getCell('A1').font = 字型(16, true);
   ws.getCell('A1').alignment = { horizontal:'left', vertical:'middle', wrapText:true };
   const 一般格 = 金額格(it.計價.一般), 假日格 = 金額格(it.計價.假日);
-  ws.getCell(it.發票合計欄 + '1').value =
-    公式("'" + it.明細 + "'!" + 一般格 + "+'" + it.明細 + "'!" + 假日格, 結果.金額);
+  金額(ws, it.發票合計欄 + '1',
+    公式("'" + it.明細 + "'!" + 一般格 + "+'" + it.明細 + "'!" + 假日格, 結果.金額));
   ws.getCell(it.發票合計欄 + '1').font = 字型(14, true);
   ws.getCell(下一欄(it.發票合計欄) + '1').value = '元';
   try { ws.mergeCells(it.發票標題合併); } catch (e) {}
+  畫發票位(ws, 6, 4, 20, 6);   // D6:F20，頁面中間偏上
 }
 
 function 建明細頁(wb, it, cfg, days) {
@@ -545,7 +566,10 @@ function 建明細頁(wb, it, cfg, days) {
        （2026-08-09 從咖哩上傳的產出檔發現：8月的明細第一列變成 2026/7/31）。
        金額用的是人數×時數不看日期，所以對帳測試全過也抓不到這個錯。 */
     ws.getCell(r, 1).value = new Date(Date.UTC(cfg.民國年 + 1911, cfg.月 - 1, x.d));
-    ws.getCell(r, 1).numFmt = 'yyyy/m/d';
+    /* 顯示成 08/01(週六)，照咖哩實檔的格式。aaa 是 Excel 的星期短格式（繁中顯示「週六」）。
+       比 yyyy/m/d 短、欄寬需求小，而且多了星期方便核對假日。
+       底層仍存日期值（不是文字），排序與公式都還能用。 */
+    ws.getCell(r, 1).numFmt = 'mm/dd(aaa)';
     if (it.有時數欄) {
       ws.getCell(r, 2).value = x.時;
       ws.getCell(r, 3).value = x.人;
@@ -589,7 +613,7 @@ function 寫計價(ws, it, 總列, res) {
     ? res.一般時
     : 公式(時欄 + 總列, res.一般時);
   put(位移(r1, 0, 3), '小時=');
-  ws.getCell(金額格(p.一般)).value = 公式(位移(r1,0,0) + '*' + 位移(r1,0,2), res.一般金額);
+  金額(ws, 金額格(p.一般), 公式(位移(r1,0,0) + '*' + 位移(r1,0,2), res.一般金額));
   put(位移(r1, 0, 5), '元');
 
   put(p.假日, '(二)');
@@ -599,11 +623,11 @@ function 寫計價(ws, it, 總列, res) {
   put(位移(r2, 0, 1), '元×');
   put(位移(r2, 0, 2), res.假日時);
   put(位移(r2, 0, 3), '小時=');
-  ws.getCell(金額格(p.假日)).value = 公式(位移(r2,0,0) + '*' + 位移(r2,0,2), res.假日金額);
+  金額(ws, 金額格(p.假日), 公式(位移(r2,0,0) + '*' + 位移(r2,0,2), res.假日金額));
   put(位移(r2, 0, 5), '元');
 
   put(p.共計, '共計:', 字型(12, true));
-  ws.getCell(位移(p.共計, 0, 1)).value = 公式(金額格(p.一般) + '+' + 金額格(p.假日), res.金額);
+  金額(ws, 位移(p.共計, 0, 1), 公式(金額格(p.一般) + '+' + 金額格(p.假日), res.金額));
   ws.getCell(位移(p.共計, 0, 1)).font = 字型(13, true);
   put(位移(p.共計, 0, 3), '元(未稅)');
 }
