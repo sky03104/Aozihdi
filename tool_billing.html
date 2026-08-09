@@ -539,7 +539,12 @@ function 建明細頁(wb, it, cfg, days) {
 
   days.forEach((x, i) => {
     const r = 資料首列 + i;
-    ws.getCell(r, 1).value = new Date(cfg.民國年 + 1911, cfg.月 - 1, x.d);
+    /* ⚠️ 一定要用 Date.UTC，不能用 new Date(年, 月, 日)。
+       後者建立的是「本地時間 00:00」，台灣是 UTC+8，換算成 UTC 會變成前一天 16:00；
+       ExcelJS 寫入 Excel 日期序號時是以 UTC 為準，結果整欄日期往前跑一天
+       （2026-08-09 從咖哩上傳的產出檔發現：8月的明細第一列變成 2026/7/31）。
+       金額用的是人數×時數不看日期，所以對帳測試全過也抓不到這個錯。 */
+    ws.getCell(r, 1).value = new Date(Date.UTC(cfg.民國年 + 1911, cfg.月 - 1, x.d));
     ws.getCell(r, 1).numFmt = 'yyyy/m/d';
     if (it.有時數欄) {
       ws.getCell(r, 2).value = x.時;
