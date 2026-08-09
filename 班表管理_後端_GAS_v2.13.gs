@@ -3,6 +3,19 @@
 // 部署網址：https://script.google.com/macros/s/AKfycbzs56InZLeaHiRJhy1alNfQwDyH0mXEV9t_WJxzfjTjIhf68DHgMiWVQvVG6vKrRZ2x1w/exec
 // （早班晚班共用同一支，透過 SHIFT_CONFIG / payload.shift 分流，非天鷹保全APP帳號系統那支）
 //
+// 版本：2.13 新增（2026-08-09）：
+//   - 【重要】月初換月覆蓋線上班表「之前」先備份成隱藏分頁 _備份_{分頁名}_{yyyy-MM}
+//     原本每月1號凌晨排程會把上個月班表直接蓋掉且無任何備份，班表就此消失；
+//     咖哩是「次月初做上個月的請款」，等於每次要用的班表都剛好在前一天不見。
+//     兩個覆蓋點（排程 checkAndSwitchMonth_、上傳換月 handleUpdate）都已補上。
+//     備份只新增分頁、不刪除也不覆蓋任何既有分頁；同月已備份則跳過保留最早那份；
+//     備份失敗只記 log，不中斷換月流程。
+//   - 手動備份目前班表()：在 Apps Script 編輯器直接執行，立刻把「目前線上這個月」
+//     存一份，不用等下個月1號。**部署後請先跑這個，否則當月班表仍會在下次換月時消失。**
+//   - getScheduleByMonth：讀取指定月份班表（先找線上、再翻歷史備份），找不到明確
+//     回報失敗，不會拿別的月份充數。供請款工具 tool_billing.html 使用。
+//   - listScheduleMonths：列出目前有哪些月份的班表可用
+//   - 讀班表分頁_()：把班表解析邏輯抽出來，線上與歷史備份共用同一套
 // 版本：2.12 新增：
 //   - handleUpdateSchedule：找不到姓名時自動塞入空白列（新增員工同步）、同步寫入職稱欄
 //   - handleDeleteStaff：deleteStaff 動作，清空整列（不刪實體列，避免破壞固定範圍/格式）
@@ -73,6 +86,10 @@ function doGet(e) {
 
   if (action === 'getSchedule') {
     return getScheduleData(e);
+  } else if (action === 'getScheduleByMonth') {
+    return getScheduleByMonth_(e);   // v2.13：指定月份（含歷史備份），請款工具用
+  } else if (action === 'listScheduleMonths') {
+    return listScheduleMonths_(e);   // v2.13：列出有哪些月份可用
   } else if (action === 'getShiftSettings') {
     return getShiftSettings_();
   }
@@ -128,6 +145,73 @@ function getTaipeiYm_() {
 // ============================
 function buildYm_(year, monthNum) {
   return year + '/' + (monthNum < 10 ? '0' + monthNum : String(monthNum));
+}
+
+// ============================
+// v2.13：歷史班表備份
+// ────────────────────────────
+// 背景：月初排程會把「待生效」直接蓋掉線上班表，舊月份班表從此消失。
+// 咖哩是「次月初做上個月的請款」，等於每次要用的班表都剛好在前一天被蓋掉；
+// 出勤爭議時也查不到當時的排班。所以覆蓋前一律先留一份。
+//
+// 安全原則（這裡動的是正式營運資料，寫法刻意保守）：
+//   1. 只「新增」分頁，絕不刪除或覆蓋任何既有分頁
+//   2. 同月備份已存在就直接跳過——保留最早那份（最接近當時真實狀態）
+//   3. 備份失敗只記 log，不能讓它中斷換月流程（班表照常切換比較重要）
+// ============================
+var 備份分頁前綴_ = '_備份_';
+
+function 備份分頁名_(cfg, ym) {
+  // 例：_備份_晚班班表_2026-08
+  return 備份分頁前綴_ + cfg.targetSheetName + '_' + String(ym).replace(/\//g, '-');
+}
+
+function 備份歷史班表_(cfg, tgtSheet, ym) {
+  try {
+    var y = String(ym || '').trim();
+    if (!/^\d{4}\/\d{2}$/.test(y)) {
+      console.log('備份跳過：月份格式不正確（' + ym + '）');
+      return false;
+    }
+    var ss = SpreadsheetApp.openById(cfg.targetSsId);
+    var name = 備份分頁名_(cfg, y);
+    if (ss.getSheetByName(name)) {
+      console.log('備份跳過：' + name + ' 已存在，保留原有那份');
+      return false;
+    }
+    var copy = tgtSheet.copyTo(ss);
+    copy.setName(name);
+    copy.hideSheet(); // 藏起來，不干擾日常操作
+    SpreadsheetApp.flush();
+    console.log('已備份班表：' + name);
+    return true;
+  } catch (err) {
+    // 備份失敗不能擋住換月，班表該切還是要切
+    console.error('備份歷史班表失敗（' + cfg.label + ' ' + ym + '）：' + err.toString());
+    return false;
+  }
+}
+
+// ============================
+// v2.13：一次性手動備份（在 Apps Script 編輯器直接執行這個函式）
+// 用途：程式剛部署時，先把「目前線上這個月」的班表保起來，
+//       不用等到下個月 1 號排程才有備份。
+// ============================
+function 手動備份目前班表() {
+  var 結果 = [];
+  for (var key in SHIFT_CONFIG) {
+    var cfg = SHIFT_CONFIG[key];
+    try {
+      var sh = resolveTargetSheet(cfg);
+      var ym = String(sh.getRange('Z1').getValue() || '').trim();
+      var ok = 備份歷史班表_(cfg, sh, ym);
+      結果.push(cfg.label + ' ' + (ym || '(無月份)') + '：' + (ok ? '已備份' : '跳過（已存在或月份無效）'));
+    } catch (err) {
+      結果.push(cfg.label + '：失敗 ' + err.toString());
+    }
+  }
+  Logger.log(結果.join('\n'));
+  return 結果.join('\n');
 }
 
 // ============================
@@ -197,6 +281,10 @@ function handleUpdate(payload) {
       oldVals   = tgtSheet.getRange('A4:AG30').getValues();
       oldColors = tgtSheet.getRange('A4:AG30').getFontColors();
     }
+
+    // v2.13：換月上傳（直接蓋掉上個月）之前先留一份。
+    // 非換月的一般上傳是同月修訂，不備份，否則每改一次就多一個分頁。
+    if (isMonthSwitch) 備份歷史班表_(cfg, tgtSheet, liveYm);
 
     copyRangeWithFormat(srcSheet, tgtSheet, 'A4:AG30');
 
@@ -300,31 +388,101 @@ function copyRangeWithFormat(srcSheet, tgtSheet, rangeA1) {
 // ============================
 // 班表管理工具：讀取線上班表
 // ============================
+/* v2.13：把「把一個班表分頁讀成 rows」抽出來，線上班表與歷史備份共用同一套解析，
+   免得兩邊各寫一份、日後改了一邊忘了另一邊（本 repo 已經因為這種寫法出過 bug）。 */
+function 讀班表分頁_(sh) {
+  var rng = sh.getRange('A4:AG30');
+  var data = rng.getValues();
+  var colors = rng.getFontColors();
+  var rows = [];
+  for (var r = 0; r < data.length; r++) {
+    var name = String(data[r][1] || '').trim();
+    if (!name) continue;
+    var shifts = [];
+    for (var c = 2; c < 33; c++) {
+      var v = String(data[r][c] == null ? '' : data[r][c]).trim();
+      if (v === '休') {
+        var col = String(colors[r][c] || '').toLowerCase();
+        if (col === '#ff0000' || col === 'red') v = '排休';
+      }
+      shifts.push(v);
+    }
+    rows.push({ roleStr: String(data[r][0] || '').trim(), name: name, shifts: shifts });
+  }
+  return rows;
+}
+
 function getScheduleData(e) {
   try {
     var shiftKey = (e && e.parameter) ? e.parameter.shift : '';
     var cfg = SHIFT_CONFIG[shiftKey] || SHIFT_CONFIG.night;
     var sh = resolveTargetSheet(cfg);
     var ym = String(sh.getRange('Z1').getValue() || '').trim();
-    var rng = sh.getRange('A4:AG30');
-    var data = rng.getValues();
-    var colors = rng.getFontColors();
-    var rows = [];
-    for (var r = 0; r < data.length; r++) {
-      var name = String(data[r][1] || '').trim();
-      if (!name) continue;
-      var shifts = [];
-      for (var c = 2; c < 33; c++) {
-        var v = String(data[r][c] == null ? '' : data[r][c]).trim();
-        if (v === '休') {
-          var col = String(colors[r][c] || '').toLowerCase();
-          if (col === '#ff0000' || col === 'red') v = '排休';
-        }
-        shifts.push(v);
-      }
-      rows.push({ roleStr: String(data[r][0] || '').trim(), name: name, shifts: shifts });
+    return respond({ success: true, ym: ym, rows: 讀班表分頁_(sh) });
+  } catch (err) {
+    return respond({ success: false, error: err.message });
+  }
+}
+
+// ============================
+// v2.13：讀取「指定月份」的班表（給請款工具用）
+// 參數：shift=morning|night、ym=yyyy/MM
+// 先找線上班表（月份剛好相符時），找不到再翻歷史備份分頁。
+// 找不到就明確回報失敗，不會退而求其次拿別的月份充數——
+// 拿錯月份的班表去請款會出大事。
+// ============================
+function getScheduleByMonth_(e) {
+  try {
+    var shiftKey = (e && e.parameter) ? e.parameter.shift : '';
+    var ym = String((e && e.parameter) ? e.parameter.ym : '').trim();
+    if (!/^\d{4}\/\d{2}$/.test(ym)) {
+      return respond({ success: false, error: '月份格式需為 yyyy/MM，收到：' + ym });
     }
-    return respond({ success: true, ym: ym, rows: rows });
+    var cfg = SHIFT_CONFIG[shiftKey] || SHIFT_CONFIG.night;
+
+    var live = resolveTargetSheet(cfg);
+    var liveYm = String(live.getRange('Z1').getValue() || '').trim();
+    if (liveYm === ym) {
+      return respond({ success: true, ym: ym, source: 'live', rows: 讀班表分頁_(live) });
+    }
+
+    var ss = SpreadsheetApp.openById(cfg.targetSsId);
+    var backup = ss.getSheetByName(備份分頁名_(cfg, ym));
+    if (backup) {
+      return respond({ success: true, ym: ym, source: 'backup', rows: 讀班表分頁_(backup) });
+    }
+
+    return respond({
+      success: false,
+      error: '找不到 ' + ym + ' 的' + cfg.label + '班表（線上目前是 ' + (liveYm || '未知') + '，也沒有該月備份）',
+      liveYm: liveYm
+    });
+  } catch (err) {
+    return respond({ success: false, error: err.message });
+  }
+}
+
+// ============================
+// v2.13：列出有哪些月份的班表可用（給前端顯示「可選月份」）
+// ============================
+function listScheduleMonths_(e) {
+  try {
+    var shiftKey = (e && e.parameter) ? e.parameter.shift : '';
+    var cfg = SHIFT_CONFIG[shiftKey] || SHIFT_CONFIG.night;
+    var ss = SpreadsheetApp.openById(cfg.targetSsId);
+    var 前綴 = 備份分頁前綴_ + cfg.targetSheetName + '_';
+    var 月份 = [];
+    ss.getSheets().forEach(function (sh) {
+      var n = sh.getName();
+      if (n.indexOf(前綴) === 0) {
+        var ym = n.substring(前綴.length).replace(/-/g, '/');
+        if (/^\d{4}\/\d{2}$/.test(ym)) 月份.push(ym);
+      }
+    });
+    var liveYm = String(resolveTargetSheet(cfg).getRange('Z1').getValue() || '').trim();
+    if (liveYm && 月份.indexOf(liveYm) < 0) 月份.push(liveYm);
+    月份.sort();
+    return respond({ success: true, months: 月份, liveYm: liveYm });
   } catch (err) {
     return respond({ success: false, error: err.message });
   }
@@ -426,6 +584,9 @@ function checkAndSwitchMonth_() {
       var tgtSheet = resolveTargetSheet(cfg);
       var liveYm = String(tgtSheet.getRange('Z1').getValue() || '').trim();
       if (liveYm === todayYm) continue;
+
+      // v2.13：蓋掉之前先留一份。這行沒有的話，上個月的班表就永遠消失了。
+      備份歷史班表_(cfg, tgtSheet, liveYm);
 
       copyRangeWithFormat(stagingSheet, tgtSheet, 'A4:AG30');
       copyRangeWithFormat(stagingSheet, tgtSheet, 'C2:AG3');
