@@ -195,7 +195,9 @@ const ITEMS = [
     附表:'安全駕駛費用(VIP泊車)附表六', 附表號:'六',
     標題:'7.安全駕駛費用(VIP泊車)', 明細標題:'其他費用', 組別:'(一)安全駕駛費用(VIP泊車)哨增派',
     發票合計欄:'F', 發票標題合併:'A1:E1', 時數欄:'C', 計價:{一般:'D4',假日:'D8',共計:'D6'},
-    時段:{8:'VIP泊車哨 12:30-20:30'} }
+    // 固定 12:30 上哨，時數由咖哩逐日填（8/9/10 小時都出現過），
+    // 下哨時間交給 時段文字_() 自動算，不用窮舉對照表
+    時段:{8:'VIP泊車哨 12:30-20:30'}, 起始:'12:30', 哨名:'VIP泊車哨 ' }
 ];
 const ITEM_BY_NO = {}; ITEMS.forEach(it => ITEM_BY_NO[it.no] = it);
 
@@ -265,17 +267,67 @@ function 日期分行(days, 月) {
   });
 }
 
-/* 附表的內容（日期列舉行＋時段描述＋小計）。
+/* 附表要寫的時段文字。優先用 ITEMS.時段 的對照表；查不到而該項目有固定上哨時間
+   （起始）時，用「起始 ＋ 時數」自動算出下哨時間。
+   VIP泊車固定 12:30 上哨，咖哩會依當天狀況調整時數（8/9/10 小時都有），
+   對照表不可能窮舉，自動算才不會出現「9小時時段(9小時)」這種佔位文字。 */
+function 時段文字_(it, 時) {
+  if (it.時段 && it.時段[時]) return it.時段[時];
+  if (it.起始) {
+    const p = n => String(n).padStart(2, '0');
+    const [h, m] = it.起始.split(':').map(Number);
+    const 總分 = h * 60 + m + Math.round(時 * 60);
+    return (it.哨名 || '') + it.起始 + '-' + p(Math.floor(總分 / 60) % 24) + ':' + p(總分 % 60);
+  }
+  return 時 + '小時時段';
+}
+
+/* 把 days 依「日」聚合。同一天可以有多筆班次（例如 VIP泊車 一個人 8 小時、
+   另一個人 9 小時），這是咖哩 2026-08-09 回報的真實情況。
+   回傳 [{ d, 假, 班次:[{人,時}], 人:當天總人數, 小計:當天總時數 }] */
+function 依日聚合_(days) {
+  const m = new Map();
+  (days || []).forEach(x => {
+    if (!m.has(x.d)) m.set(x.d, { d: x.d, 假: !!x.假, 班次: [], 人: 0, 小計: 0 });
+    const v = m.get(x.d);
+    v.班次.push({ 人: Number(x.人) || 0, 時: Number(x.時) || 0 });
+    v.人 += Number(x.人) || 0;
+    v.小計 += (Number(x.人) || 0) * (Number(x.時) || 0);
+    if (x.假) v.假 = true;   // 同一天只要有一筆標假日，整天算假日
+  });
+  return Array.from(m.values()).sort((a, b) => a.d - b.d);
+}
+
+/* 附表的內容（日期列舉行＋各時段描述＋小計）。
    產生 xlsx 的 建附表() 與畫面上的預覽都走這裡——預覽看到的必須跟實際下載的檔案
-   一模一樣，兩邊各寫一套的話，預覽就失去意義了。 */
+   一模一樣，兩邊各寫一套的話，預覽就失去意義了。
+
+   分段規則：把「當天班次組成完全相同」的日期歸成一段（例如 7/18、7/19 都是
+   1人8H＋1人9H），段內再按時數各列一行。這樣同一天多時段的情況才描述得出來，
+   對照咖哩實檔 7 月的寫法（09~12日一段、18~19日一段、25~26日一段）。 */
 function 附表內容_(it, 月, days) {
-  const 段 = 依時數分組(days).map(g => ({
-    日期行: 日期分行(g.days, 月),
-    時段: ((it.時段 && it.時段[g.時]) || (g.時 + '小時時段')) + '(' + g.時 + '小時) ×' + g.人 + '人'
-          + (g.假 ? '【國定假日】' : ''),
-    每日: g.時 * g.人,
-    小計: g.時 * g.人 * g.days.length
-  }));
+  const 依日 = 依日聚合_(days);
+  const 組 = new Map();
+  依日.forEach(v => {
+    const key = v.班次.slice().sort((a, b) => a.時 - b.時 || a.人 - b.人)
+      .map(b => b.人 + 'x' + b.時).join(',') + (v.假 ? '|假' : '');
+    if (!組.has(key)) 組.set(key, { 假: v.假, 班次: v.班次.slice().sort((a, b) => b.時 - a.時), days: [] });
+    組.get(key).days.push(v);
+  });
+  const 段 = Array.from(組.values()).sort((a, b) => a.days[0].d - b.days[0].d).map(g => {
+    const 天數 = g.days.length;
+    const 明細行 = g.班次.map(b => ({
+      文字: 時段文字_(it, b.時) + '(' + b.時 + '小時) ×' + b.人 + '人'
+            + (g.假 ? '【國定假日】' : ''),
+      小時: b.時 * b.人 * 天數
+    }));
+    return {
+      日期行: 日期分行(g.days, 月),
+      明細行: 明細行,
+      每日: g.班次.reduce((s, b) => s + b.人 * b.時, 0),
+      小計: 明細行.reduce((s, x) => s + x.小時, 0)
+    };
+  });
   return { 段: 段, 總時: 段.reduce((s, x) => s + x.小計, 0) };
 }
 
@@ -569,7 +621,9 @@ function 建明細頁(wb, it, cfg, days) {
   const 表頭 = it.有時數欄 ? ['日期','時數','人數','每日小計H'] : ['日期','人數','每日小計H'];
   表頭.forEach((t, i) => { ws.getCell(3, i+1).value = t; ws.getCell(3, i+1).font = 字型(12, true); });
 
-  days.forEach((x, i) => {
+  /* 同一天可能有多筆班次（VIP泊車 一人8H、另一人9H），明細頁一天只佔一列，
+     所以先聚合：人數加總、每日小計加總。這樣 7/18 會顯示「2人 / 17小時」。 */
+  依日聚合_(days).forEach((x, i) => {
     const r = 資料首列 + i;
     /* ⚠️ 一定要用 Date.UTC，不能用 new Date(年, 月, 日)。
        後者建立的是「本地時間 00:00」，台灣是 UTC+8，換算成 UTC 會變成前一天 16:00；
@@ -582,12 +636,16 @@ function 建明細頁(wb, it, cfg, days) {
        底層仍存日期值（不是文字），排序與公式都還能用。 */
     ws.getCell(r, 1).numFmt = 'mm/dd(aaa)';
     if (it.有時數欄) {
-      ws.getCell(r, 2).value = x.時;
+      /* 漢來頁有獨立的「時數」欄。同一天只有一種時數時照寫並用 B*C 公式；
+         萬一同天有多種時數（自動抓的 H/H2 互斥不會發生，手動改才可能），
+         時數欄改放平均、小計直接寫死值，免得公式算出來跟小計對不起來。 */
+      const 單一 = x.班次.length === 1;
+      ws.getCell(r, 2).value = 單一 ? x.班次[0].時 : Math.round(x.小計 / (x.人 || 1) * 100) / 100;
       ws.getCell(r, 3).value = x.人;
-      ws.getCell(r, 4).value = 公式('B'+r+'*C'+r, x.時 * x.人);
+      ws.getCell(r, 4).value = 單一 ? 公式('B'+r+'*C'+r, x.小計) : x.小計;
     } else {
       ws.getCell(r, 2).value = x.人;
-      ws.getCell(r, 3).value = x.時 * x.人;
+      ws.getCell(r, 3).value = x.小計;
     }
   });
 
@@ -596,7 +654,9 @@ function 建明細頁(wb, it, cfg, days) {
   const res = 算項目(days), 總 = 總計列, 時欄 = it.時數欄;
   const 範圍 = 欄 => 'SUM(' + 欄 + 資料首列 + ':' + 欄 + 資料末列 + ')';
   ws.getCell(總, 1).value = '總計'; ws.getCell(總, 1).font = 字型(12, true);
-  const 時數和 = days.reduce((s, x) => s + (Number(x.時) || 0), 0);
+  // 漢來頁 B 欄是「每人時數」，總計要用聚合後的每日時數相加（不能直接加原始 days，
+  // 同一天有多筆時會重複計入）
+  const 時數和 = 依日聚合_(days).reduce((s, x) => s + (x.人 ? x.小計 / x.人 : 0), 0);
   ws.getCell(總, 2).value = 公式(範圍('B'), it.有時數欄 ? 時數和 : res.人次);
   if (it.有時數欄) ws.getCell(總, 3).value = 公式(範圍('C'), res.人次);
   ws.getCell(時欄 + 總).value = 公式(範圍(時欄), res.總時);
@@ -665,10 +725,13 @@ function 建附表(wb, it, cfg, days) {
     g.日期行.forEach(t => {
       ws.getCell(r, 2).value = t; 靠左(r); merges.push('B'+r+':E'+r); r++;
     });
-    ws.getCell(r, 2).value = '        ' + g.時段;
-    靠左(r);
-    ws.getCell(r, 6).value = g.小計 + '小時';
-    merges.push('B'+r+':E'+r); r++;
+    // 同一天可能有多種時數（VIP泊車 一人8H、另一人9H），各列一行
+    g.明細行.forEach(行 => {
+      ws.getCell(r, 2).value = '        ' + 行.文字;
+      靠左(r);
+      ws.getCell(r, 6).value = 行.小時 + '小時';
+      merges.push('B'+r+':E'+r); r++;
+    });
     ws.getCell(r,3).value='每日共計'; ws.getCell(r,4).value=g.每日; ws.getCell(r,5).value='小時'; r++;
     ws.getCell(r,3).value='共小計';   ws.getCell(r,4).value=g.小計; ws.getCell(r,5).value='小時'; r++;
     r++;
@@ -700,7 +763,7 @@ function buildWorkbook(ExcelJSLib, cfg) {
 
 try { if (typeof module !== 'undefined') Object.assign(module.exports, {
   一般費率, 假日費率, ITEMS, ITEM_BY_NO, 總表項目名,
-  算項目, 算主合約, 撈代號日期, 日期分行, 依時數分組, 月天數, 附表內容_,
+  算項目, 算主合約, 撈代號日期, 日期分行, 依時數分組, 月天數, 附表內容_, 依日聚合_, 時段文字_,
   buildWorkbook, 位移, 公式
 }); } catch (e) {}
 
@@ -724,9 +787,13 @@ function Toast({ msg }) {
 function DayEditor({ 民國年, 月, days, onChange, 預設時, 預設人 }) {
   const 西元 = 民國年 + 1911;
   const 天數 = 月天數(西元, 月);
-  const 已用 = days.map(x => x.d);
+  /* 同一天可以加第二筆（例如 VIP泊車 一人8H、另一人9H），所以日期不去重——
+     全部日期都可選。已經有資料的那天會標「已有」，加進去就是同天第二筆。
+     （2026-08-09 咖哩回報實際會發生這種情況） */
+  const 已用 = {};
+  days.forEach(x => { 已用[x.d] = (已用[x.d] || 0) + 1; });
   const 可加 = [];
-  for (let d = 1; d <= 天數; d++) if (已用.indexOf(d) < 0) 可加.push(d);
+  for (let d = 1; d <= 天數; d++) 可加.push(d);
   const [新日, set新日] = useState('');
 
   const 改 = (i, k, v) => {
@@ -780,7 +847,8 @@ function DayEditor({ 民國年, 月, days, onChange, 預設時, 預設人 }) {
         h('select', { value: 新日, onChange: e => set新日(e.target.value) },
           h('option', { value: '' }, '選擇…'),
           ...可加.map(d => h('option', { key: d, value: d },
-            d + '日 (' + WD[new Date(西元, 月 - 1, d).getDay()] + ')')))),
+            d + '日 (' + WD[new Date(西元, 月 - 1, d).getDay()] + ')'
+            + (已用[d] ? '　已有' + 已用[d] + '筆' : ''))))),
       h('button', { className: 'btn btn-ghost btn-sm', onClick: 加, disabled: !新日 }, '＋ 加入'))
   );
 }
@@ -793,7 +861,8 @@ function ItemCard({ it, 民國年, 月, data, onChange, 展開, setToggle, 來�
       h('div', { className: 'item-name' },
         總表項目名[it.no].replace('\n', ''),
         h('div', { className: 'item-meta' },
-          data.days.length + ' 天 · ' + res.總時 + ' 小時',
+          // 用聚合後的天數，不是筆數——同一天兩筆班次仍然只算一天
+          依日聚合_(data.days).length + ' 天 · ' + res.總時 + ' 小時',
           res.假日時 ? ('（含假日 ' + res.假日時 + 'H）') : '')),
       h('span', { className: 'src-tag ' + (來源 === 'auto' ? 'src-auto' : 'src-man') },
         來源 === 'auto' ? ('班表 ' + it.代號.join('/')) : '手動'),
@@ -830,13 +899,16 @@ function PreviewModal({ cfg, 結果, mc, 總金額, onClose, onDownload, busy })
     return h('div', { className: 'pv', id: 'pv-' + it.no, key: it.no },
       h('div', { className: 'pv-h' }, it.no + '. ' + 總表項目名[it.no].replace('\n', '')),
       h('div', { className: 'pv-sub' },
-        days.length + ' 天 ・ ' + res.總時 + ' 小時 ・ $' + fmt(res.金額)),
+        依日聚合_(days).length + ' 天 ・ ' + res.總時 + ' 小時 ・ $' + fmt(res.金額)),
       days.length
         ? h('div', { className: 'pv-scroll' }, h('table', { className: 'pv-tb' }, h('tbody', null,
-            h('tr', null, h('th', null, '日期'), h('th', null, '人數'), h('th', null, '每人時數'), h('th', null, '每日小計H')),
-            ...days.map(x => h('tr', { key: x.d, className: x.假 ? 'hol' : '' },
+            h('tr', null, h('th', null, '日期'), h('th', null, '人數'), h('th', null, '時數明細'), h('th', null, '每日小計H')),
+            /* 一天一列（同天多筆已聚合），時數明細把各班次列出來，例如「8H×1人 + 9H×1人」 */
+            ...依日聚合_(days).map(x => h('tr', { key: x.d, className: x.假 ? 'hol' : '' },
               h('td', null, x.d + '日 (' + WD[new Date(西元, cfg.月 - 1, x.d).getDay()] + ')' + (x.假 ? ' 假' : '')),
-              h('td', null, x.人), h('td', null, x.時), h('td', null, x.人 * x.時))),
+              h('td', null, x.人),
+              h('td', null, x.班次.map(b => b.時 + 'H×' + b.人 + '人').join(' ＋ ')),
+              h('td', null, x.小計))),
             h('tr', { className: 'sum' },
               h('td', null, '總計'), h('td', null, res.人次), h('td', null, '—'), h('td', null, res.總時)))))
         : h('div', { className: 'empty-note' }, '本月沒有資料，這一項的金額是 0'),
@@ -844,7 +916,8 @@ function PreviewModal({ cfg, 結果, mc, 總金額, onClose, onDownload, busy })
       days.length ? h('div', null,
         h('div', { className: 'pv-sub', style: { marginTop: '11px' } }, '附表' + it.附表號 + '　' + it.組別),
         h('div', { className: 'pv-txt' },
-          附.段.map(g => g.日期行.join('\n') + '\n　　' + g.時段 + '　→ ' + g.小計 + ' 小時').join('\n\n')
+          附.段.map(g => g.日期行.join('\n') + '\n'
+            + g.明細行.map(行 => '　　' + 行.文字 + '　→ ' + 行.小時 + ' 小時').join('\n')).join('\n\n')
           + '\n\n以上共計 ' + 附.總時 + ' 小時')) : null
     );
   };
