@@ -547,7 +547,85 @@ try { if (typeof module !== 'undefined') Object.assign(module.exports, { buildMe
 // 跟真實範本逐格比對後的結果覆寫成靠右/靠左對齊，第1列(標題日期列)只留下框線。
 const RIGHT_ALIGN_CELLS = ['D1', 'F1', 'A1', 'C3', 'I3']; // 月、日、115年、帶隊幹部標籤(早)、帶隊幹部標籤(晚)
 const LEFT_ALIGN_CELLS = ['I1', 'E3', 'L3']; // 標題文字、早班帶隊幹部值、晚班帶隊幹部值
-async function downloadXlsx(rows, dateStr) {
+
+/* ══════════════════════ xlsx 人名格下拉選單（2026-08-10） ══════════════════════
+   咖哩要求：下載的哨表每個人名格都能用下拉選單換人，早班格子只列早班人員、晚班只列晚班。
+   ⚠️ 人名格的值不是純姓名，是「姓名\n時段」（例如 王小明\n0800-2000），所以下拉選項也
+   必須是整串「姓名\n時段」——只給姓名的話，選完人時段會不見，版面就毀了。
+   時段分兩種，決定下拉選項要配什麼時間：
+   ①「跟人走」(perPerson)——一般崗位與帶隊幹部。時段由本人的月班表代號決定
+     （S 班是 0800-1600，其餘照班別預設），所以選項要逐人算 timeForPerson()。
+     ⚠️ 不能拿「格子現在的值」當崗位時段：某崗位這次剛好排到 S 班的人，那格就會是
+     0800-1600，若照抄下去，整個下拉的每個人都會變成 0800-1600（2026-08-10 測到）。
+   ②「跟崗位走」——增派/見習區與漢來飯店(forcedCodes)。時段是那個哨位本身的
+     （巡檢增派 1200-2000、泊車 1230-2030、漢來 1100-2200…），換誰上都一樣。 */
+function nameCellTime(v, shift) {
+  const s = String(v == null ? '' : v);
+  const i = s.indexOf('\n');
+  return i >= 0 ? s.slice(i + 1) : DEFAULT_TIME[shift];
+}
+// 找出所有「該放人名」的格子，連同它屬早班還是晚班、時段跟人走還是跟崗位走
+function buildNameCellPlan(rows) {
+  const plan = [];
+  const add = (r, c, shift, perPerson) => plan.push({
+    r: r, c: c, shift: shift, perPerson: !!perPerson, time: nameCellTime(rows[r][c], shift)
+  });
+  // 固定崗位：標籤沒寫出來的（例如當天沒勾南側門）代表這個哨位不存在，不給下拉
+  POST_DEFS.forEach(def => {
+    if (String(rows[def.row][def.col - 1] || '') !== '') add(def.row, def.col, def.shift, !def.forcedCodes);
+  });
+  add(2, 4, 'early', true);  // 早班帶隊幹部
+  add(2, 11, 'late', true);  // 晚班帶隊幹部
+  // 增派／見習區（第11~17列）：label 欄有字才是真的哨位；'←' 那列是增派時數註記不是人名
+  [{ labelCol: 4, nameCol: 5, shift: 'early' }, { labelCol: 11, nameCol: 12, shift: 'late' }].forEach(function (z) {
+    for (let r = 10; r <= 16; r++) {
+      const label = String(rows[r][z.labelCol] || '');
+      if (label !== '' && label !== '←') add(r, z.nameCol, z.shift, false);
+    }
+  });
+  return plan;
+}
+// 1->A。隱藏表欄數＝不同時段數（實務上個位數），還是寫成支援兩位字母以免哪天時段變多
+function colLetter(n) {
+  let s = '';
+  while (n > 0) { s = String.fromCharCode(65 + (n - 1) % 26) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+function applyNameDropdowns(wb, ws, rows, rosters) {
+  const roster = { early: (rosters && rosters.early) || [], late: (rosters && rosters.late) || [] };
+  if (!roster.early.length && !roster.late.length) return; // 沒名單就整個跳過，維持加這功能之前的行為
+  const plan = buildNameCellPlan(rows);
+  const listWs = wb.addWorksheet('名單', { state: 'hidden' }); // 隱藏而非 veryHidden，咖哩想自己看/改也取消隱藏得了
+  // 分組鍵：跟人走的格子全部共用一欄（'early|*'），跟崗位走的則一個時段一欄
+  const groupKey = p => p.shift + '|' + (p.perPerson ? '*' : p.time);
+  const colOf = {}; // 分組鍵 -> 隱藏表欄號
+  plan.forEach(function (p) {
+    const key = groupKey(p);
+    if (colOf[key] || !roster[p.shift].length) return;
+    const col = Object.keys(colOf).length + 1;
+    colOf[key] = col;
+    roster[p.shift].forEach(function (person, i) {
+      const t = p.perPerson ? timeForPerson(person, p.shift) : p.time;
+      listWs.getCell(i + 1, col).value = person.name + '\n' + t;
+    });
+  });
+  plan.forEach(function (p) {
+    const col = colOf[groupKey(p)];
+    if (!col) return;
+    const L = colLetter(col);
+    ws.getCell(p.r + 1, p.c + 1).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      // 不擋非清單值：現場一定會遇到臨時支援、名字不在當天月班表裡的人，
+      // 下拉是「幫你少打字」，不是「只准選這些」
+      showErrorMessage: false,
+      formulae: ["='名單'!$" + L + "$1:$" + L + "$" + roster[p.shift].length]
+    };
+  });
+}
+try { if (typeof module !== 'undefined') Object.assign(module.exports, { buildNameCellPlan, nameCellTime, colLetter }); } catch (e) {}
+
+async function downloadXlsx(rows, dateStr, rosters) {
   const wb = new ExcelJS.Workbook();
   // 列印設定直接寫進檔案，咖哩下載後開列印預覽就已經是「橫向＋A4＋縮成一頁」，
   // 不用每天手動重設（2026-08-07：原本沒寫 pageSetup，Excel 會套自己的預設＝直向不縮放）。
@@ -587,6 +665,9 @@ async function downloadXlsx(rows, dateStr) {
   // 對齊蓋掉，變成整個合併範圍都套用「最後一格」的樣式，不是anchor那格的樣式
   // （2026-07-20實測抓到：A1本來要靠右對齊，結果被B1/C1的置中設定蓋掉）。
   MERGE_RANGES.forEach(range => ws.mergeCells(range));
+  // 下拉選單放在合併之後：人名格都是合併範圍的左上角那格（例如 C4:D4 的 C4），
+  // 驗證要掛在那格上；先合併再掛，才不會被合併過程動到
+  applyNameDropdowns(wb, ws, rows, rosters);
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
@@ -845,7 +926,9 @@ function GenerateTab({ postConfig }) {
         parkNames, manualExtraPosts, leaderEarly, leaderLate
       });
       const dateLabel = y + '/' + String(m).padStart(2, '0') + '/' + String(d).padStart(2, '0') + ' 星期' + WEEKDAY_ZH[weekdayIdx];
-      setResult({ rows, warnings, forcedWarnings, dateLabel, year: y, month: m, day: d, weekday: WEEKDAY_ZH[weekdayIdx] });
+      // rosters 一起存起來：匯出 xlsx 時要拿它產生人名格的下拉選單（早班格列早班人員、晚班列晚班）
+      setResult({ rows, warnings, forcedWarnings, dateLabel, year: y, month: m, day: d, weekday: WEEKDAY_ZH[weekdayIdx],
+        rosters: { early: r.data.early || [], late: r.data.late || [] } });
       showToast('預覽已產生', 'ok');
     } catch (e) {
       showToast('產生失敗：' + e.message, 'err');
@@ -856,7 +939,7 @@ function GenerateTab({ postConfig }) {
   async function handleExportXlsx() {
     if (!result) return;
     try {
-      await downloadXlsx(result.rows, result.dateLabel.split(' ')[0]);
+      await downloadXlsx(result.rows, result.dateLabel.split(' ')[0], result.rosters);
       showToast('xlsx 已下載', 'ok');
     } catch (e) {
       showToast('產生xlsx失敗：' + e.message, 'err');
