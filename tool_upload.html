@@ -1474,12 +1474,18 @@ function gdDoPrint(){
     '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>哨表列印</title>'+
     '<style>'+
     'body{font-family:"Microsoft JhengHei",sans-serif;margin:0;padding:0;background:white;}'+
+    // 邊界對齊排哨工具（tool_guard_gen.html）下載的 xlsx：上下 0.35 吋＝8.89mm、
+    // 左右 0.25 吋＝6.35mm，兩邊印出來的版面才會一致（2026-08-10 咖哩要求）
     // 第1頁：橫式
-    '@page landscape-page{size:A4 landscape;margin:6mm 4mm;}'+
+    '@page landscape-page{size:A4 landscape;margin:8.89mm 6.35mm;}'+
     // 第2頁：直式
-    '@page portrait-page{size:A4 portrait;margin:6mm 4mm;}'+
+    '@page portrait-page{size:A4 portrait;margin:8.89mm 6.35mm;}'+
     '.page-landscape{page:landscape-page;page-break-after:always;}'+
     '.page-portrait{page:portrait-page;}'+
+    // xlsx 那邊是靠 fitToPage 縮成一頁，CSS 沒有對應的東西，只能盡量不讓它分頁：
+    // 整份表格與每一列都禁止被切斷，內容真的超過一頁時才會溢出到下一頁
+    'table{page-break-inside:avoid;}'+
+    'tr,td{page-break-inside:avoid;}'+
     '</style>'+
     '</head><body>'+
     // 第1頁橫式
