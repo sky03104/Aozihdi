@@ -644,7 +644,10 @@ async function downloadXlsx(rows, dateStr, rosters) {
     row.forEach((val, c) => { ws.getCell(r + 1, c + 1).value = val; });
   });
   for (let c = 1; c <= 14; c++) ws.getColumn(c).width = 12;
-  for (let r = 1; r <= 18; r++) ws.getRow(r).height = 32;
+  // 列高 33.75 點（＝45 像素）。2026-08-10 咖哩指定；原本寫 32 點，Excel 會換算成
+  // 42 像素再倒回去顯示成 31.5，跟他要的高度差一截。33.75 是 0.75 的整數倍，
+  // 換算成像素剛好整數，不會被 Excel 取整成別的值
+  for (let r = 1; r <= 18; r++) ws.getRow(r).height = 33.75;
   const thinBorder = { style: 'thin' };
   for (let r = 1; r <= 18; r++) {
     for (let c = 1; c <= 14; c++) {
