@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>天鷹保全 · 生理假紀錄</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0A0C10; --surface:#0D0F14; --card:rgba(255,255,255,.03);
+  --border:rgba(255,255,255,.08); --gold:#D4A800; --gold2:#FFD700;
+  --indigo:#818CF8; --indigo2:#6366F1;
+  --success:#4ADE80; --danger:#F87171; --warn:#FB923C;
+  --text:#F5F5F5; --muted:#8A95A8;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;min-height:100vh;}
+.wrap{max-width:820px;margin:0 auto;padding:14px 13px 90px;}
+
+.hd{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.back{background:var(--card);border:1px solid var(--border);color:var(--text);
+  padding:11px 14px;border-radius:10px;text-decoration:none;display:flex;align-items:center;gap:5px;
+  font-size:14px;min-height:44px;}
+.hd-t{flex:1;text-align:center;}
+.hd-t .t1{color:var(--gold);font-size:18px;font-weight:700;letter-spacing:1px;}
+.hd-t .t2{color:var(--muted);font-size:10.5px;letter-spacing:2px;margin-top:2px;}
+
+.privacy{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);
+  color:var(--danger);border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.6;margin-bottom:12px;}
+
+.bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+select,input[type=text],input[type=date],input[type=number],textarea{
+  background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);
+  padding:11px 12px;border-radius:9px;font-size:15px;font-family:inherit;min-height:46px;width:100%;}
+select option{background:#0D0F14;color:var(--text);}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold);}
+.bar .yr{flex:0 0 120px;} .bar .q{flex:1;min-width:140px;}
+
+.card{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;
+  background:rgba(255,255,255,.02);overflow:hidden;}
+.card-h{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;}
+.nm{flex:1;min-width:0;}
+.nm .n1{font-size:15px;font-weight:700;}
+.nm .n2{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.5;}
+.badge{font-size:12px;font-weight:900;padding:5px 10px;border-radius:8px;white-space:nowrap;}
+.b-ok{background:rgba(74,222,128,.14);color:var(--success);}
+.b-warn{background:rgba(251,146,60,.16);color:var(--warn);}
+.b-over{background:rgba(248,113,113,.16);color:var(--danger);}
+.card-b{padding:0 14px 12px;border-top:1px solid var(--border);}
+
+.rec{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;
+  padding:10px 2px;border-bottom:1px solid var(--border);font-size:13.5px;}
+.rec:last-child{border-bottom:none;}
+.rec .d{min-width:0;}
+.rec .d .dd{font-weight:700;}
+.rec .d .dn{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.5;}
+.tag{font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(255,255,255,.06);color:var(--muted);white-space:nowrap;}
+.tag-sick{background:rgba(248,113,113,.15);color:var(--danger);}
+.del{background:none;border:none;color:var(--danger);font-size:19px;cursor:pointer;padding:6px 8px;line-height:1;}
+
+.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;z-index:40;
+  background:linear-gradient(135deg,#D4A800,#FFD700);color:#0A0C10;border:none;
+  padding:15px 26px;border-radius:30px;font-size:16px;font-weight:900;font-family:inherit;
+  cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.5);display:flex;align-items:center;gap:7px;}
+
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:60;display:flex;align-items:flex-end;justify-content:center;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:18px 18px 0 0;
+  width:100%;max-width:520px;max-height:92vh;overflow-y:auto;padding:16px 16px 24px;}
+.modal h3{margin:0 0 14px;font-size:17px;color:var(--gold2);}
+.fld{margin-bottom:12px;}
+.fld label{display:block;font-size:13px;color:var(--muted);margin-bottom:5px;}
+.seg{display:flex;gap:8px;}
+.seg button{flex:1;padding:12px;border-radius:9px;background:var(--card);
+  border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:14.5px;cursor:pointer;min-height:46px;}
+.seg button.on{background:rgba(212,168,0,.18);border-color:var(--gold);color:var(--gold2);font-weight:700;}
+.btns{display:flex;gap:9px;margin-top:16px;}
+.btn{flex:1;border:none;border-radius:10px;padding:14px;font-size:15.5px;font-weight:700;
+  font-family:inherit;cursor:pointer;min-height:50px;}
+.btn-pri{background:linear-gradient(135deg,#D4A800,#FFD700);color:#0A0C10;}
+.btn-gh{background:var(--card);border:1px solid var(--border);color:var(--text);flex:0 0 96px;}
+.btn:disabled{opacity:.45;}
+
+.note{font-size:12px;color:var(--muted);line-height:1.65;margin-top:6px;}
+.empty{color:var(--muted);font-size:13.5px;text-align:center;padding:34px 12px;line-height:1.8;}
+.errbox{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:var(--danger);
+  border-radius:12px;padding:18px;text-align:center;font-size:14px;line-height:1.7;}
+.errbox i{font-size:30px;display:block;margin-bottom:8px;}
+#twrap{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;z-index:80;display:flex;
+  flex-direction:column;gap:8px;align-items:center;}
+.toast{padding:12px 18px;border-radius:10px;font-size:14px;font-weight:700;max-width:90vw;text-align:center;}
+.t-ok{background:#22C55E;color:#fff;} .t-err{background:#E53E3E;color:#fff;} .t-inf{background:#334155;color:#fff;}
+#splash{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;
+  z-index:90;transition:opacity .4s;} #splash.out{opacity:0;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="splash"><div style="color:var(--gold);font-size:16px;font-weight:700;letter-spacing:2px">天鷹保全</div></div>
+<div class="wrap" id="app" style="display:none">
+  <div class="hd">
+    <a class="back" id="backBtn" href="index.html"><i class="ti ti-arrow-left"></i>返回</a>
+    <div class="hd-t"><div class="t1">生理假紀錄</div><div class="t2">TIANYING SECURITY</div></div>
+    <div style="width:82px"></div>
+  </div>
+  <div class="privacy">
+    <i class="ti ti-lock"></i> 本頁含健康相關個資（特種個資），僅供排班與差勤管理使用，請勿擷圖外流或轉述他人。
+  </div>
+  <div class="bar">
+    <select class="yr" id="yr"></select>
+    <input class="q" id="q" type="text" placeholder="🔍 搜尋姓名…" oninput="render()">
+  </div>
+  <div id="list"></div>
+</div>
+<button class="fab" id="fab" style="display:none" onclick="openAdd()"><i class="ti ti-plus"></i>新增紀錄</button>
+<div id="modal"></div>
+<div id="twrap"></div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   天鷹保全 · 生理假紀錄
+   ────────────────────────────────────────────────────────────────────
+   主管（副隊長以上）登記女性員工生理假，並自動統計年度天數與法規狀態。
+
+   ⚠️ 本工具處理健康相關個資（個資法第6條特種個資）。三層權限：
+      index.html DEFAULT_PERMS → 本頁 checkPermission() → GAS 每個 action
+      再驗一次 token+角色。前兩層都在使用者瀏覽器裡、改得掉，後端那層才是真的。
+
+   法規依據（性別平等工作法第14條）：
+      女性受僱者因生理日致工作有困難者，每月得請生理假一日，
+      全年請假日數未逾三日，不併入病假計算，其餘日數併入病假計算。
+   ════════════════════════════════════════════════════════════════════ */
+
+var LEAVE_GAS_URL = 'https://script.google.com/macros/s/AKfycbzo-nh_broJRph-y7ocobFRe-pPF1CX2Q4yNVex-P2dqKyKHMcXqpAI_hTMtOyTi6v1wg/exec';
+var ACCOUNT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxEVBHseDpLWiWe4d8kLcCHbVFiKAK9wyoLwqNkt59PS4vPCY9QfG0_wiDJf2coO3zMcg/exec';
+var VICE_PLUS_ROLES = ['vicecaptain', 'captain', 'executive', 'admin'];
+
+/* 全年不併入病假的上限（天）。法規值，不要隨手改。 */
+var 年度免併病假上限 = 3;
+/* 每月得請的天數上限 */
+var 每月上限 = 1;
+
+var S = { records: [], employees: {}, year: new Date().getFullYear(), open: {}, form: {} };
+
+/* ════════════════════════════════════════════════════════════════
+   核心計算（純函式，可用 node 直接測，不依賴畫面）
+   ════════════════════════════════════════════════════════════════ */
+
+/* 兩個 YYYY-MM-DD 相差幾天 */
+function 日差(a, b) {
+  var d1 = new Date(a + 'T00:00:00Z'), d2 = new Date(b + 'T00:00:00Z');
+  return Math.round((d2 - d1) / 86400000);
+}
+function 加日(ymd, n) {
+  var d = new Date(ymd + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/* 單一員工的年度統計。
+   回傳每筆紀錄的累計天數與「是否併入病假」，以及全年合計。
+   併入病假的判定：依日期排序累加，累計超過 3 天之後的部分要併入病假
+   （法規是「全年未逾三日不併入」，所以第 3.5 天起就開始併）。 */
+function 算年度(records) {
+  var 排序 = records.slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+  var 累計 = 0, 明細 = [], 併病假天數 = 0;
+  for (var i = 0; i < 排序.length; i++) {
+    var r = 排序[i];
+    var 前 = 累計;
+    累計 += r.days;
+    // 這筆有多少落在 3 天額度內、多少要併病假
+    var 免併 = Math.max(0, Math.min(r.days, 年度免併病假上限 - 前));
+    var 併 = r.days - 免併;
+    併病假天數 += 併;
+    明細.push({ rec: r, 累計: 累計, 併病假: 併 > 0, 併病假天數: 併 });
+  }
+  return { 明細: 明細, 合計: 累計, 併病假天數: 併病假天數, 超過上限: 累計 > 年度免併病假上限 };
+}
+
+/* 找出同一個月請超過 1 天的月份（法規：每月得請一日） */
+function 超月上限的月份(records) {
+  var byMonth = {};
+  records.forEach(function (r) {
+    var m = String(r.date || '').slice(0, 7);
+    if (m) byMonth[m] = (byMonth[m] || 0) + r.days;
+  });
+  return Object.keys(byMonth).filter(function (m) { return byMonth[m] > 每月上限; })
+    .sort().map(function (m) { return { 月: m, 天數: byMonth[m] }; });
+}
+
+/* 預估下次生理期。
+   ⚠️ 這是「參考區間」不是預測結果，資料本來就有限、週期也會變動。
+   規則：
+     - 至少要 2 次紀錄才算得出間隔，只有 1 次一律回 null（沒根據就不猜）
+     - 只取最近 6 次，太舊的週期參考價值低
+     - 間隔在 15~60 天之外視為異常剔除（同一次經期分兩天登記會產生 1~2 天的
+       假間隔，會嚴重拉低平均；超過 60 天多半是中間漏登記）
+     - 回傳預估日與 ±3 天的區間 */
+function 預估下次(records) {
+  var 日期 = records.map(function (r) { return r.date; })
+    .filter(function (d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); })
+    .sort();
+  // 同一天可能有多筆（不該發生，GAS 有擋，但前端也去重一次）
+  日期 = 日期.filter(function (d, i) { return i === 0 || d !== 日期[i - 1]; });
+  if (日期.length < 2) return null;
+  var 最近 = 日期.slice(-6);
+  var 間隔 = [];
+  for (var i = 1; i < 最近.length; i++) {
+    var g = 日差(最近[i - 1], 最近[i]);
+    if (g >= 15 && g <= 60) 間隔.push(g);
+  }
+  if (!間隔.length) return null;
+  var 平均 = Math.round(間隔.reduce(function (a, b) { return a + b; }, 0) / 間隔.length);
+  var 末次 = 最近[最近.length - 1];
+  var 預估 = 加日(末次, 平均);
+  return { 平均間隔: 平均, 末次: 末次, 預估: 預估,
+           起: 加日(預估, -3), 訖: 加日(預估, 3), 依據筆數: 間隔.length + 1 };
+}
+
+/* 把所有紀錄依員工分組，附上該年度統計與預估 */
+function 分組統計(records, year) {
+  var 本年 = records.filter(function (r) { return String(r.date || '').slice(0, 4) === String(year); });
+  var by = {};
+  本年.forEach(function (r) {
+    if (!by[r.empId]) by[r.empId] = { empId: r.empId, name: r.name, recs: [] };
+    by[r.empId].recs.push(r);
+    if (r.name) by[r.empId].name = r.name;
+  });
+  return Object.keys(by).map(function (id) {
+    var g = by[id];
+    // 預估要看「跨年度」的完整紀錄，只用本年會在年初算不出來
+    var 全部 = records.filter(function (r) { return r.empId === id; });
+    return { empId: id, name: g.name, 年度: 算年度(g.recs),
+             月超標: 超月上限的月份(g.recs), 預估: 預估下次(全部) };
+  }).sort(function (a, b) { return b.年度.合計 - a.年度.合計; });
+}
+
+try { if (typeof module !== 'undefined') Object.assign(module.exports, {
+  算年度: 算年度, 預估下次: 預估下次, 超月上限的月份: 超月上限的月份,
+  分組統計: 分組統計, 日差: 日差, 加日: 加日,
+  年度免併病假上限: 年度免併病假上限, 每月上限: 每月上限
+}); } catch (e) {}
+</script>
+<script>
+/* ════════════════════════════════════════════════════════════════
+   以下為畫面與通訊
+   ════════════════════════════════════════════════════════════════ */
+if (typeof document !== 'undefined') {
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(m){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
+function getSessionUser(){
+  try { return JSON.parse(localStorage.getItem('hsh_session_user') || 'null'); } catch(e){ return null; }
+}
+function getAuthToken(){
+  try { return localStorage.getItem('hsh_auth_token') || ''; } catch(e){ return ''; }
+}
+function toast(msg, type){
+  var d = document.createElement('div');
+  d.className = 'toast ' + (type==='ok'?'t-ok':type==='err'?'t-err':'t-inf');
+  d.textContent = msg;
+  $('twrap').appendChild(d);
+  setTimeout(function(){ if(d.parentNode) d.parentNode.removeChild(d); }, 3200);
+}
+function hideSplash(){ var s=$('splash'); if(s){ s.classList.add('out'); setTimeout(function(){ s.remove(); },450); } }
+function showNoPerm(msg){
+  hideSplash();
+  document.body.innerHTML = '<div style="position:fixed;inset:0;display:flex;align-items:center;'+
+    'justify-content:center;padding:20px;background:#0A0C10">'+
+    '<div class="errbox" style="max-width:360px"><i class="ti ti-lock"></i><div>'+esc(msg)+'</div></div></div>';
+}
+function checkPermission(){
+  var u = getSessionUser();
+  if(!u || !u.empId){ showNoPerm('請從天鷹保全 App 登入後開啟本工具'); return false; }
+  if(!getAuthToken()){ showNoPerm('登入已失效，請重新從天鷹保全 App 登入'); return false; }
+  if(VICE_PLUS_ROLES.indexOf(u.role) === -1){ showNoPerm('此工具僅限副隊長以上使用，如有需要請洽主管'); return false; }
+  return true;
+}
+
+/* ── 資料 ── */
+async function loadEmployees(){
+  try {
+    var res = await fetch(ACCOUNT_GAS_URL + '?action=getApprovedUsers');
+    var d = await res.json();
+    if(d && d.status === 'ok' && d.users) S.employees = d.users;
+  } catch(e){ /* 拿不到就留空，不擋其他功能 */ }
+}
+async function loadRecords(){
+  try {
+    var res = await fetch(LEAVE_GAS_URL + '?action=getRecords&token=' + encodeURIComponent(getAuthToken()));
+    var d = await res.json();
+    if(d.status !== 'ok') throw new Error(d.msg || '讀取失敗');
+    S.records = d.records || [];
+    render();
+  } catch(err){
+    $('list').innerHTML = '<div class="errbox"><i class="ti ti-alert-triangle"></i><div>載入失敗：'+
+      esc(err.message)+'</div></div>';
+  }
+}
+
+/* ── 畫面 ── */
+function 年份選單(){
+  var ys = {}; ys[new Date().getFullYear()] = 1;
+  S.records.forEach(function(r){ var y=String(r.date||'').slice(0,4); if(y) ys[y]=1; });
+  var arr = Object.keys(ys).sort().reverse();
+  $('yr').innerHTML = arr.map(function(y){
+    return '<option value="'+y+'"'+(String(y)===String(S.year)?' selected':'')+'>'+y+' 年</option>';
+  }).join('');
+}
+
+function render(){
+  年份選單();
+  var q = ($('q').value || '').trim();
+  var 群 = 分組統計(S.records, S.year);
+  if(q) 群 = 群.filter(function(g){ return String(g.name||'').indexOf(q) >= 0; });
+
+  if(!群.length){
+    $('list').innerHTML = '<div class="empty">'+(q ? '找不到「'+esc(q)+'」的紀錄'
+      : S.year + ' 年還沒有任何生理假紀錄。<br>按下方「新增紀錄」開始登記。')+'</div>';
+    return;
+  }
+
+  $('list').innerHTML = 群.map(function(g){
+    var 合計 = g.年度.合計;
+    var cls = g.年度.超過上限 ? 'b-over' : (合計 >= 年度免併病假上限 ? 'b-warn' : 'b-ok');
+    var 提醒 = [];
+    if(g.年度.超過上限) 提醒.push('超過 '+年度免併病假上限+' 天，超出的 '+
+      g.年度.併病假天數+' 天併入病假');
+    if(g.月超標.length) 提醒.push('同月超過 '+每月上限+' 天：'+
+      g.月超標.map(function(m){ return m.月.slice(5)+'月('+m.天數+'天)'; }).join('、'));
+    var 預 = g.預估;
+    var 預文 = 預 ? ('下次約 '+預.起.slice(5).replace('-','/')+'～'+預.訖.slice(5).replace('-','/')+
+      '（週期約 '+預.平均間隔+' 天）') : '紀錄未滿 2 次，尚無法推估';
+
+    var open = !!S.open[g.empId];
+    var 明細 = g.年度.明細.slice().reverse().map(function(m){
+      var r = m.rec;
+      return '<div class="rec">'+
+        '<div class="d"><div class="dd">'+esc(r.date)+'　'+(r.days===0.5?'半天':'全天')+'</div>'+
+        '<div class="dn">'+(r.shift?esc(r.shift)+'　':'')+(r.note?esc(r.note)+'　':'')+
+        '累計 '+m.累計+' 天'+(r.byName?'　· 登記：'+esc(r.byName):'')+'</div></div>'+
+        (m.併病假 ? '<span class="tag tag-sick">併病假</span>' : '<span class="tag">不併病假</span>')+
+        '<button class="del" onclick="delRec('+r.id+')" title="刪除"><i class="ti ti-trash"></i></button>'+
+      '</div>';
+    }).join('');
+
+    return '<div class="card">'+
+      '<div class="card-h" onclick="toggle(\''+esc(g.empId)+'\')">'+
+        '<div class="nm"><div class="n1">'+esc(g.name||g.empId)+'</div>'+
+        '<div class="n2">'+預文+(提醒.length?'<br>⚠ '+提醒.join('；'):'')+'</div></div>'+
+        '<span class="badge '+cls+'">'+合計+' 天</span>'+
+        '<i class="ti ti-chevron-'+(open?'up':'down')+'" style="color:var(--muted)"></i>'+
+      '</div>'+
+      (open ? '<div class="card-b">'+明細+'</div>' : '')+
+    '</div>';
+  }).join('');
+}
+function toggle(id){ S.open[id] = !S.open[id]; render(); }
+
+/* ── 新增 ── */
+function openAdd(){
+  var ids = Object.keys(S.employees).sort(function(a,b){
+    return String(S.employees[a].name||'').localeCompare(String(S.employees[b].name||''),'zh-Hant');
+  });
+  var opts = '<option value="">— 請選擇 —</option>' + ids.map(function(id){
+    return '<option value="'+esc(id)+'">'+esc(S.employees[id].name||id)+'</option>'; }).join('');
+  S.form = { days: 1, shift: '' };
+  $('modal').innerHTML =
+   '<div class="mask" onclick="if(event.target===this)closeAdd()"><div class="modal">'+
+    '<h3>新增生理假紀錄</h3>'+
+    '<div class="fld"><label>員工</label><select id="f-emp">'+opts+'</select></div>'+
+    '<div class="fld"><label>日期</label><input id="f-date" type="date" value="'+
+      new Date().toISOString().slice(0,10)+'"></div>'+
+    '<div class="fld"><label>天數</label><div class="seg" id="f-days">'+
+      '<button class="on" onclick="setDays(1)">全天</button>'+
+      '<button onclick="setDays(0.5)">半天</button></div></div>'+
+    '<div class="fld"><label>班別（選填）</label><div class="seg" id="f-shift">'+
+      '<button onclick="setShift(\'早班\')">早班</button>'+
+      '<button onclick="setShift(\'晚班\')">晚班</button>'+
+      '<button class="on" onclick="setShift(\'\')">不填</button></div></div>'+
+    '<div class="fld"><label>備註（選填）</label>'+
+      '<textarea id="f-note" rows="2" placeholder="例：已找人代班"></textarea></div>'+
+    '<div class="note">同一人同一天只能登記一筆。送出後可在列表展開刪除。</div>'+
+    '<div class="btns"><button class="btn btn-gh" onclick="closeAdd()">取消</button>'+
+      '<button class="btn btn-pri" id="f-submit" onclick="submitAdd()">送出</button></div>'+
+   '</div></div>';
+}
+function closeAdd(){ $('modal').innerHTML = ''; }
+function setDays(v){
+  S.form.days = v;
+  [].forEach.call($('f-days').children, function(b,i){ b.classList.toggle('on', (i===0)===(v===1)); });
+}
+function setShift(v){
+  S.form.shift = v;
+  var map = ['早班','晚班',''];
+  [].forEach.call($('f-shift').children, function(b,i){ b.classList.toggle('on', map[i]===v); });
+}
+async function submitAdd(){
+  var empId = $('f-emp').value;
+  var date = $('f-date').value;
+  if(!empId){ toast('請選擇員工','err'); return; }
+  if(!date){ toast('請選擇日期','err'); return; }
+  var name = (S.employees[empId] && S.employees[empId].name) || '';
+  var btn = $('f-submit'); btn.disabled = true; btn.textContent = '送出中…';
+  try {
+    var body = new URLSearchParams();
+    body.append('action','addRecord');
+    body.append('token', getAuthToken());
+    body.append('data', JSON.stringify({ date:date, empId:empId, name:name,
+      days:S.form.days, shift:S.form.shift, note:($('f-note').value||'').trim() }));
+    var res = await fetch(LEAVE_GAS_URL, { method:'POST', body:body });
+    var d = await res.json();
+    if(d.status !== 'ok') throw new Error(d.msg || '未知錯誤');
+    toast('✓ 已新增','ok');
+    closeAdd();
+    loadRecords();
+  } catch(err){
+    toast('✗ '+err.message,'err');
+  } finally { btn.disabled = false; btn.textContent = '送出'; }
+}
+
+async function delRec(id){
+  if(!window.confirm('確定刪除這筆紀錄？此動作無法復原。')) return;
+  try {
+    var body = new URLSearchParams();
+    body.append('action','deleteRecord');
+    body.append('token', getAuthToken());
+    body.append('data', JSON.stringify({ id:id }));
+    var res = await fetch(LEAVE_GAS_URL, { method:'POST', body:body });
+    var d = await res.json();
+    if(d.status !== 'ok') throw new Error(d.msg || '未知錯誤');
+    toast('🗑 已刪除','ok');
+    loadRecords();
+  } catch(err){ toast('✗ 刪除失敗：'+err.message,'err'); }
+}
+
+/* ── 啟動 ── */
+window.addEventListener('load', function(){
+  // 返回主選單要保留工號（天鷹規範：工號狀態不可遺失）
+  var empId = new URLSearchParams(location.search).get('empId') || '';
+  if(empId) $('backBtn').href = 'index.html?empId=' + encodeURIComponent(empId);
+  if(!checkPermission()) return;
+  $('app').style.display = '';
+  $('fab').style.display = '';
+  $('yr').addEventListener('change', function(){ S.year = this.value; render(); });
+  Promise.all([loadEmployees(), loadRecords()]).then(hideSplash);
+  setTimeout(hideSplash, 3000); // 保險：網路慢也要讓畫面出現
+});
+
+}
+</script>
+</body>
+</html>
