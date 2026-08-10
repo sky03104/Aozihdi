@@ -1420,11 +1420,13 @@ function gdDoPrint(){
   }
 
   // 建立表格 HTML
-  // ⚠️ 欄寬要用「百分比」不能用固定 pt：配上 table-layout:fixed 時，固定 pt 會直接
-  // 決定表格總寬（各欄相加，通常遠小於紙張寬度），外層的 width:100% 形同無效，
-  // 整張表就縮在紙張左上角一小塊（2026-08-10 咖哩的列印預覽截圖抓到）。
-  // 改成各欄佔總寬的百分比，欄與欄的比例維持原樣，整體則跟著紙張撐滿。
-  let tableHtml='<table style="border-collapse:collapse;width:100%;height:100%;table-layout:fixed;">';
+  // 版面策略＝完全照抄 Excel 的 fitToPage：把 xlsx 原本的欄寬、列高、字級都保留成
+  // 「點」，列印前再整體乘上同一個縮放比 scale＝min(可用寬/原始寬, 可用高/原始高, 1)。
+  // ⚠️ 三個踩過的坑（2026-08-10 咖哩三輪截圖回報）：
+  //   ① 不能寬高各自硬撐（欄寬用 %、列高用 100%）——那不是等比例，版面比例會歪掉。
+  //   ② scale 上限是 1：Excel 的 fitToPage 只縮不放，內容少時就讓下面留白，不會拉滿整張紙。
+  //   ③ 縮放比要在「紙張」尺寸上算，不能用螢幕上的 clientWidth（列印前視窗是螢幕寬，算出來是錯的）。
+  let tableHtml='<table style="border-collapse:collapse;table-layout:fixed;margin:0 auto;">';
   const colPt=[];
   for(let c=0;c<=realLastCol;c++){
     const w=colWidths[c];
@@ -1433,12 +1435,19 @@ function gdDoPrint(){
     else if(w&&w.wpx)wPt=Math.round(w.wpx*0.75);
     colPt.push(wPt);
   }
-  const totalPt=colPt.reduce(function(a,b){return a+b;},0)||1;
   tableHtml+='<colgroup>';
   colPt.forEach(function(wPt){
-    tableHtml+='<col style="width:'+(wPt/totalPt*100).toFixed(4)+'%;">';
+    tableHtml+='<col data-pt="'+wPt+'" style="width:'+wPt+'pt;">';
   });
   tableHtml+='</colgroup><tbody>';
+  // 列高：xlsx 有寫就用它的，沒有就用排哨工具的預設 33.75pt
+  const rowInfo=ws['!rows']||[];
+  const rowPtOf=function(r){
+    const ri=rowInfo[r];
+    if(ri&&ri.hpt)return ri.hpt;
+    if(ri&&ri.hpx)return ri.hpx*0.75;
+    return 33.75;
+  };
 
   // 合併儲存格：原本完全沒處理，所以像「13人/12HR+8HR(0800-1600) 增派…」這種在 xlsx 裡
   // 跨 6 欄（B18:G18）的內容，會被硬塞進單一窄欄，撐出一個又高又窄的格子，
@@ -1474,7 +1483,12 @@ function gdDoPrint(){
       // 框線原本完全沒設，所以印出來整張是白的（咖哩回報「沒有框線」）。
       // 比照排哨工具產出的 xlsx：第1列（標題日期列）只有下框線，其餘四邊細框線。
       const border=(r===0)?'border-bottom:0.75pt solid #000;':'border:0.75pt solid #000;';
-      let style=border+'padding:2pt 3pt;overflow:hidden;word-break:break-all;white-space:normal;vertical-align:middle;font-size:9pt;';
+      // 字級跟著 xlsx 走（排哨工具是第1列 14pt、其餘 12pt），原始值放 data-pt，
+      // 列印前再乘上 scale。word-break 改回 normal：break-all 會把「0800-2000」
+      // 從中間硬切成兩行，Excel 不會這樣
+      let fontPt=(cell&&cell.s&&cell.s.font&&cell.s.font.sz)?cell.s.font.sz:(r===0?14:12);
+      let style=border+'padding:1pt 2pt;overflow:hidden;word-break:normal;'
+        +'white-space:pre-wrap;text-align:center;vertical-align:middle;font-size:'+fontPt+'pt;line-height:1.15;';
       if(cell&&cell.s){
         const s=cell.s;
         if(s.fgColor&&s.fgColor.rgb){
@@ -1494,14 +1508,15 @@ function gdDoPrint(){
       const safe=val.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const a=mAnchor[r+','+c];
       const span=a?((a.rs>1?' rowspan="'+a.rs+'"':'')+(a.cs>1?' colspan="'+a.cs+'"':'')):'';
-      row+='<td'+span+' style="'+style+'">'+safe+'</td>';
+      row+='<td'+span+' data-pt="'+fontPt+'" style="'+style+'">'+safe+'</td>';
     }
-    trHtml.push(row);
+    trHtml.push({html:row,pt:rowPtOf(r)});
   }
-  // 列高不在這裡寫死：CSS 的 table/tr height 是「最小高度」語意，內容一多就被撐開，
-  // 空白列則被壓到極扁（2026-08-10 實測：同一張表列高從 1.6mm 到 14.3mm 都有）。
-  // 改由列印視窗載入後用 JS 量測再套（見下方 fitPage）。
-  trHtml.forEach(function(row){ tableHtml+='<tr>'+row+'</tr>'; });
+  // 欄寬/列高/字級全部先寫 xlsx 的原始「點」值，data-pt 記著原值，
+  // 列印前由 scalePage() 統一乘上縮放比（原值要留著，否則重複縮放會越縮越小）
+  trHtml.forEach(function(x){
+    tableHtml+='<tr data-pt="'+x.pt+'" style="height:'+x.pt+'pt;">'+x.html+'</tr>';
+  });
   tableHtml+='</tbody></table>';
 
   // 一個視窗，用 @page 規則同時送出橫式（第1頁）+ 直式（第2頁）
@@ -1517,13 +1532,12 @@ function gdDoPrint(){
     '@page landscape-page{size:A4 landscape;margin:8.89mm 6.35mm;}'+
     // 第2頁：直式
     '@page portrait-page{size:A4 portrait;margin:8.89mm 6.35mm;}'+
-    // 頁面容器給明確高度，表格的 height:100% 才有依據可以撐滿整張紙
-    // （A4 橫向 210mm、直向 297mm，各扣掉上下邊界 17.78mm，再留一點餘裕免得剛好觸發分頁）
-    '.page-landscape{page:landscape-page;page-break-after:always;height:190mm;}'+
-    '.page-portrait{page:portrait-page;height:277mm;}'+
-    // xlsx 那邊靠 fitToPage 縮成一頁，CSS 沒有對應的東西。這裡的做法是：容器高度固定＋
-    // 表格 height:100%＋每列等高，效果接近。只禁止「單一列」被切成兩頁——
-    // 不能對整個 table 設 page-break-inside:avoid，那會讓剛好滿一頁的表格整個被推到下一頁
+    // ⚠️ A4 橫向是 297mm 寬 x 210mm 高（直向才是 210 x 297）——這裡搞錯會讓縮放比整個算歪。
+    // 容器寬高＝紙張扣掉上下左右邊界後的可用區，scalePage() 用它算縮放比。
+    '.page-landscape{page:landscape-page;page-break-after:always;width:284.3mm;height:192.2mm;}'+
+    '.page-portrait{page:portrait-page;width:197.3mm;height:279.2mm;}'+
+    // 只禁止「單一列」被切成兩頁。不能對整個 table 設 page-break-inside:avoid，
+    // 那會讓剛好滿一頁的表格整個被推到下一頁
     'tr,td{page-break-inside:avoid;}'+
     '</style>'+
     '</head><body>'+
@@ -1537,23 +1551,30 @@ function gdDoPrint(){
     // Excel 是靠自動縮小字體塞進去的，這裡照做：從 9pt 開始每次減 0.5pt，
     // 直到表格自然高度塞得進紙張為止（下限 4pt，免得資料異常時無限迴圈）。
     // 塞得下之後再把列高平分，讓整頁填滿且每列等高，跟 Excel 印出來的樣子一致。
-    'function fitPage(pg){'+
-    '  var t=pg.querySelector("table"); if(!t) return;'+
-    '  var tds=t.querySelectorAll("td"), trs=t.querySelectorAll("tr"), fs=9;'+
-    '  if(!trs.length) return;'+
-    // 順序很重要：先把每列設成「紙張高度 ÷ 列數」當目標列高，再縮字。
-    // CSS 的 height 是最小高度語意（只撐得高、壓不低），所以反過來做——
-    // 先縮字再設列高——設完又會被撐爆（2026-08-10 實測：縮到 7.5pt 仍溢出 206.9mm）。
-    '  var h=Math.floor(pg.clientHeight/trs.length);'+
-    '  for(var j=0;j<trs.length;j++) trs[j].style.height=h+"px";'+
-    '  while(t.offsetHeight>pg.clientHeight&&fs>4){'+
-    '    fs-=0.5;'+
-    '    for(var i=0;i<tds.length;i++) tds[i].style.fontSize=fs+"pt";'+
-    '  }'+
+    // Excel 的 fitToPage 手工版。做法就是 Excel 在做的事：算一個縮放比，
+    // 把欄寬、列高、字級「同時」乘上去，維持原始版面比例。
+    // scale = min(可用寬/原始寬, 可用高/原始高, 1)：兩個方向都要塞得下，取較嚴格的那個；
+    // 上限 1 是因為 fitToPage 只縮不放——內容本來就塞得下時，Excel 不會把它拉大填滿紙張，
+    // 下面就是留白（咖哩給的 Excel 列印預覽正是這樣）。
+    // 尺寸一律用「紙張」算，不能用 clientWidth：列印前視窗還是螢幕尺寸，量出來是錯的。
+    'var MM2PT=72/25.4;'+
+    'function scalePage(pg,availWmm,availHmm){'+
+    '  var t=pg.querySelector("table"); if(!t) return 1;'+
+    '  var cols=t.querySelectorAll("col"), trs=t.querySelectorAll("tr"), tds=t.querySelectorAll("td");'+
+    '  var totalW=0,totalH=0,i;'+
+    '  for(i=0;i<cols.length;i++) totalW+=parseFloat(cols[i].getAttribute("data-pt"))||0;'+
+    '  for(i=0;i<trs.length;i++) totalH+=parseFloat(trs[i].getAttribute("data-pt"))||0;'+
+    '  if(!totalW||!totalH) return 1;'+
+    '  var scale=Math.min(availWmm*MM2PT/totalW, availHmm*MM2PT/totalH, 1);'+
+    '  for(i=0;i<cols.length;i++) cols[i].style.width=(parseFloat(cols[i].getAttribute("data-pt"))*scale)+"pt";'+
+    '  for(i=0;i<trs.length;i++) trs[i].style.height=(parseFloat(trs[i].getAttribute("data-pt"))*scale)+"pt";'+
+    '  for(i=0;i<tds.length;i++) tds[i].style.fontSize=(parseFloat(tds[i].getAttribute("data-pt"))*scale)+"pt";'+
+    '  return scale;'+
     '}'+
     'window.onload=function(){'+
-    '  var pages=document.querySelectorAll(".page-landscape,.page-portrait");'+
-    '  for(var i=0;i<pages.length;i++) fitPage(pages[i]);'+
+    '  var L=document.querySelector(".page-landscape"), P=document.querySelector(".page-portrait");'+
+    '  if(L) scalePage(L,284.3,192.2);'+  // A4 橫向 297x210 扣掉左右 6.35、上下 8.89
+    '  if(P) scalePage(P,197.3,279.2);'+  // A4 直向 210x297 扣掉同樣的邊界
     '  setTimeout(function(){window.print();},300);'+
     '};'+
     'window.onafterprint=function(){window.close();};<\/script>'+
