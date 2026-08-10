@@ -1532,10 +1532,13 @@ function gdDoPrint(){
     '@page landscape-page{size:A4 landscape;margin:8.89mm 6.35mm;}'+
     // 第2頁：直式
     '@page portrait-page{size:A4 portrait;margin:8.89mm 6.35mm;}'+
-    // ⚠️ A4 橫向是 297mm 寬 x 210mm 高（直向才是 210 x 297）——這裡搞錯會讓縮放比整個算歪。
-    // 容器寬高＝紙張扣掉上下左右邊界後的可用區，scalePage() 用它算縮放比。
-    '.page-landscape{page:landscape-page;page-break-after:always;width:284.3mm;height:192.2mm;}'+
-    '.page-portrait{page:portrait-page;width:197.3mm;height:279.2mm;}'+
+    // ⚠️ 容器「絕對不要」設 width/height。縮放比是用紙張常數算的（見 scalePage），
+    // 不靠量測容器，所以容器只是分頁用的包裝，讓它跟著表格自然大小就好。
+    // 2026-08-10 踩過：給容器固定 284.3x192.2mm，只要實際可列印區小一點點
+    //（印表機硬體邊界、捨入誤差都會），容器就溢出 → 第1頁被切一半、
+    // 直式容器跟著被推到第2頁跟橫式疊在一起、還多印一張紙。
+    '.page-landscape{page:landscape-page;page-break-after:always;}'+
+    '.page-portrait{page:portrait-page;}'+
     // 只禁止「單一列」被切成兩頁。不能對整個 table 設 page-break-inside:avoid，
     // 那會讓剛好滿一頁的表格整個被推到下一頁
     'tr,td{page-break-inside:avoid;}'+
@@ -1573,8 +1576,11 @@ function gdDoPrint(){
     '}'+
     'window.onload=function(){'+
     '  var L=document.querySelector(".page-landscape"), P=document.querySelector(".page-portrait");'+
-    '  if(L) scalePage(L,284.3,192.2);'+  // A4 橫向 297x210 扣掉左右 6.35、上下 8.89
-    '  if(P) scalePage(P,197.3,279.2);'+  // A4 直向 210x297 扣掉同樣的邊界
+    // A4 橫向 297x210、直向 210x297，各扣掉左右 6.35mm、上下 8.89mm 的邊界，
+    // 再各留 4mm 餘裕——實際可列印區常比理論值再小一點（印表機硬體邊界），
+    // 算得剛剛好就會溢出去多印一頁
+    '  if(L) scalePage(L,280,188);'+
+    '  if(P) scalePage(P,193,275);'+
     '  setTimeout(function(){window.print();},300);'+
     '};'+
     'window.onafterprint=function(){window.close();};<\/script>'+
