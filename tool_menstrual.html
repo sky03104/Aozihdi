@@ -436,6 +436,24 @@ async function delRec(id){
   } catch(err){ toast('✗ 刪除失敗：'+err.message,'err'); }
 }
 
+/* ── 掛到 window：動態插入的 HTML 用 onclick="xxx()" 呼叫這些函式 ──
+   ⚠️ 這裡不能省。本檔的函式都寫在 if (typeof document !== 'undefined') 區塊內
+   （為了讓 node 能單獨測上面的核心計算），而 HTML 屬性裡的 onclick 只找得到
+   window 上的函式。
+   普通 function 宣告在區塊內時，瀏覽器會自動建立全域繫結（規格 Annex B 的
+   相容行為），所以 openAdd/setDays 沒事；但 async function 沒有這個待遇，
+   只存在於區塊作用域——submitAdd 與 delRec 剛好是唯二的 async 函式，
+   結果按了完全沒反應也不報錯（2026-08-10 咖哩回報「沒辦法按送出」）。
+   一律明確掛載，不要依賴那條隱晦規則。 */
+window.openAdd = openAdd;
+window.closeAdd = closeAdd;
+window.submitAdd = submitAdd;
+window.setDays = setDays;
+window.setShift = setShift;
+window.delRec = delRec;
+window.toggle = toggle;
+window.render = render;
+
 /* ── 啟動 ── */
 window.addEventListener('load', function(){
   // 返回主選單要保留工號（天鷹規範：工號狀態不可遺失）
