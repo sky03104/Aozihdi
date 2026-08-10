@@ -1418,6 +1418,10 @@ function gdDoPrint(){
       }
     }
   }
+  // 合併範圍蓋到的欄也要算進來：合併格的值只存在左上角那格，
+  // 像 M4:N4 的值在 M4，N 欄自己是空的，只看「有沒有資料」會少算一欄，
+  // 導致 colspan="2" 指到不存在的欄、表格結構歪掉（2026-08-10 實測欄數 13 應為 14）
+  (ws['!merges']||[]).forEach(function(m){ if(m.e.c>realLastCol) realLastCol=m.e.c; });
 
   // 建立表格 HTML
   // 版面策略＝完全照抄 Excel 的 fitToPage：把 xlsx 原本的欄寬、列高、字級都保留成
@@ -1560,7 +1564,7 @@ function gdDoPrint(){
     // 上限 1 是因為 fitToPage 只縮不放——內容本來就塞得下時，Excel 不會把它拉大填滿紙張，
     // 下面就是留白（咖哩給的 Excel 列印預覽正是這樣）。
     // 尺寸一律用「紙張」算，不能用 clientWidth：列印前視窗還是螢幕尺寸，量出來是錯的。
-    'var MM2PT=72/25.4;'+
+    'var MM2PT=72/25.4, MM2PX=96/25.4;'+
     'function scalePage(pg,availWmm,availHmm){'+
     '  var t=pg.querySelector("table"); if(!t) return 1;'+
     '  var cols=t.querySelectorAll("col"), trs=t.querySelectorAll("tr"), tds=t.querySelectorAll("td");'+
@@ -1568,10 +1572,27 @@ function gdDoPrint(){
     '  for(i=0;i<cols.length;i++) totalW+=parseFloat(cols[i].getAttribute("data-pt"))||0;'+
     '  for(i=0;i<trs.length;i++) totalH+=parseFloat(trs[i].getAttribute("data-pt"))||0;'+
     '  if(!totalW||!totalH) return 1;'+
+    '  function apply(s){'+
+    '    for(var k=0;k<cols.length;k++) cols[k].style.width=(parseFloat(cols[k].getAttribute("data-pt"))*s)+"pt";'+
+    '    for(k=0;k<trs.length;k++) trs[k].style.height=(parseFloat(trs[k].getAttribute("data-pt"))*s)+"pt";'+
+    '    for(k=0;k<tds.length;k++) tds[k].style.fontSize=(parseFloat(tds[k].getAttribute("data-pt"))*s)+"pt";'+
+    '  }'+
     '  var scale=Math.min(availWmm*MM2PT/totalW, availHmm*MM2PT/totalH, 1);'+
-    '  for(i=0;i<cols.length;i++) cols[i].style.width=(parseFloat(cols[i].getAttribute("data-pt"))*scale)+"pt";'+
-    '  for(i=0;i<trs.length;i++) trs[i].style.height=(parseFloat(trs[i].getAttribute("data-pt"))*scale)+"pt";'+
-    '  for(i=0;i<tds.length;i++) tds[i].style.fontSize=(parseFloat(tds[i].getAttribute("data-pt"))*scale)+"pt";'+
+    // ⚠️ 算出來的 scale 只是「理論值」。CSS 的列高是最小高度語意，標籤兩行的格子
+    // （P3\n車道、停巡7\n(廣場哨)）內容需要的高度會超過指定列高，把那幾列撐高，
+    // 18 列累積起來就超出紙張被切成兩頁（2026-08-10 實測：目標 188mm、實際 198.4mm，
+    // 其中 3 列從 10.3mm 被撐成 13.8mm）。Excel 沒這問題是因為它的列高是絕對的、
+    // 超出的內容直接裁掉。所以這裡不能只算一次，要量了再縮到真的塞得下為止。
+    // 量測時暫時把容器撐成紙張寬度（螢幕視窗比紙窄，不撐開會量到被壓縮的錯誤值），
+    // 量完一定要移除——容器留著固定尺寸會在列印時溢出、多印一頁。
+    '  pg.style.width=availWmm+"mm";'+
+    '  var limitPx=availHmm*MM2PX;'+
+    '  for(i=0;i<8;i++){'+
+    '    apply(scale);'+
+    '    if(t.offsetHeight<=limitPx) break;'+
+    '    scale*=(limitPx/t.offsetHeight)*0.985;'+
+    '  }'+
+    '  pg.style.width="";'+
     '  return scale;'+
     '}'+
     'window.onload=function(){'+
@@ -1579,8 +1600,8 @@ function gdDoPrint(){
     // A4 橫向 297x210、直向 210x297，各扣掉左右 6.35mm、上下 8.89mm 的邊界，
     // 再各留 4mm 餘裕——實際可列印區常比理論值再小一點（印表機硬體邊界），
     // 算得剛剛好就會溢出去多印一頁
-    '  if(L) scalePage(L,280,188);'+
-    '  if(P) scalePage(P,193,275);'+
+    '  if(L) scalePage(L,282,190);'+
+    '  if(P) scalePage(P,195,277);'+
     '  setTimeout(function(){window.print();},300);'+
     '};'+
     'window.onafterprint=function(){window.close();};<\/script>'+
