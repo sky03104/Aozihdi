@@ -342,6 +342,7 @@ function render(){
       dup.map(function(d){ return esc(d.編號)+'（'+d.台數+' 筆）'; }).join('、')+'</div>'
     : '';
 
+  更新FAB();
   if(!list.length){
     $('list').innerHTML = 警示 + '<div class="empty">'+
       (S.radios.length ? '沒有符合條件的無線電' :
@@ -357,6 +358,9 @@ function render(){
     if(r.site) 副.push(esc(r.site));
     if(r.ownership === '自購') 副.push('自購機');
     if(r.fixNote) 副.push('🔧 ' + esc(r.fixNote));
+    /* 備註也要出現在卡片上，不能只藏在展開後。「待盤點」那批機器的原登記
+       使用者就記在備註裡，盤點時最需要的線索，收起來等於沒有。太長才截斷。 */
+    if(r.note) 副.push('📝 ' + esc(r.note.length > 26 ? r.note.slice(0,26) + '…' : r.note));
     var body = '';
     if(open){
       var logs = S.logs[r.id];
@@ -402,6 +406,13 @@ function render(){
       '</div>'+ body +
     '</div>';
   }).join('');
+}
+/* 展開卡片時把浮動的「新增無線電」收起來。
+   它固定在畫面底部中央，剛好會壓住展開後那排動作鈕（刪除鍵直接被蓋住），
+   而且正在處理某一台機器時也不會想新增，藏起來沒有損失。 */
+function 更新FAB(){
+  var 有展開 = Object.keys(S.open).some(function(k){ return S.open[k]; });
+  $('fab').style.display = 有展開 ? 'none' : '';
 }
 function toggle(id){
   S.open[id] = !S.open[id];
@@ -614,6 +625,7 @@ function exportXlsx(){
    但 async function 沒有這個待遇——2026-08-10 生理假工具就是這樣按了沒反應
    而且完全不報錯（見 docs/技術經驗筆記.md）。一律明確掛載。 */
 window.render = render;
+window.更新FAB = 更新FAB;
 window.toggle = toggle;
 window.setStatus = setStatus;
 window.openIssue = openIssue;
