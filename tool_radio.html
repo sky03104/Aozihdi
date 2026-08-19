@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>天鷹保全 · 無線電管理</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#0A0C10; --surface:#0D0F14; --card:rgba(255,255,255,.03);
+  --border:rgba(255,255,255,.08); --gold:#D4A800; --gold2:#FFD700;
+  --indigo:#818CF8; --indigo2:#6366F1;
+  --success:#4ADE80; --danger:#F87171; --warn:#FB923C; --info:#38BDF8;
+  --text:#F5F5F5; --muted:#8A95A8;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;min-height:100vh;}
+.wrap{max-width:860px;margin:0 auto;padding:14px 13px 96px;}
+
+.hd{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.back{background:var(--card);border:1px solid var(--border);color:var(--text);
+  padding:11px 14px;border-radius:10px;text-decoration:none;display:flex;align-items:center;gap:5px;
+  font-size:14px;min-height:44px;}
+.hd-t{flex:1;text-align:center;}
+.hd-t .t1{color:var(--gold);font-size:18px;font-weight:700;letter-spacing:1px;}
+.hd-t .t2{color:var(--muted);font-size:10.5px;letter-spacing:2px;margin-top:2px;}
+.ico-btn{background:var(--card);border:1px solid var(--border);color:var(--text);
+  border-radius:10px;min-width:46px;min-height:44px;font-size:19px;cursor:pointer;font-family:inherit;}
+
+/* 統計列：點一下就等於套用該狀態的篩選 */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(94px,1fr));gap:8px;margin-bottom:12px;}
+.st{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:11px;
+  padding:11px 8px;text-align:center;cursor:pointer;min-height:64px;}
+.st.on{border-color:var(--gold);background:rgba(212,168,0,.12);}
+.st .v{font-size:20px;font-weight:900;line-height:1.2;}
+.st .k{font-size:11.5px;color:var(--muted);margin-top:3px;}
+
+.bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+select,input[type=text],textarea{
+  background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);
+  padding:11px 12px;border-radius:9px;font-size:15px;font-family:inherit;min-height:46px;width:100%;}
+select option{background:#0D0F14;color:var(--text);}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold);}
+.bar .q{flex:1;min-width:150px;} .bar .sel{flex:0 0 128px;}
+
+.card{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;
+  background:rgba(255,255,255,.02);overflow:hidden;}
+.card-h{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;}
+.nm{flex:1;min-width:0;}
+.nm .n1{font-size:15px;font-weight:700;word-break:break-all;}
+.nm .n2{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.55;word-break:break-all;}
+.badge{font-size:12px;font-weight:900;padding:5px 10px;border-radius:8px;white-space:nowrap;}
+.b-use{background:rgba(74,222,128,.14);color:var(--success);}
+.b-idle{background:rgba(56,189,248,.14);color:var(--info);}
+.b-pub{background:rgba(129,140,248,.16);color:var(--indigo);}
+.b-fix{background:rgba(251,146,60,.16);color:var(--warn);}
+.b-out{background:rgba(248,113,113,.16);color:var(--danger);}
+.b-chk{background:rgba(255,255,255,.08);color:var(--muted);}
+.card-b{padding:12px 14px;border-top:1px solid var(--border);}
+.kv{display:grid;grid-template-columns:74px 1fr;gap:6px 10px;font-size:13px;margin-bottom:12px;}
+.kv .k{color:var(--muted);}
+.acts{display:flex;gap:8px;flex-wrap:wrap;}
+.act{border:1px solid var(--border);background:var(--card);color:var(--text);
+  border-radius:9px;padding:10px 13px;font-size:13.5px;font-family:inherit;cursor:pointer;min-height:44px;
+  display:flex;align-items:center;gap:5px;}
+.act-gold{border-color:var(--border-gold,rgba(212,168,0,.35));background:rgba(212,168,0,.14);color:var(--gold2);}
+.act-red{border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.1);color:var(--danger);}
+.logs{margin-top:12px;border-top:1px solid var(--border);padding-top:10px;}
+.log{font-size:12px;color:var(--muted);line-height:1.6;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);}
+.log:last-child{border-bottom:none;}
+.log b{color:var(--text);font-weight:700;}
+
+.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;z-index:40;
+  background:linear-gradient(135deg,#D4A800,#FFD700);color:#0A0C10;border:none;
+  padding:15px 26px;border-radius:30px;font-size:16px;font-weight:900;font-family:inherit;
+  cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.5);display:flex;align-items:center;gap:7px;}
+
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:60;display:flex;align-items:flex-end;justify-content:center;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:18px 18px 0 0;
+  width:100%;max-width:520px;max-height:92vh;overflow-y:auto;padding:16px 16px 24px;}
+.modal h3{margin:0 0 14px;font-size:17px;color:var(--gold2);}
+.fld{margin-bottom:12px;}
+.fld label{display:block;font-size:13px;color:var(--muted);margin-bottom:5px;}
+.btns{display:flex;gap:9px;margin-top:16px;}
+.btn{flex:1;border:none;border-radius:10px;padding:14px;font-size:15.5px;font-weight:700;
+  font-family:inherit;cursor:pointer;min-height:50px;}
+.btn-pri{background:linear-gradient(135deg,#D4A800,#FFD700);color:#0A0C10;}
+.btn-gh{background:var(--card);border:1px solid var(--border);color:var(--text);flex:0 0 96px;}
+.btn:disabled{opacity:.45;}
+.note{font-size:12px;color:var(--muted);line-height:1.65;margin-top:6px;}
+.empty{color:var(--muted);font-size:13.5px;text-align:center;padding:34px 12px;line-height:1.8;}
+.errbox{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:var(--danger);
+  border-radius:12px;padding:18px;text-align:center;font-size:14px;line-height:1.7;}
+.errbox i{font-size:30px;display:block;margin-bottom:8px;}
+#twrap{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;z-index:80;display:flex;
+  flex-direction:column;gap:8px;align-items:center;}
+.toast{padding:12px 18px;border-radius:10px;font-size:14px;font-weight:700;max-width:90vw;text-align:center;}
+.t-ok{background:#22C55E;color:#fff;} .t-err{background:#E53E3E;color:#fff;} .t-inf{background:#334155;color:#fff;}
+#splash{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;
+  z-index:90;transition:opacity .4s;} #splash.out{opacity:0;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="splash"><div style="color:var(--gold);font-size:16px;font-weight:700;letter-spacing:2px">天鷹保全</div></div>
+<div class="wrap" id="app" style="display:none">
+  <div class="hd">
+    <a class="back" id="backBtn" href="index.html"><i class="ti ti-arrow-left"></i>返回</a>
+    <div class="hd-t"><div class="t1">無線電管理</div><div class="t2">TIANYING SECURITY</div></div>
+    <button class="ico-btn" onclick="exportXlsx()" title="匯出清冊"><i class="ti ti-file-spreadsheet"></i></button>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="bar">
+    <input class="q" id="q" type="text" placeholder="🔍 機身編號／使用者／機型…" oninput="render()">
+    <select class="sel" id="own" onchange="render()">
+      <option value="">全部歸屬</option><option value="公司">公司機</option><option value="自購">自購機</option>
+    </select>
+  </div>
+  <div id="list"></div>
+</div>
+<button class="fab" id="fab" style="display:none" onclick="openAdd()"><i class="ti ti-plus"></i>新增無線電</button>
+<div id="modal"></div>
+<div id="twrap"></div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   天鷹保全 · 無線電管理
+   ────────────────────────────────────────────────────────────────────
+   一台無線電＝清冊裡一列（唯一鍵：機身編號），撥發／歸還／轉移／報修／
+   報廢都只是改那一列的狀態與使用者，另外在「異動紀錄」留一筆流水帳。
+   資料來源是咖哩原本的「無線電編列登錄.xlsx」三個分頁合併去重後的現況。
+
+   權限：組長以上。三層把關——index.html DEFAULT_PERMS →
+   本頁 checkPermission() → GAS 每個 action 驗 token+角色
+   （前兩層在瀏覽器裡改得掉，後端那層才是真的）。
+   ════════════════════════════════════════════════════════════════════ */
+
+var RADIO_GAS_URL = '請填入無線電管理GAS部署網址';
+var ACCOUNT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxEVBHseDpLWiWe4d8kLcCHbVFiKAK9wyoLwqNkt59PS4vPCY9QfG0_wiDJf2coO3zMcg/exec';
+var LEADER_PLUS_ROLES = ['leader', 'vicecaptain', 'captain', 'executive', 'admin'];
+
+/* 狀態清單要跟 無線電管理_GAS.gs 的 STATUSES_ 完全一致，
+   任一邊多打少打字，統計就會出現「總數對不起來」的鬼數字。 */
+var STATUSES = ['使用中', '庫存', '公用機', '維修中', '繳回公司', '報廢', '未找到', '待盤點'];
+var STATUS_CLS = {
+  '使用中': 'b-use', '庫存': 'b-idle', '公用機': 'b-pub', '維修中': 'b-fix',
+  '繳回公司': 'b-out', '報廢': 'b-out', '未找到': 'b-out', '待盤點': 'b-chk'
+};
+/* 統計列只放這幾格，其餘狀態併進「其他」，手機一排放不下太多格 */
+var STAT_KEYS = ['使用中', '庫存', '公用機', '維修中', '待盤點'];
+
+var S = { radios: [], employees: {}, logs: {}, open: {}, status: '', form: {} };
+
+/* ════════════════════════════════════════════════════════════════
+   核心邏輯（純函式，可用 node 直接測，不依賴畫面）
+   ════════════════════════════════════════════════════════════════ */
+
+/* 機身編號正規化後才比對。現場抄寫時空格、大小寫都會飄
+   （'S/NO 0531C6A51017' 跟 's/no0531c6a51017' 是同一台），
+   只做字面比對會讓同一台機器被登記成兩台，庫存數就永遠對不起來。
+   ⚠️ 這裡的規則必須跟 GAS 的 normSn_ 一模一樣，否則前端說沒重複、
+   後端卻擋下來（或反過來），使用者只會看到莫名其妙的錯誤。 */
+function 正規化編號(sn) {
+  return String(sn == null ? '' : sn).replace(/\s+/g, '').toUpperCase();
+}
+
+/* 統計各狀態台數。回傳 { 總數, byStatus:{狀態:台數}, 其他 } */
+function 統計(radios) {
+  var by = {};
+  STATUSES.forEach(function (s) { by[s] = 0; });
+  radios.forEach(function (r) {
+    var s = r.status || '庫存';
+    by[s] = (by[s] || 0) + 1;
+  });
+  var 其他 = 0;
+  Object.keys(by).forEach(function (s) { if (STAT_KEYS.indexOf(s) === -1) 其他 += by[s]; });
+  return { 總數: radios.length, byStatus: by, 其他: 其他 };
+}
+
+/* 篩選：狀態（''＝全部，'其他'＝不在統計列那幾格的）＋歸屬＋關鍵字。
+   關鍵字比對機身編號時用正規化後的字串，這樣打 "0531c6a51017"
+   也找得到 "S/NO 0531C6A51017"（現場最常見的查法就是只報後幾碼）。 */
+function 篩選(radios, opt) {
+  var q = String((opt && opt.q) || '').trim();
+  var qn = 正規化編號(q);
+  var status = (opt && opt.status) || '';
+  var own = (opt && opt.own) || '';
+  return radios.filter(function (r) {
+    if (status === '其他') { if (STAT_KEYS.indexOf(r.status) !== -1) return false; }
+    else if (status && r.status !== status) return false;
+    if (own && (r.ownership || '公司') !== own) return false;
+    if (!q) return true;
+    if (正規化編號(r.sn).indexOf(qn) >= 0) return true;
+    return [r.model, r.userName, r.userEmpId, r.note, r.fixNote, r.site]
+      .some(function (v) { return String(v || '').indexOf(q) >= 0; });
+  });
+}
+
+/* 排序：使用中的排前面（現場最常查「這台在誰身上」），
+   同狀態依機型再依機身編號，讓同型號的機器排在一起好對照 */
+function 排序(radios) {
+  var 序 = {};
+  STATUSES.forEach(function (s, i) { 序[s] = i; });
+  return radios.slice().sort(function (a, b) {
+    var d = (序[a.status] == null ? 99 : 序[a.status]) - (序[b.status] == null ? 99 : 序[b.status]);
+    if (d) return d;
+    d = String(a.model || '').localeCompare(String(b.model || ''), 'zh-Hant');
+    if (d) return d;
+    return 正規化編號(a.sn) < 正規化編號(b.sn) ? -1 : 1;
+  });
+}
+
+/* 找出重複登記的機身編號（正規化後相同）。
+   種子資料匯入與人工新增都有可能造成重複，重複就代表統計數字是錯的，
+   要主動提醒，不能安靜地算下去。 */
+function 找重複(radios) {
+  var by = {};
+  radios.forEach(function (r) {
+    var k = 正規化編號(r.sn);
+    if (!k) return;
+    (by[k] = by[k] || []).push(r);
+  });
+  return Object.keys(by).filter(function (k) { return by[k].length > 1; })
+    .map(function (k) { return { 編號: by[k][0].sn, 台數: by[k].length }; });
+}
+
+try { if (typeof module !== 'undefined') Object.assign(module.exports, {
+  正規化編號: 正規化編號, 統計: 統計, 篩選: 篩選, 排序: 排序, 找重複: 找重複,
+  STATUSES: STATUSES, STAT_KEYS: STAT_KEYS
+}); } catch (e) {}
+</script>
+<script>
+/* ════════════════════════════════════════════════════════════════
+   以下為畫面與通訊
+   ════════════════════════════════════════════════════════════════ */
+if (typeof document !== 'undefined') {
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(m){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
+function getSessionUser(){
+  try { return JSON.parse(localStorage.getItem('hsh_session_user') || 'null'); } catch(e){ return null; }
+}
+function getAuthToken(){
+  try { return localStorage.getItem('hsh_auth_token') || ''; } catch(e){ return ''; }
+}
+function toast(msg, type){
+  var d = document.createElement('div');
+  d.className = 'toast ' + (type==='ok'?'t-ok':type==='err'?'t-err':'t-inf');
+  d.textContent = msg;
+  $('twrap').appendChild(d);
+  setTimeout(function(){ if(d.parentNode) d.parentNode.removeChild(d); }, 3200);
+}
+function hideSplash(){ var s=$('splash'); if(s){ s.classList.add('out'); setTimeout(function(){ s.remove(); },450); } }
+function showNoPerm(msg){
+  hideSplash();
+  document.body.innerHTML = '<div style="position:fixed;inset:0;display:flex;align-items:center;'+
+    'justify-content:center;padding:20px;background:#0A0C10">'+
+    '<div class="errbox" style="max-width:360px"><i class="ti ti-lock"></i><div>'+esc(msg)+'</div></div></div>';
+}
+function checkPermission(){
+  var u = getSessionUser();
+  if(!u || !u.empId){ showNoPerm('請從天鷹保全 App 登入後開啟本工具'); return false; }
+  if(!getAuthToken()){ showNoPerm('登入已失效，請重新從天鷹保全 App 登入'); return false; }
+  if(LEADER_PLUS_ROLES.indexOf(u.role) === -1){ showNoPerm('此工具僅限組長以上使用，如有需要請洽主管'); return false; }
+  return true;
+}
+
+/* ── 通訊 ── */
+async function api(action, data){
+  var body = new URLSearchParams();
+  body.append('action', action);
+  body.append('token', getAuthToken());
+  body.append('data', JSON.stringify(data || {}));
+  var res = await fetch(RADIO_GAS_URL, { method:'POST', body:body });
+  var d = await res.json();
+  if(d.status !== 'ok') throw new Error(d.msg || '未知錯誤');
+  return d;
+}
+async function loadEmployees(){
+  try {
+    var res = await fetch(ACCOUNT_GAS_URL + '?action=getApprovedUsers');
+    var d = await res.json();
+    if(d && d.status === 'ok' && d.users) S.employees = d.users;
+  } catch(e){ /* 拿不到就留空，改用手打姓名，不擋其他功能 */ }
+}
+async function loadRadios(){
+  try {
+    var res = await fetch(RADIO_GAS_URL + '?action=getRadios&token=' + encodeURIComponent(getAuthToken()));
+    var d = await res.json();
+    if(d.status !== 'ok') throw new Error(d.msg || '讀取失敗');
+    S.radios = d.radios || [];
+    render();
+  } catch(err){
+    $('list').innerHTML = '<div class="errbox"><i class="ti ti-alert-triangle"></i><div>載入失敗：'+
+      esc(err.message)+'</div></div>';
+  }
+}
+/* 動作完成後刷新：清冊一定要重讀，卡片若是展開狀態連異動紀錄也要重讀，
+   否則剛做的撥發不會出現在紀錄裡，看起來像沒存到。 */
+function 刷新(id){
+  S.logs[id] = undefined;
+  loadRadios();
+  if(S.open[id]) loadLogs(id);
+}
+async function loadLogs(id){
+  try {
+    var res = await fetch(RADIO_GAS_URL + '?action=getLogs&radioId=' + id +
+      '&token=' + encodeURIComponent(getAuthToken()));
+    var d = await res.json();
+    S.logs[id] = (d.status === 'ok') ? (d.logs || []) : null;
+  } catch(e){ S.logs[id] = null; }
+  render();
+}
+
+/* ── 畫面 ── */
+function 統計列(st){
+  var cells = STAT_KEYS.map(function(k){
+    return { key:k, label:k, n:st.byStatus[k] || 0 };
+  });
+  cells.unshift({ key:'', label:'全部', n:st.總數 });
+  cells.push({ key:'其他', label:'繳回/報廢等', n:st.其他 });
+  return cells.map(function(c){
+    return '<div class="st'+(S.status===c.key?' on':'')+'" onclick="setStatus(\''+c.key+'\')">'+
+      '<div class="v">'+c.n+'</div><div class="k">'+esc(c.label)+'</div></div>';
+  }).join('');
+}
+
+function render(){
+  var st = 統計(S.radios);
+  $('stats').innerHTML = 統計列(st);
+
+  var list = 排序(篩選(S.radios, { q:$('q').value, status:S.status, own:$('own').value }));
+  var dup = 找重複(S.radios);
+  var 警示 = dup.length
+    ? '<div class="errbox" style="margin-bottom:10px;text-align:left;font-size:13px">'+
+      '<i class="ti ti-alert-triangle" style="font-size:20px"></i>'+
+      '偵測到重複的機身編號（統計台數會失真，請刪掉多餘那筆）：'+
+      dup.map(function(d){ return esc(d.編號)+'（'+d.台數+' 筆）'; }).join('、')+'</div>'
+    : '';
+
+  更新FAB();
+  if(!list.length){
+    $('list').innerHTML = 警示 + '<div class="empty">'+
+      (S.radios.length ? '沒有符合條件的無線電' :
+       '清冊還是空的。<br>請先在 Apps Script 執行一次「初始匯入」，或按下方新增。')+'</div>';
+    return;
+  }
+
+  $('list').innerHTML = 警示 + list.map(function(r){
+    var open = !!S.open[r.id];
+    var cls = STATUS_CLS[r.status] || 'b-chk';
+    var 副 = [];
+    if(r.userName) 副.push('👤 ' + esc(r.userName));
+    if(r.site) 副.push(esc(r.site));
+    if(r.ownership === '自購') 副.push('自購機');
+    if(r.fixNote) 副.push('🔧 ' + esc(r.fixNote));
+    /* 備註也要出現在卡片上，不能只藏在展開後。「待盤點」那批機器的原登記
+       使用者就記在備註裡，盤點時最需要的線索，收起來等於沒有。太長才截斷。 */
+    if(r.note) 副.push('📝 ' + esc(r.note.length > 26 ? r.note.slice(0,26) + '…' : r.note));
+    var body = '';
+    if(open){
+      var logs = S.logs[r.id];
+      var logHtml = logs === undefined ? '<div class="log">異動紀錄載入中…</div>'
+        : logs === null ? '<div class="log">異動紀錄載入失敗</div>'
+        : !logs.length ? '<div class="log">尚無異動紀錄</div>'
+        : logs.slice(0,10).map(function(l){
+            return '<div class="log"><b>'+esc(l.action)+'</b>　'+esc(l.at)+
+              (l.fromUser||l.toUser ? '<br>'+esc(l.fromUser||'—')+' → '+esc(l.toUser||'—') : '')+
+              (l.desc ? '<br>'+esc(l.desc) : '')+
+              (l.byName ? '<br>操作：'+esc(l.byName) : '')+'</div>';
+          }).join('');
+      body = '<div class="card-b">'+
+        '<div class="kv">'+
+          '<div class="k">機身編號</div><div>'+esc(r.sn)+'</div>'+
+          '<div class="k">機型</div><div>'+esc(r.model)+'</div>'+
+          '<div class="k">歸屬</div><div>'+esc(r.ownership||'公司')+'機</div>'+
+          '<div class="k">案場</div><div>'+esc(r.site||'—')+'</div>'+
+          '<div class="k">採購日期</div><div>'+esc(r.buyDate||'—')+'</div>'+
+          '<div class="k">撥發日期</div><div>'+esc(r.issueDate||'—')+'</div>'+
+          '<div class="k">使用者</div><div>'+esc(r.userName||'—')+'</div>'+
+          '<div class="k">維修紀錄</div><div>'+esc(r.fixNote||'—')+'</div>'+
+          '<div class="k">備註</div><div>'+esc(r.note||'—')+'</div>'+
+          '<div class="k">最後更新</div><div>'+esc(r.updatedAt||'—')+'</div>'+
+        '</div>'+
+        '<div class="acts">'+
+          '<button class="act act-gold" onclick="openIssue('+r.id+')"><i class="ti ti-user-plus"></i>'+
+            (r.userName?'轉移':'撥發')+'</button>'+
+          (r.userName?'<button class="act" onclick="openReturn('+r.id+')"><i class="ti ti-user-minus"></i>歸還</button>':'')+
+          '<button class="act" onclick="openStatus('+r.id+')"><i class="ti ti-tool"></i>改狀態</button>'+
+          '<button class="act" onclick="openEdit('+r.id+')"><i class="ti ti-edit"></i>編輯</button>'+
+          '<button class="act act-red" onclick="delRadio('+r.id+')"><i class="ti ti-trash"></i>刪除</button>'+
+        '</div>'+
+        '<div class="logs">'+logHtml+'</div>'+
+      '</div>';
+    }
+    return '<div class="card">'+
+      '<div class="card-h" onclick="toggle('+r.id+')">'+
+        '<div class="nm"><div class="n1">'+esc(r.model)+'　<span style="color:var(--muted);font-weight:400">'+esc(r.sn)+'</span></div>'+
+        '<div class="n2">'+(副.join('　·　')||'—')+'</div></div>'+
+        '<span class="badge '+cls+'">'+esc(r.status)+'</span>'+
+        '<i class="ti ti-chevron-'+(open?'up':'down')+'" style="color:var(--muted)"></i>'+
+      '</div>'+ body +
+    '</div>';
+  }).join('');
+}
+/* 展開卡片時把浮動的「新增無線電」收起來。
+   它固定在畫面底部中央，剛好會壓住展開後那排動作鈕（刪除鍵直接被蓋住），
+   而且正在處理某一台機器時也不會想新增，藏起來沒有損失。 */
+function 更新FAB(){
+  var 有展開 = Object.keys(S.open).some(function(k){ return S.open[k]; });
+  $('fab').style.display = 有展開 ? 'none' : '';
+}
+function toggle(id){
+  S.open[id] = !S.open[id];
+  if(S.open[id] && S.logs[id] === undefined) loadLogs(id);
+  render();
+}
+function setStatus(k){ S.status = k; render(); }
+
+function findRadio(id){
+  for(var i=0;i<S.radios.length;i++) if(S.radios[i].id === Number(id)) return S.radios[i];
+  return null;
+}
+function 員工選單(selectedName){
+  var ids = Object.keys(S.employees).sort(function(a,b){
+    return String(S.employees[a].name||'').localeCompare(String(S.employees[b].name||''),'zh-Hant');
+  });
+  return '<option value="">— 手動輸入 —</option>' + ids.map(function(id){
+    var n = S.employees[id].name || id;
+    return '<option value="'+esc(id)+'"'+(n===selectedName?' selected':'')+'>'+esc(n)+'</option>';
+  }).join('');
+}
+function closeModal(){ $('modal').innerHTML = ''; }
+function 狀態選單(sel, 排除使用中){
+  return STATUSES.filter(function(s){ return !(排除使用中 && s === '使用中'); })
+    .map(function(s){ return '<option value="'+s+'"'+(s===sel?' selected':'')+'>'+s+'</option>'; }).join('');
+}
+
+/* ── 撥發／轉移 ── */
+function openIssue(id){
+  var r = findRadio(id); if(!r) return;
+  $('modal').innerHTML =
+   '<div class="mask" onclick="if(event.target===this)closeModal()"><div class="modal">'+
+    '<h3>'+(r.userName?'轉移':'撥發')+'：'+esc(r.model)+' '+esc(r.sn)+'</h3>'+
+    (r.userName?'<div class="note" style="margin-bottom:10px">目前使用者：'+esc(r.userName)+'</div>':'')+
+    '<div class="fld"><label>撥發給（員工清單）</label><select id="f-emp" onchange="onEmpPick()">'+員工選單('')+'</select></div>'+
+    '<div class="fld"><label>姓名</label><input id="f-name" type="text" placeholder="清單沒有的人可直接打姓名"></div>'+
+    '<div class="fld"><label>撥發日期（留空＝今天）</label><input id="f-date" type="text" placeholder="例：115.08.19"></div>'+
+    '<div class="fld"><label>說明（選填）</label><input id="f-desc" type="text" placeholder="例：原機故障換發"></div>'+
+    '<div class="btns"><button class="btn btn-gh" onclick="closeModal()">取消</button>'+
+      '<button class="btn btn-pri" id="f-submit" onclick="submitIssue('+id+')">確認撥發</button></div>'+
+   '</div></div>';
+}
+function onEmpPick(){
+  var id = $('f-emp').value;
+  if(id && S.employees[id]) $('f-name').value = S.employees[id].name || '';
+}
+async function submitIssue(id){
+  var name = ($('f-name').value||'').trim();
+  if(!name){ toast('請選擇或輸入使用者姓名','err'); return; }
+  var empId = $('f-emp').value;
+  // 下拉選了人之後又手改姓名，工號就對不上了，這種情況一律不送工號，
+  // 免得清冊上出現「工號 A、姓名 B」這種以後查不出是誰的資料
+  if(empId && S.employees[empId] && S.employees[empId].name !== name) empId = '';
+  var btn = $('f-submit'); btn.disabled = true; btn.textContent = '送出中…';
+  try {
+    await api('changeUser', { id:id, toUserName:name, toUserEmpId:empId,
+      issueDate:($('f-date').value||'').trim(), desc:($('f-desc').value||'').trim() });
+    toast('✓ 已撥發給 '+name,'ok'); closeModal(); 刷新(id);
+  } catch(err){ toast('✗ '+err.message,'err'); }
+  finally { btn.disabled = false; btn.textContent = '確認撥發'; }
+}
+
+/* ── 歸還 ── */
+function openReturn(id){
+  var r = findRadio(id); if(!r) return;
+  $('modal').innerHTML =
+   '<div class="mask" onclick="if(event.target===this)closeModal()"><div class="modal">'+
+    '<h3>歸還：'+esc(r.model)+' '+esc(r.sn)+'</h3>'+
+    '<div class="note" style="margin-bottom:10px">目前使用者：'+esc(r.userName||'—')+'</div>'+
+    '<div class="fld"><label>歸還後狀態</label><select id="f-back">'+狀態選單('庫存', true)+'</select></div>'+
+    '<div class="fld"><label>說明（選填）</label><input id="f-desc" type="text" placeholder="例：離職繳回"></div>'+
+    '<div class="btns"><button class="btn btn-gh" onclick="closeModal()">取消</button>'+
+      '<button class="btn btn-pri" id="f-submit" onclick="submitReturn('+id+')">確認歸還</button></div>'+
+   '</div></div>';
+}
+async function submitReturn(id){
+  var btn = $('f-submit'); btn.disabled = true; btn.textContent = '送出中…';
+  try {
+    await api('changeUser', { id:id, toUserName:'', backStatus:$('f-back').value,
+      desc:($('f-desc').value||'').trim() });
+    toast('✓ 已歸還','ok'); closeModal(); 刷新(id);
+  } catch(err){ toast('✗ '+err.message,'err'); }
+  finally { btn.disabled = false; btn.textContent = '確認歸還'; }
+}
+
+/* ── 改狀態（報修／修好／報廢／盤點）── */
+function openStatus(id){
+  var r = findRadio(id); if(!r) return;
+  $('modal').innerHTML =
+   '<div class="mask" onclick="if(event.target===this)closeModal()"><div class="modal">'+
+    '<h3>改狀態：'+esc(r.model)+' '+esc(r.sn)+'</h3>'+
+    '<div class="fld"><label>狀態</label><select id="f-st">'+狀態選單(r.status, true)+'</select></div>'+
+    '<div class="fld"><label>維修紀錄／狀況說明</label>'+
+      '<textarea id="f-fix" rows="2" placeholder="例：耳機孔接觸不良，已送修">'+esc(r.fixNote||'')+'</textarea></div>'+
+    '<div class="note">'+(r.userName?'目前掛在 '+esc(r.userName)+' 名下，改狀態後會自動從他名下移除。':
+      '改成「使用中」請改用撥發功能。')+'</div>'+
+    '<div class="btns"><button class="btn btn-gh" onclick="closeModal()">取消</button>'+
+      '<button class="btn btn-pri" id="f-submit" onclick="submitStatus('+id+')">儲存</button></div>'+
+   '</div></div>';
+}
+async function submitStatus(id){
+  var btn = $('f-submit'); btn.disabled = true; btn.textContent = '儲存中…';
+  try {
+    await api('setStatus', { id:id, status:$('f-st').value, fixNote:($('f-fix').value||'').trim() });
+    toast('✓ 已更新狀態','ok'); closeModal(); 刷新(id);
+  } catch(err){ toast('✗ '+err.message,'err'); }
+  finally { btn.disabled = false; btn.textContent = '儲存'; }
+}
+
+/* ── 新增／編輯 ── */
+function 表單欄位(r){
+  r = r || {};
+  return '<div class="fld"><label>機型</label><input id="f-model" type="text" value="'+esc(r.model||'')+'" placeholder="例：NTS-18LC"></div>'+
+    '<div class="fld"><label>機身編號</label><input id="f-sn" type="text" value="'+esc(r.sn||'')+'" placeholder="例：S/N2107E01028"></div>'+
+    '<div class="fld"><label>採購日期</label><input id="f-buy" type="text" value="'+esc(r.buyDate||'')+'" placeholder="例：113.5.21 或 112.自購"></div>'+
+    '<div class="fld"><label>撥發日期</label><input id="f-issue" type="text" value="'+esc(r.issueDate||'')+'" placeholder="例：113.5.22"></div>'+
+    '<div class="fld"><label>案場</label><input id="f-site" type="text" value="'+esc(r.site||'巨蛋')+'"></div>'+
+    '<div class="fld"><label>歸屬</label><select id="f-own">'+
+      ['公司','自購'].map(function(o){ return '<option value="'+o+'"'+((r.ownership||'公司')===o?' selected':'')+'>'+o+'機</option>'; }).join('')+
+    '</select></div>'+
+    '<div class="fld"><label>維修紀錄（選填）</label><input id="f-fix" type="text" value="'+esc(r.fixNote||'')+'"></div>'+
+    '<div class="fld"><label>備註（選填）</label><textarea id="f-note" rows="2">'+esc(r.note||'')+'</textarea></div>';
+}
+function 讀表單(){
+  return { model:($('f-model').value||'').trim(), sn:($('f-sn').value||'').trim(),
+    buyDate:($('f-buy').value||'').trim(), issueDate:($('f-issue').value||'').trim(),
+    site:($('f-site').value||'').trim(), ownership:$('f-own').value,
+    fixNote:($('f-fix').value||'').trim(), note:($('f-note').value||'').trim() };
+}
+function openAdd(){
+  $('modal').innerHTML =
+   '<div class="mask" onclick="if(event.target===this)closeModal()"><div class="modal">'+
+    '<h3>新增無線電</h3>'+ 表單欄位() +
+    '<div class="fld"><label>狀態</label><select id="f-st">'+狀態選單('庫存', true)+'</select></div>'+
+    '<div class="note">同一個機身編號只能有一台，重複會被擋下。撥發給誰請在新增後用「撥發」功能登記，才會留下異動紀錄。</div>'+
+    '<div class="btns"><button class="btn btn-gh" onclick="closeModal()">取消</button>'+
+      '<button class="btn btn-pri" id="f-submit" onclick="submitAdd()">新增</button></div>'+
+   '</div></div>';
+}
+async function submitAdd(){
+  var d = 讀表單();
+  if(!d.model){ toast('請填寫機型','err'); return; }
+  if(!d.sn){ toast('請填寫機身編號','err'); return; }
+  // 前端先擋一次重複，讓使用者立刻看到是哪一台，不用等後端來回
+  var dup = S.radios.filter(function(r){ return 正規化編號(r.sn) === 正規化編號(d.sn); })[0];
+  if(dup){ toast('✗ 機身編號 '+dup.sn+' 已存在','err'); return; }
+  d.status = $('f-st').value;
+  var btn = $('f-submit'); btn.disabled = true; btn.textContent = '新增中…';
+  try {
+    await api('addRadio', d);
+    toast('✓ 已新增','ok'); closeModal(); loadRadios();
+  } catch(err){ toast('✗ '+err.message,'err'); }
+  finally { btn.disabled = false; btn.textContent = '新增'; }
+}
+function openEdit(id){
+  var r = findRadio(id); if(!r) return;
+  $('modal').innerHTML =
+   '<div class="mask" onclick="if(event.target===this)closeModal()"><div class="modal">'+
+    '<h3>編輯：'+esc(r.sn)+'</h3>'+ 表單欄位(r) +
+    '<div class="note">狀態與使用者請用「撥發／歸還／改狀態」修改，那些動作才會留下異動紀錄。</div>'+
+    '<div class="btns"><button class="btn btn-gh" onclick="closeModal()">取消</button>'+
+      '<button class="btn btn-pri" id="f-submit" onclick="submitEdit('+id+')">儲存</button></div>'+
+   '</div></div>';
+}
+async function submitEdit(id){
+  var d = 讀表單(); d.id = id;
+  if(!d.model){ toast('請填寫機型','err'); return; }
+  if(!d.sn){ toast('請填寫機身編號','err'); return; }
+  var btn = $('f-submit'); btn.disabled = true; btn.textContent = '儲存中…';
+  try {
+    await api('updateRadio', d);
+    toast('✓ 已儲存','ok'); closeModal(); 刷新(id);
+  } catch(err){ toast('✗ '+err.message,'err'); }
+  finally { btn.disabled = false; btn.textContent = '儲存'; }
+}
+async function delRadio(id){
+  var r = findRadio(id); if(!r) return;
+  if(!window.confirm('確定刪除「'+r.model+' '+r.sn+'」？\n\n淘汰請改狀態為「報廢」保留紀錄，刪除只用在誤登記。此動作無法復原。')) return;
+  try {
+    await api('deleteRadio', { id:id });
+    toast('🗑 已刪除','ok'); loadRadios();
+  } catch(err){ toast('✗ 刪除失敗：'+err.message,'err'); }
+}
+
+/* ── 匯出 xlsx（照目前畫面的篩選結果匯出，看到什麼就匯出什麼）── */
+function exportXlsx(){
+  try {
+    var list = 排序(篩選(S.radios, { q:$('q').value, status:S.status, own:$('own').value }));
+    if(!list.length){ toast('目前沒有可匯出的資料','err'); return; }
+    var head = ['項次','機型','機身編號','採購日期','撥發日期','案場','歸屬','狀態','使用者','維修紀錄','備註'];
+    var rows = list.map(function(r,i){
+      return [i+1, r.model, r.sn, r.buyDate, r.issueDate, r.site,
+              (r.ownership||'公司')+'機', r.status, r.userName, r.fixNote, r.note];
+    });
+    var ws = XLSX.utils.aoa_to_sheet([head].concat(rows));
+    ws['!cols'] = [{wch:6},{wch:18},{wch:22},{wch:14},{wch:14},{wch:14},{wch:9},{wch:10},{wch:10},{wch:20},{wch:26}];
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '無線電清冊');
+    var d = new Date();
+    var ymd = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+    XLSX.writeFile(wb, '無線電清冊_'+ymd+'.xlsx');
+    toast('✓ 已匯出 '+list.length+' 台','ok');
+  } catch(err){ toast('✗ 匯出失敗：'+err.message,'err'); }
+}
+
+/* ── 掛到 window：動態插入的 HTML 用 onclick="xxx()" 呼叫這些函式 ──
+   ⚠️ 這裡不能省。本檔函式都寫在 if (typeof document !== 'undefined') 區塊內
+   （為了讓 node 能單獨測上面的核心邏輯），而 HTML 屬性的 onclick 只找得到
+   window 上的函式。普通 function 宣告在區塊內時瀏覽器會自動建立全域繫結，
+   但 async function 沒有這個待遇——2026-08-10 生理假工具就是這樣按了沒反應
+   而且完全不報錯（見 docs/技術經驗筆記.md）。一律明確掛載。 */
+window.render = render;
+window.更新FAB = 更新FAB;
+window.toggle = toggle;
+window.setStatus = setStatus;
+window.openIssue = openIssue;
+window.onEmpPick = onEmpPick;
+window.submitIssue = submitIssue;
+window.openReturn = openReturn;
+window.submitReturn = submitReturn;
+window.openStatus = openStatus;
+window.submitStatus = submitStatus;
+window.openAdd = openAdd;
+window.submitAdd = submitAdd;
+window.openEdit = openEdit;
+window.submitEdit = submitEdit;
+window.delRadio = delRadio;
+window.closeModal = closeModal;
+window.exportXlsx = exportXlsx;
+
+/* ── 啟動 ── */
+window.addEventListener('load', function(){
+  // 返回主選單要保留工號（天鷹規範：工號狀態不可遺失）
+  var empId = new URLSearchParams(location.search).get('empId') || '';
+  if(empId) $('backBtn').href = 'index.html?empId=' + encodeURIComponent(empId);
+  if(!checkPermission()) return;
+  $('app').style.display = '';
+  $('fab').style.display = '';
+  Promise.all([loadEmployees(), loadRadios()]).then(hideSplash);
+  setTimeout(hideSplash, 3000); // 保險：網路慢也要讓畫面出現
+});
+
+}
+</script>
+</body>
+</html>
