@@ -215,8 +215,14 @@ function backToMain_(){
 function showNoPerm(msg){
   var sp = document.getElementById('splash');
   if(sp) sp.classList.add('out');
-  document.body.innerHTML = '<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:#0A0C10">'+
-    '<div class="errbox" style="max-width:360px"><i class="ti ti-lock"></i><div>'+msg+'</div></div></div>';
+  /* 這裡會整個把 <body> 換掉，使用者卡在這頁只能滑掉分頁重開，
+     沒有回主選單的路。補一個返回鈕，backToMain_() 本來就會帶工號
+     （天鷹規範：工號狀態不可遺失）。 */
+  document.body.innerHTML = '<div style="position:fixed;inset:0;display:flex;flex-direction:column;'+
+    'align-items:center;justify-content:center;gap:16px;padding:20px;background:#0A0C10">'+
+    '<div class="errbox" style="max-width:360px"><i class="ti ti-lock"></i><div>'+msg+'</div></div>'+
+    '<button class="ibtn" onclick="backToMain_()" style="width:auto;padding:11px 18px;gap:6px;'+
+    'display:flex;align-items:center"><i class="ti ti-arrow-left"></i>返回主選單</button></div>';
 }
 function checkPermission(){
   var u = getSessionUser();
