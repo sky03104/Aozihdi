@@ -2211,7 +2211,7 @@ function App() {
     const [permRole, setPermRole] = useState("fulltime");
     const [workAllowedIds, setWorkAllowedIds] = useState(null); // 施工單查詢(id 9) 正職/兼職個別白名單；null=不限制(全員可用，現狀)
     const [selectedUser, setSelectedUser] = useState(null);
-    const [loginForm, setLoginForm] = useState({ id: "", pw: "" });
+    const [loginForm, setLoginForm] = useState({ id: "", pw: "", remember: false });
     const [loggingIn, setLoggingIn] = useState(false);   // 登入中（同時擋連點重送）
     const [changingPw, setChangingPw] = useState(false); // 改密碼送出中（同時擋連點重送）
     const [regForm, setRegForm] = useState({ name: "", id: "", dept: "", role: "fulltime", pw: "", pw2: "" });
@@ -2573,10 +2573,15 @@ function App() {
     // 記住我：頁面載入時自動登入
     // 2026-07-26 改版：原本是拿存在瀏覽器裡的明文密碼跟前端的 USER_DB 比對，
     //   現在改成拿後端發的通行證去後端換身分，前端不再需要保存密碼。
+    // 2026-08-19 再改版：「記住我」跟 hsh_auth_token 拆開了。通行證/登入態
+    //   一律存起來，讓無線電管理等獨立分頁工具永遠連得上（不受這個核取方塊
+    //   影響）；「記住我」只決定主控台重新整理時要不要免密碼自動登入，靠
+    //   獨立的 hsh_remember_flag 判斷，沒勾就一律要求重新輸入密碼。
     useEffect(() => {
         let cancelled = false;
         (async () => {
             try {
+                if (localStorage.getItem('hsh_remember_flag') !== '1') return;
                 let sessionUser = null;
 
                 // 1) 優先用「記住我」的通行證，向後端換回目前身分
@@ -2671,15 +2676,18 @@ function App() {
         /* 寫入 localStorage 讓 iframe 工具（緊急聯絡清單等）能讀到目前登入者角色 */
         localStorage.setItem('hsh_session_user', JSON.stringify(sessionUser));
                 try { if (typeof logWorkflow === 'function') logWorkflow('app', 'login', '上線'); } catch (e) {}
-        /* 通行證（不存密碼）一律發放並存起來。原本靠「記住我」核取方塊
-           決定要不要存，但主控台本身不管有沒有勾都會自動用快取的登入態
-           重新進來（見下方 restore-session 流程），核取方塊唯一的實際
-           效果只是讓無線電管理/生理假紀錄/缺班調班紀錄這幾個獨立分頁
-           工具在沒勾時永遠連不上——使用者完全猜不到兩者有關聯
-           （2026-08-19 咖哩實機回報「無線電管理一直跳登入已失效」查出）。
-           token 本身在後端就有 7 天效期（issueToken_），不會因為一律
-           存起來而變得比較不安全。 */
+        /* 通行證（不存密碼）一律發放並存起來，跟「記住我」拆開——
+           無線電管理/生理假紀錄/缺班調班紀錄這幾個獨立分頁工具是靠這張
+           通行證跟 GAS 對話，不應該因為使用者沒勾記住我就連不上，
+           使用者也完全猜不到兩者有關聯（2026-08-19 咖哩實機回報
+           「無線電管理一直跳登入已失效」查出）。token 本身在後端就有
+           7 天效期（issueToken_），一律存起來不會比較不安全。 */
         setAuthToken(d.token);
+        /* 記住我：只決定主控台下次重新整理要不要免密碼自動登入
+           （hsh_session_user/hsh_auth_token 已經一律存了，這裡只是額外
+           一個開關）。沒勾就清掉，下次開主控台會停在登入頁要求重打密碼。 */
+        if (loginForm.remember) localStorage.setItem('hsh_remember_flag', '1');
+        else localStorage.removeItem('hsh_remember_flag');
         /* 清掉舊版遺留的「記住我」資料（裡面存的是明文密碼） */
         try { localStorage.removeItem('hsh_remember_user'); } catch (e) {}
         /* 讀取個人收藏 */
@@ -3176,6 +3184,14 @@ function App() {
                         React.createElement("div", { className: "input-wrap" },
                             React.createElement("span", { className: "input-icon" }, "\uD83D\uDD12"),
                             React.createElement("input", { className: "inp", type: "password", placeholder: "\u8ACB\u8F38\u5165\u5BC6\u78BC", value: loginForm.pw, onChange: e => setLoginForm({ ...loginForm, pw: e.target.value }) }))),
+                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14 } },
+                        React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" } },
+                            React.createElement("div", { onClick: () => setLoginForm(p => ({ ...p, remember: !p.remember })),
+                                style: { width: 20, height: 20, borderRadius: 5, border: loginForm.remember ? "2px solid var(--gold)" : "2px solid rgba(255,255,255,.3)",
+                                    background: loginForm.remember ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
+                                    cursor: "pointer", flexShrink: 0, transition: "all .2s" } },
+                                loginForm.remember && React.createElement("span", { style: { color: "#0A0C10", fontSize: 13, fontWeight: 900 } }, "\u2713")),
+                            React.createElement("span", { style: { fontSize: 13, color: "var(--muted)" }, onClick: () => setLoginForm(p => ({ ...p, remember: !p.remember })) }, "\u8A18\u4F4F\u6211\uFF087\u5929\u5167\u514D\u767B\u5165\uFF09"))),
                     React.createElement("button", { className: "btn-gold", onClick: handleLogin, disabled: loggingIn, style: loggingIn ? { opacity: .6, cursor: 'wait' } : null }, loggingIn ? "\u767B\u5165\u4E2D\u2026" : "\u767B\u5165\u7CFB\u7D71"),
                     React.createElement("div", { className: "divider" },
                         React.createElement("div", { className: "divider-line" }),
@@ -3663,7 +3679,7 @@ function App() {
                     color: '#fff', cursor: 'pointer', marginBottom: 10,
                     fontFamily: "'Microsoft JhengHei',sans-serif",
                     boxShadow: '0 3px 14px rgba(6,199,85,.3)' } }, "\uD83D\uDCF1 \u7DA1\u5B9A LINE \u901A\u77E5"),
-            React.createElement("button", { className: "logout-btn", onClick: () => { try { if (typeof logWorkflow === 'function') logWorkflow('app', 'logout', '離線'); } catch (e) {} setPage("login"); setCurrentUser(null); localStorage.removeItem('hsh_session_user'); setAuthToken(''); try { localStorage.removeItem('hsh_remember_user'); localStorage.removeItem('hsh_ec_contacts'); } catch (e) {} showToast("已登出"); } }, "\u767B\u51FA\u5E33\u865F")));
+            React.createElement("button", { className: "logout-btn", onClick: () => { try { if (typeof logWorkflow === 'function') logWorkflow('app', 'logout', '離線'); } catch (e) {} setPage("login"); setCurrentUser(null); localStorage.removeItem('hsh_session_user'); setAuthToken(''); try { localStorage.removeItem('hsh_remember_user'); localStorage.removeItem('hsh_remember_flag'); localStorage.removeItem('hsh_ec_contacts'); } catch (e) {} showToast("已登出"); } }, "\u767B\u51FA\u5E33\u865F")));
     };
     const NAV = [
         { id: "home", icon: "🏠", label: "首頁" },
