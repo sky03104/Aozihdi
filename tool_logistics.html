@@ -817,17 +817,29 @@ function getSheet_() {
   return sheet;
 }
 
-// 主鍵：掃描既有最大ID+1
+// 主鍵：Script Properties 快取下一個可用ID（O(1)），沒快取時才全表掃描重建一次
+// 用 sheet.getSheetId() 當快取 key，避免主資料表跟快捷表共用同一組計數
 function nextId_(sheet) {
+  var props = PropertiesService.getScriptProperties();
+  var key = 'NEXT_ID_' + sheet.getSheetId();
+  var cached = parseInt(props.getProperty(key), 10);
+  if (!isNaN(cached) && cached > 0) return cached;
+
   var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return 1;
-  var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
   var max = 0;
-  for (var i = 0; i < ids.length; i++) {
-    var n = parseInt(ids[i][0], 10);
-    if (!isNaN(n) && n > max) max = n;
+  if (lastRow >= 2) {
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      var n = parseInt(ids[i][0], 10);
+      if (!isNaN(n) && n > max) max = n;
+    }
   }
   return max + 1;
+}
+
+// 寫入成功後才呼叫：把快取推到下一格。刪除紀錄不會讓快取倒退，故 ID 永不重複使用
+function commitNextId_(sheet, id) {
+  PropertiesService.getScriptProperties().setProperty('NEXT_ID_' + sheet.getSheetId(), String(id + 1));
 }
 
 // 以紀錄ID找列號（找不到回 -1）
@@ -873,6 +885,7 @@ function addRecord(e) {
     ]]);
     sheet.getRange(row, 6).setNumberFormat('@');                    // 工號純文字（保留開頭 0）
     sheet.getRange(row, 8).setNumberFormat('yyyy/M/d HH:mm:ss');
+    commitNextId_(sheet, id);
     return jsonRes({ status: 'ok', id: id });
   } finally {
     lock.releaseLock();
@@ -1054,6 +1067,7 @@ function addShortcut(e) {
     var sheet = getShortcutSheet_();
     var id = nextId_(sheet);
     sheet.appendRow([id, String(e.parameter.category).trim(), parseInt(e.parameter.count, 10)]);
+    commitNextId_(sheet, id);
     return jsonRes({ status: 'ok', id: id });
   } finally {
     lock.releaseLock();
