@@ -342,7 +342,8 @@ function loadLeaveCounts(){
     if(d && d.status==='ok' && Array.isArray(d.list)){
       d.list.forEach(function(req){
         if(req.status === 'rejected') return;
-        var sh = (req.shift === '早班') ? '早班' : '晚班';  // 容錯：非早班一律當晚班
+        var sh = req.shift;
+        if(sh !== '早班' && sh !== '晚班') return;  // 班別未知（帳號沒設定）：不計入任何一班，避免灌水
         var dates = req.dates || [];
         dates.forEach(function(dt){
           dayCount[sh][dt] = (dayCount[sh][dt] || 0) + 1;
@@ -521,10 +522,16 @@ async function main(){
 
     var res = await resolveEmp(userId);
     if(res && res.status==='ok' && res.bound){
+      if(res.shift !== '早班' && res.shift !== '晚班'){
+        // 帳號在「帳號管理」還沒設定班別：不要悄悄當晚班處理，
+        // 否則這筆假單會被誤算進晚班額度，害真正的晚班同仁看到假滿
+        fail('您的帳號尚未設定班別，暫時無法送出請假。請聯絡管理員在「帳號管理」設定您的班別後再試一次。');
+        return;
+      }
       ME.empId = res.empId;
       ME.name = res.name || '';
       ME.dept = res.dept || '';
-      ME.shift = (res.shift === '早班') ? '早班' : '晚班';
+      ME.shift = res.shift;
       bootForm();
     } else {
       showState('unbound');
