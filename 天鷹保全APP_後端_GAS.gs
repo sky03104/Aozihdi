@@ -288,10 +288,12 @@ function getApprovedUsers() {
       if (!data[r][0]) continue;
       var status = String(data[r][5] || 'active');
       if (status !== 'active') continue;
-      var shift = '晚班';
+      // 班別：只信任明確填「早班」或「晚班」，其餘（空值/查不到）一律回空字串，
+      // 不准悄悄當晚班——否則帳號沒設班別的人會被永久誤算進晚班統計
+      var shift = '';
       if (shiftIdx >= 0) {
         var sv = String(data[r][shiftIdx] || '').trim();
-        shift = (sv === '早班') ? '早班' : '晚班';
+        if (sv === '早班' || sv === '晚班') shift = sv;
       }
       users[String(data[r][0])] = {
         name: String(data[r][1]),
@@ -352,22 +354,23 @@ function ensureColumn_(sh, name) {
   return newCol - 1;
 }
 
-// 用工號查帳號管理分頁的「班別」，回傳「早班」/「晚班」，查不到或空值回 '晚班'
+// 用工號查帳號管理分頁的「班別」，回傳「早班」/「晚班」；查不到、空值、或非這兩個
+// 精確值一律回空字串 ''——不准悄悄當晚班，否則帳號沒設班別的人會被永久誤算進晚班統計
 function getShiftByEmpId_(empId) {
   try {
     var sh = getUserDbSheet_();
     var shiftIdx = colIndexByName_(sh, '班別');
-    if (shiftIdx < 0) return '晚班';
+    if (shiftIdx < 0) return '';
     var data = sh.getDataRange().getValues();
     for (var r = 1; r < data.length; r++) {
       if (String(data[r][0]) === String(empId)) {
         var v = String(data[r][shiftIdx] || '').trim();
-        return (v === '早班') ? '早班' : '晚班';  // 空值或其他一律當晚班
+        return (v === '早班' || v === '晚班') ? v : '';
       }
     }
-    return '晚班';
+    return '';
   } catch (err) {
-    return '晚班';
+    return '';
   }
 }
 
@@ -377,7 +380,9 @@ function submitLeave(e) {
     if (!d.empId || !d.name) return jsonRes({status:'err', msg:'申請資料不完整'});
     var sh = getLeaveSheet();
 
-    // 用工號查帳號管理的班別（空值/查不到→晚班）；前端有帶 shift 則優先採用
+    // 用工號查帳號管理的班別；前端有帶明確的 早班/晚班 才優先採用
+    // 查不到就存空字串，不准偷偷塞晚班——空字串代表「帳號未設定班別」，
+    // getLeaveRequests() 統計人數時會直接略過，不計入任何一班的上限
     var shift = (d.shift === '早班' || d.shift === '晚班') ? d.shift : getShiftByEmpId_(d.empId);
 
     sh.appendRow([
@@ -390,7 +395,7 @@ function submitLeave(e) {
     d.shift = shift;  // 帶給通知函式
     notifyLeaveSubmitted_(d);
 
-    return jsonRes({status:'ok', shift:shift});
+    return jsonRes({status:'ok', shift:shift, shiftUnset: !shift});
   } catch(err) {
     return jsonRes({status:'err', msg:err.toString()});
   }
@@ -418,11 +423,12 @@ function getLeaveRequests() {
         dates = String(datesRaw == null ? '' : datesRaw).split(',').map(function(s){ return s.trim(); }).filter(Boolean);
       }
 
-      // 班別：讀不到欄位或空值一律當晚班
-      var shift = '晚班';
+      // 班別：只信任明確的「早班」/「晚班」，讀不到欄位或空值回空字串（未知），
+      // 不准悄悄當晚班——空字串由前端排除在早/晚班人數統計之外
+      var shift = '';
       if (shiftIdx >= 0) {
         var sv = String(data[r][shiftIdx] || '').trim();
-        shift = (sv === '早班') ? '早班' : '晚班';
+        if (sv === '早班' || sv === '晚班') shift = sv;
       }
 
       list.push({
@@ -2660,7 +2666,8 @@ function resolveEmp(e) {
     var sh = getUserDbSheet_();
     var shiftIdx = colIndexByName_(sh, '班別');
     var data = sh.getDataRange().getValues();
-    var role = 'fulltime', dept = '', name = bound.name, status = 'active', shift = '晚班';
+    // 班別：只信任明確的「早班」/「晚班」，查不到或空值回空字串——不准悄悄當晚班
+    var role = 'fulltime', dept = '', name = bound.name, status = 'active', shift = '';
     for (var r = 1; r < data.length; r++) {
       if (String(data[r][0]) === String(bound.empId)) {
         name   = String(data[r][1]) || name;
@@ -2669,14 +2676,14 @@ function resolveEmp(e) {
         status = String(data[r][5] || 'active');
         if (shiftIdx >= 0) {
           var sv = String(data[r][shiftIdx] || '').trim();
-          shift = (sv === '早班') ? '早班' : '晚班';
+          if (sv === '早班' || sv === '晚班') shift = sv;
         }
         break;
       }
     }
     if (status !== 'active') return jsonRes({status:'ok', bound:false, msg:'帳號未啟用'});
 
-    return jsonRes({status:'ok', bound:true, empId:bound.empId, name:name, role:role, dept:dept, shift:shift});
+    return jsonRes({status:'ok', bound:true, empId:bound.empId, name:name, role:role, dept:dept, shift:shift, shiftUnset: !shift});
   } catch (err) {
     return jsonRes({status:'err', msg:err.toString(), bound:false});
   }

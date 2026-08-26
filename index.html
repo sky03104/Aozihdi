@@ -1901,10 +1901,11 @@ function UsersTab({ userDb, setUserDb, showToast, setSelectedUser, canEdit }) {
                         u.dept,
                         React.createElement("span", { style: { marginLeft: 6, fontSize: 9, fontWeight: 700,
                                 borderRadius: 4, padding: '1px 5px',
-                                background: (u.shift === '早班') ? 'rgba(129,140,248,.15)' : 'rgba(212,168,0,.15)',
-                                color: (u.shift === '早班') ? '#818CF8' : 'var(--gold2)',
-                                border: (u.shift === '早班') ? '1px solid rgba(129,140,248,.3)' : '1px solid rgba(212,168,0,.3)' } },
-                            (u.shift === '早班') ? '早班' : '晚班'))),
+                                background: (u.shift === '早班') ? 'rgba(129,140,248,.15)' : (u.shift === '晚班') ? 'rgba(212,168,0,.15)' : 'rgba(248,113,113,.15)',
+                                color: (u.shift === '早班') ? '#818CF8' : (u.shift === '晚班') ? 'var(--gold2)' : '#F87171',
+                                border: (u.shift === '早班') ? '1px solid rgba(129,140,248,.3)' : (u.shift === '晚班') ? '1px solid rgba(212,168,0,.3)' : '1px solid rgba(248,113,113,.3)' } },
+                            // 未設定班別會被誤算進晚班請假額度，顯示為明確警示而非悄悄當晚班
+                            (u.shift === '早班') ? '早班' : (u.shift === '晚班') ? '晚班' : '⚠️ 未設定班別'))),
                 React.createElement("div", { style: { fontSize: 10, padding: '2px 7px', borderRadius: 20, fontWeight: 700,
                         color: rc, border: `1px solid ${rc}44`, flexShrink: 0, whiteSpace: 'nowrap' } }, roleLabels[u.role]),
                 canEdit && React.createElement("button", { onClick: (e) => { e.stopPropagation(); setResetTarget(u); setNewPwInput(''); }, style: { flexShrink: 0, background: 'rgba(99,102,241,.15)',
@@ -3833,7 +3834,9 @@ function App() {
                             leaveRequests.forEach(req => {
                                 if (req.status === 'rejected')
                                     return;
-                                const sh = (req.shift === '早班') ? '早班' : '晚班';
+                                const sh = req.shift;
+                                if (sh !== '早班' && sh !== '晚班')
+                                    return; // 帳號未設定班別：不計入任何一班，避免灌水
                                 (req.dates || []).forEach(d => {
                                     dayCount[sh][d] = (dayCount[sh][d] || 0) + 1;
                                 });
@@ -4669,15 +4672,17 @@ function App() {
                             React.createElement("select", { className: "select-inp", value: selectedUser.role, onChange: e => setSelectedUser({ ...selectedUser, role: e.target.value }) }, ROLES.map(r => (React.createElement("option", { key: r.id, value: r.id }, r.label))))),
                         React.createElement("div", { className: "input-group" },
                             React.createElement("label", { className: "input-label" }, "\u73ED\u5225\uFF08\u8ACB\u5047\u540D\u984D\u4F9D\u6B64\uFF09"),
+                            (selectedUser.shift !== '早班' && selectedUser.shift !== '晚班') &&
+                                React.createElement("div", { style: { fontSize: 11, color: '#F87171', marginBottom: 6 } }, "⚠️ 尚未設定班別，此人的請假不會計入早/晚班額度，請點選一邊並儲存"),
                             React.createElement("div", { style: { display: 'flex', gap: 8 } }, ['早班', '晚班'].map(s => (React.createElement("button", { key: s, onClick: () => setSelectedUser({ ...selectedUser, shift: s }), style: { flex: 1, padding: '9px', borderRadius: 8, cursor: 'pointer', fontFamily: "'Microsoft JhengHei',sans-serif",
                                     fontSize: 13, fontWeight: 700, border: '1px solid', transition: 'all .2s',
-                                    background: (selectedUser.shift || '晚班') === s
+                                    background: selectedUser.shift === s
                                         ? (s === '早班' ? 'rgba(129,140,248,.2)' : 'rgba(212,168,0,.18)')
                                         : 'var(--card)',
-                                    color: (selectedUser.shift || '晚班') === s
+                                    color: selectedUser.shift === s
                                         ? (s === '早班' ? '#818CF8' : 'var(--gold2)')
                                         : 'var(--muted)',
-                                    borderColor: (selectedUser.shift || '晚班') === s
+                                    borderColor: selectedUser.shift === s
                                         ? (s === '早班' ? '#818CF8' : 'var(--gold2)')
                                         : 'var(--border)',
                                 } }, s === '早班' ? '🌅 早班' : '🌙 晚班'))))),
@@ -4711,7 +4716,7 @@ function App() {
                                     " \u9805")),
                         React.createElement("button", { className: "save-btn", onClick: () => {
                                 const tgtId = selectedUser.empId || selectedUser.id;
-                                const newShift = (selectedUser.shift === '早班') ? '早班' : '晚班';
+                                const newShift = (selectedUser.shift === '早班' || selectedUser.shift === '晚班') ? selectedUser.shift : '';
                                 // Save to userDb (real account store)
                                 setUserDb(prev => ({
                                     ...prev,
@@ -4745,7 +4750,7 @@ function App() {
                                     }
                                 })();
                                 setSelectedUser(null);
-                                showToast("✅ 員工資料已更新！");
+                                showToast(newShift ? "✅ 員工資料已更新！" : "⚠️ 已儲存，但此人尚未設定班別，請假不會計入早/晚班額度");
                             } }, "\uD83D\uDCBE \u5132\u5B58\u8B8A\u66F4"));
                 })()))),
         currentUser && React.createElement(MascotWidget, { key: "mascot-widget", empId: currentUser.empId })
