@@ -78,7 +78,8 @@ GAS 用 `UrlFetchApp` 呼叫 Supabase 自動產生的 REST API。金鑰（servic
 ## 六、進度追蹤
 
 - [x] 階段1：建置（2026-08-27，Supabase 專案 `narilpgjmjncladkquly`，三張表建立完成，讀寫刪皆驗證成功，RLS 阻擋無金鑰請求已確認生效）
-- [ ] 階段2：歷史資料搬遷
+- [x] 階段2：歷史資料搬遷（2026-08-27，共6個版本：晚班/早班各線上+備份+待生效；經核對遷移結果與直接查詢Supabase雙重驗證，人數/內容抽查皆正確，紅字排休語意正確轉換）
+  - ⚠️ 踩坑記錄：Supabase 新版 `sb_secret_` 金鑰有瀏覽器偵測機制，GAS 的 `UrlFetchApp` 無法自訂 User-Agent（Google平台長年限制）會被誤判擋下，改用 legacy `service_role` JWT 金鑰解決，且**REST請求必須同時帶 `apikey` 與 `Authorization: Bearer` 兩個標頭**，只帶 apikey 會被當成匿名身份、被RLS規則擋成回傳空陣列（非報錯，容易誤判為資料遺失）。Phase 3 讀取程式碼務必兩個標頭都帶。
 - [ ] 階段3：只換讀
 - [ ] 階段4：換寫
 - [ ] 階段5：觀察期
