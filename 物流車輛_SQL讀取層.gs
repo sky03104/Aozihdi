@@ -36,6 +36,29 @@ function fmtISO_(d) {
   return Utilities.formatDate(d, 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX");
 }
 
+// Supabase單次GET預設上限1000筆，一整個月的資料量可能超過，用Range分頁抓到全部
+// （踩過的坑：aggregateMonth_SQL沒分頁時，超過1000筆之後的日期會被悄悄截斷成0）
+function supabaseRequestAll_(path) {
+  var cfg = supabaseConfig_();
+  var headers = { apikey: cfg.key, Authorization: 'Bearer ' + cfg.key };
+  var all = [];
+  var offset = 0;
+  var PAGE = 1000;
+  while (true) {
+    var pageHeaders = {};
+    for (var k in headers) pageHeaders[k] = headers[k];
+    pageHeaders.Range = offset + '-' + (offset + PAGE - 1);
+    var resp = UrlFetchApp.fetch(cfg.url + path, { method: 'get', headers: pageHeaders, muteHttpExceptions: true });
+    var code = resp.getResponseCode();
+    if (code >= 400) throw new Error('Supabase請求失敗（' + code + '）：' + resp.getContentText() + '｜path=' + path);
+    var chunk = JSON.parse(resp.getContentText() || '[]');
+    all = all.concat(chunk);
+    if (chunk.length < PAGE) break; // 這頁沒填滿，代表已經是最後一頁
+    offset += PAGE;
+  }
+  return all;
+}
+
 // 對應原本 getDay(e)，但改讀 Supabase
 function getDay_SQL(dateStr) {
   var range = 算日範圍_(dateStr);
@@ -43,7 +66,7 @@ function getDay_SQL(dateStr) {
     + '?created_at=gte.' + encodeURIComponent(fmtISO_(range.start))
     + '&created_at=lt.' + encodeURIComponent(fmtISO_(range.end))
     + '&order=created_at.desc';
-  var supaRows = supabaseRequest_('get', path);
+  var supaRows = supabaseRequestAll_(path);
 
   var rows = [];
   var totals = { '1.9噸': 0, '3.5噸': 0, '8噸以上': 0 };
@@ -70,8 +93,9 @@ function aggregateMonth_SQL(monthStr) {
 
   var path = '/rest/v1/logistics_records'
     + '?created_at=gte.' + encodeURIComponent(fmtISO_(range.start))
-    + '&created_at=lt.' + encodeURIComponent(fmtISO_(range.end));
-  var supaRows = supabaseRequest_('get', path);
+    + '&created_at=lt.' + encodeURIComponent(fmtISO_(range.end))
+    + '&order=created_at.asc'; // 分頁抓取需要穩定排序，避免跨頁重複/漏抓
+  var supaRows = supabaseRequestAll_(path);
 
   var map = {};
   supaRows.forEach(function (r) {
