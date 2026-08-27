@@ -21,6 +21,18 @@
 // dedupe_key唯一鍵被Supabase擋掉，不會重複灌資料）。
 // ════════════════════════════════════════════════════════════
 
+// 用gid（分頁內部代號，不受名稱裡看不見的特殊字元影響）抓分頁，
+// 比 getSheetByName() 穩定。gid由診斷目前試算表()確認過：
+// 施工單查詢=0、動火申請查詢=294199656。
+function 依gid取分頁_(gid) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].getSheetId() === gid) return sheets[i];
+  }
+  throw new Error('找不到 gid=' + gid + ' 的分頁');
+}
+
 function supabaseConfig2_() {
   var props = PropertiesService.getScriptProperties();
   var url = props.getProperty('SUPABASE_URL');
@@ -94,8 +106,7 @@ function 批次寫入_(path, rows) {
 // 搬遷「施工單查詢」（A~O，15欄）
 // ============================
 function 遷移施工單查詢_() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('施工單查詢');
-  if (!sheet) throw new Error('找不到分頁：施工單查詢');
+  var sheet = 依gid取分頁_(0);
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return { rows: [], skippedEmpty: 0, skippedDup: [] };
 
@@ -147,8 +158,7 @@ function 遷移施工單查詢_() {
 //           L動火器具 M施工日期 N退場日期
 // ============================
 function 遷移動火申請查詢_() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('動火申請查詢');
-  if (!sheet) throw new Error('找不到分頁：動火申請查詢');
+  var sheet = 依gid取分頁_(294199656);
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return { rows: [], skippedEmpty: 0, skippedDup: [] };
 
