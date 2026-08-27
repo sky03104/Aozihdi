@@ -155,16 +155,16 @@ function listScheduleMonths_SQL(e) {
 }
 
 // ============================
-// v2.16：getSchedule 短時間快取（30秒）
+// v2.16：getSchedule 短時間快取（1小時）
 // ────────────────────────────
 // getSchedule 這支查詢範圍固定很小，Sheets本身就夠快，真正拖慢的是 Apps
 // Script 平台本身每次冷啟動＋重新打開試算表的開銷（跟讀哪個資料庫無關）。
-// 加一層短時間快取：第一個人查詢照常走完整流程，接下來30秒內任何人再查
+// 加一層短時間快取：第一個人查詢照常走完整流程，接下來1小時內任何人再查
 // 直接吃快取，幾乎瞬間。所有會改動班表的地方（handleUpdate/
 // handleUpdateSchedule/handleDeleteStaff/checkAndSwitchMonth_）寫入成功
-// 後都會主動清掉快取，不用等30秒自然過期，一改就能查到最新的。
+// 後都會主動清掉快取，不用等1小時自然過期，一改就能查到最新的。
 // ============================
-var 班表快取秒數_ = 30;
+var 班表快取秒數_ = 3600; // 1小時。寫入時會主動清快取（見下方），設長一點沒關係
 
 function 班表快取Key_(shiftKey) {
   return 'schedule_' + (shiftKey || 'night');
