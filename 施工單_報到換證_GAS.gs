@@ -55,6 +55,13 @@ function supabaseRequest3_(method, path, body, extraHeaders) {
   return text ? JSON.parse(text) : null;
 }
 
+// 最簡單的連線測試：只做一次GET，用來觸發/確認UrlFetchApp的授權視窗
+function 測試Supabase連線() {
+  var result = supabaseRequest3_('GET', '/rest/v1/construction_orders?limit=1');
+  Logger.log(JSON.stringify(result));
+  return JSON.stringify(result);
+}
+
 // 測試用：在編輯器直接執行這個函式，模擬對「1F 警衛室 識別證檢查」那筆
 // 按報到換證，把結果跟過程中的錯誤都印在執行紀錄，不用去點Executions
 // 介面裡的每一筆。
