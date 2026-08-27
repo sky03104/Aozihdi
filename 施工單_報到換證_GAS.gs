@@ -55,6 +55,29 @@ function supabaseRequest3_(method, path, body, extraHeaders) {
   return text ? JSON.parse(text) : null;
 }
 
+// 診斷用：看「1F 警衛室 識別證檢查」這筆在Sheets裡實際存的型別跟值，
+// 跟Supabase比對鍵的組成方式是否吻合
+function 診斷報到資料型別() {
+  var ss = SpreadsheetApp.openById('1QuNkwu9zgPidUfSgWpqyT1M9X683IU-0LhXTc23hw-A');
+  var sheet = ss.getSheetByName('施工單查詢');
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][0]).trim() === '10522') {
+      var row = values[i];
+      var info = [];
+      for (var c = 1; c <= 10; c++) {
+        info.push('col' + c + '=' + JSON.stringify(row[c]) + '（型別:' + (typeof row[c]) + '）');
+      }
+      var key = [row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10]]
+        .map(function (v) { return String(v == null ? '' : v).trim(); }).join('§');
+      var msg = info.join('\n') + '\n組出來的key：' + key;
+      Logger.log(msg);
+      return msg;
+    }
+  }
+  return '找不到ID=10522的列';
+}
+
 // 最簡單的連線測試：只做一次GET，用來觸發/確認UrlFetchApp的授權視窗
 function 測試Supabase連線() {
   var result = supabaseRequest3_('GET', '/rest/v1/construction_orders?limit=1');
