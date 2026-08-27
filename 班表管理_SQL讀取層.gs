@@ -224,11 +224,15 @@ function 同步目前線上班表到Supabase_(shiftKey) {
   if (existingLive && existingLive.length > 0 && existingLive[0].year_month === ym) {
     // 同月修訂：原地清掉重灌
     versionId = existingLive[0].id;
-    supabaseRequest_('DELETE', '/rest/v1/schedule_entries?version_id=eq.' + versionId);
+    // 2026-08-27踩坑：GAS的UrlFetchApp對大寫'DELETE'/'PATCH'方法字串疑似無法正確
+    // 辨識（會靜默失敗或被當成別的方法處理，不報錯但也不會真的執行），改用小寫。
+    // 施工單管理搬遷時實測發現大寫'PATCH'完全沒有更新到資料才抓到這個問題，
+    // 這裡的DELETE/PATCH當初沒被實際驗證過是否真的執行成功，一併修正。
+    supabaseRequest_('delete', '/rest/v1/schedule_entries?version_id=eq.' + versionId);
   } else {
     // 換月或第一次：舊的line標記成歷史，開一個新版本
     if (existingLive && existingLive.length > 0) {
-      supabaseRequest_('PATCH', '/rest/v1/schedule_versions?id=eq.' + existingLive[0].id, {
+      supabaseRequest_('patch', '/rest/v1/schedule_versions?id=eq.' + existingLive[0].id, {
         status: 'superseded',
         superseded_at: new Date().toISOString()
       });
