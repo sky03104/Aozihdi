@@ -123,6 +123,18 @@ function onEdit(e) {
   sheet.getRange(startRow, 1, updates.length, 13).setValues(updates);
 }
 
+// 2026-08-27：這支同時被選單手動點選、也被時間驅動排程自動呼叫，但
+// getUi() 只有手動點選單那種有UI互動的情境才能用，排程觸發時呼叫會
+// 直接拋例外。改成有UI就跳視窗，沒有（排程觸發）就寫進log，不讓排程
+// 每次都失敗。
+function 安全提示_(msg) {
+  try {
+    SpreadsheetApp.getUi().alert(msg);
+  } catch (err) {
+    console.log('（排程觸發，無法顯示視窗）' + msg);
+  }
+}
+
 function removeDuplicateBM() {
   const sheet = SpreadsheetApp
     .getActiveSpreadsheet()
@@ -153,7 +165,7 @@ function removeDuplicateBM() {
   }
 
   if (keepRows.length === data.length) {
-    SpreadsheetApp.getUi().alert('沒有發現重複或空殼列！');
+    安全提示_('沒有發現重複或空殼列！');
     return;
   }
 
@@ -161,7 +173,7 @@ function removeDuplicateBM() {
   sheet.getRange(2, 1, lastRow - 1, COLS).clearContent();
   if (keepRows.length > 0)
     sheet.getRange(2, 1, keepRows.length, COLS).setValues(keepRows);
-  SpreadsheetApp.getUi().alert(`完成！清掉 ${removed} 筆重複/空殼列，保留 ${keepRows.length} 筆。`);
+  安全提示_(`完成！清掉 ${removed} 筆重複/空殼列，保留 ${keepRows.length} 筆。`);
 }
 
 function onOpen() {
