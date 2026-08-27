@@ -1,5 +1,18 @@
 /* ================================================================
    施工單 GAS — 修正版 v2.0（cec-up 上傳工具 / app 內資料上傳工具 的後端）
+
+   2026-08-27 SQL遷移階段3：doPost的getOrders action改呼叫
+   getOrders_含備援()（定義於同專案的 施工單_SQL讀取層.gs），優先讀
+   Supabase，失敗自動退回原本這支 getOrders(mode) 讀 Sheets。
+   ⚠️ 這個檔案要跟 施工單_SQL讀取層.gs、施工單_SQL遷移腳本.gs 貼在
+   同一個 Apps Script 專案裡，缺一支就會 ReferenceError（班表管理那次
+   踩過的坑，這次要記得）。
+
+   2026-08-27 SQL遷移階段4（雙寫）：doPost 寫入施工單/動火申請成功後，
+   同步寫進Supabase（_syncToSupabase）。⚠️ 刻意維持Sheets也照常寫入
+   （雙寫，非取代）——因為 tool_work.html 的搜尋/歷史查詢功能還沒搬，
+   仍直接讀Sheets，若停止寫入會讀到過時資料。之後那個功能也搬完，才
+   考慮要不要真正停用Sheets寫入。
    試算表真實欄位 A~N：
      A=流水號 B=申請單位 C=廠商 D=月 E=日 F=進場時間 G=退場時間
      H=人數 I=監工 J=施工地點 K=施工項目 L=施工日期 M=退場日期 N=分頁來源/備註
@@ -116,6 +129,18 @@ function onEdit(e) {
   sheet.getRange(startRow, 1, updates.length, 13).setValues(updates);
 }
 
+// 2026-08-27：這支同時被選單手動點選、也被時間驅動排程自動呼叫，但
+// getUi() 只有手動點選單那種有UI互動的情境才能用，排程觸發時呼叫會
+// 直接拋例外。改成有UI就跳視窗，沒有（排程觸發）就寫進log，不讓排程
+// 每次都失敗。
+function 安全提示_(msg) {
+  try {
+    SpreadsheetApp.getUi().alert(msg);
+  } catch (err) {
+    console.log('（排程觸發，無法顯示視窗）' + msg);
+  }
+}
+
 function removeDuplicateBM() {
   const sheet = SpreadsheetApp
     .getActiveSpreadsheet()
@@ -146,7 +171,7 @@ function removeDuplicateBM() {
   }
 
   if (keepRows.length === data.length) {
-    SpreadsheetApp.getUi().alert('沒有發現重複或空殼列！');
+    安全提示_('沒有發現重複或空殼列！');
     return;
   }
 
@@ -154,7 +179,7 @@ function removeDuplicateBM() {
   sheet.getRange(2, 1, lastRow - 1, COLS).clearContent();
   if (keepRows.length > 0)
     sheet.getRange(2, 1, keepRows.length, COLS).setValues(keepRows);
-  SpreadsheetApp.getUi().alert(`完成！清掉 ${removed} 筆重複/空殼列，保留 ${keepRows.length} 筆。`);
+  安全提示_(`完成！清掉 ${removed} 筆重複/空殼列，保留 ${keepRows.length} 筆。`);
 }
 
 function onOpen() {
@@ -178,8 +203,11 @@ function onOpen() {
 //      dedupeRows 同一套規則：監工+施工項目完全相同分桶，桶內廠商/地點寬鬆比對＋施工區間重疊
 //      才視為重複；拿不準的邊界案例一律不合併（漏抓比多顯示嚴重）。
 function getOrders(mode) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('施工單查詢');
+  // 2026-08-27：getSheetByName('施工單查詢') 手動執行時會拋出詭異的
+  // 「Sheet 38985608 not found」（一個數字，疑似分頁名稱含看不見的特殊
+  // 字元），改用 依gid取分頁_()（定義於同專案的 施工單_SQL遷移腳本.gs，
+  // gid=0 已用診斷函式確認過）繞過名稱比對。
+  var sheet = 依gid取分頁_(0);
   if (!sheet) return { status: 'error', msg: '找不到分頁：施工單查詢' };
 
   var data = sheet.getDataRange().getValues();
@@ -305,7 +333,9 @@ function doPost(e) {
     const tz = Session.getScriptTimeZone();
 
     if (payload.action === 'getOrders') {
-      const result = getOrders(payload.mode);
+      // v2：優先讀Supabase（work_date索引查詢，不用整表撈），失敗自動退回讀
+      // Sheets（getOrders_含備援 定義於 施工單_SQL讀取層.gs）
+      const result = getOrders_含備援(payload.mode);
       return ContentService
         .createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
@@ -354,6 +384,27 @@ function doPost(e) {
       return Utilities.formatDate(new Date(currentYear, Number(m) - 1, Number(d)), tz, "yyyy/M/d");
     }
 
+    // 把 "yyyy/M/d" 格式轉成 Postgres 用的 "yyyy-MM-dd"，空字串回傳null
+    function _toIsoDate(s) {
+      if (!s) return null;
+      var p = String(s).split('/');
+      if (p.length !== 3) return null;
+      return p[0] + '-' + ('0' + p[1]).slice(-2) + '-' + ('0' + p[2]).slice(-2);
+    }
+
+    // v2.16：SQL遷移階段4——同步寫入Supabase，Sheets仍照常寫入不受影響。
+    // 失敗只記log不擋Sheets這邊的正常流程（Sheets目前仍是雙寫來源之一，
+    // tool_work.html的搜尋/歷史查詢功能還沒搬，仍需要Sheets持續更新）。
+    function _syncToSupabase(path, rows) {
+      try {
+        if (rows.length === 0) return;
+        supabaseRequest2_('POST', path + '?on_conflict=dedupe_key', rows,
+          { Prefer: 'resolution=ignore-duplicates' });
+      } catch (err) {
+        console.error('同步Supabase失敗（' + path + '，不影響Sheets已成功寫入）：' + err.toString());
+      }
+    }
+
     function _buildKeys(sheet, startCol, totalCols, keyColIndexes) {
       const lastRow = sheet.getLastRow();
       const keys = new Set();
@@ -380,6 +431,7 @@ function doPost(e) {
       idValues.forEach(v => { const n = Number(v); if (!isNaN(n) && n > maxId) maxId = n; });
 
       const writeData = [];
+      const supabaseRows = [];
       let skipped = 0;
 
       payload.rows.forEach(r => {
@@ -406,10 +458,18 @@ function doPost(e) {
           entryDate, exitDate,
           ''            // ★ N 欄不再寫分頁名（不可靠又是雜訊）；留空給人工備註用
         ]);
+        supabaseRows.push({
+          apply_unit: String(r[0] || ''), vendor: String(r[1] || ''),
+          work_date: _toIsoDate(entryDate), entry_time: f.time, exit_time: g.time,
+          headcount: r[6] === '' || r[6] == null ? null : Number(r[6]),
+          supervisor: String(r[7] || ''), location: String(r[8] || ''), item: String(r[9] || ''),
+          exit_date: _toIsoDate(exitDate), note: '', dedupe_key: key
+        });
       });
 
       if (writeData.length > 0)
         sheet.getRange(sheet.getLastRow() + 1, 1, writeData.length, 14).setValues(writeData);
+      _syncToSupabase('/rest/v1/construction_orders', supabaseRows);
 
       result.construction = { inserted: writeData.length, skipped };
     }
@@ -422,6 +482,7 @@ function doPost(e) {
       const existingKeys = _buildKeys(sheet, 2, 10, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
       const writeData = [];
+      const supabaseRows = [];
       let skipped = 0;
 
       payload.fireRows.forEach(r => {
@@ -447,10 +508,18 @@ function doPost(e) {
           r[10],
           entryDate, exitDate,
         ]);
+        supabaseRows.push({
+          apply_unit: String(r[0] || ''), vendor: String(r[1] || ''),
+          work_date: _toIsoDate(entryDate), entry_time: f.time, exit_time: g.time,
+          headcount: r[6] === '' || r[6] == null ? null : Number(r[6]),
+          supervisor: String(r[7] || ''), location: String(r[8] || ''), item: String(r[9] || ''),
+          equipment: String(r[10] || ''), exit_date: _toIsoDate(exitDate), dedupe_key: key
+        });
       });
 
       if (writeData.length > 0)
         sheet.getRange(sheet.getLastRow() + 1, 2, writeData.length, 13).setValues(writeData);
+      _syncToSupabase('/rest/v1/fire_permits', supabaseRows);
 
       result.fire = { inserted: writeData.length, skipped };
     }
