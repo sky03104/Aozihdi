@@ -58,7 +58,11 @@ function 批次寫入2_(path, rows) {
   var inserted = 0;
   for (var i = 0; i < rows.length; i += BATCH) {
     var chunk = rows.slice(i, i + BATCH);
-    supabaseRequest2_('POST', path, chunk);
+    // on_conflict + resolution=ignore-duplicates：等同 ON CONFLICT DO NOTHING，
+    // 靠legacy_id唯一約束擋掉重複，重複執行這支腳本不會重複灌資料
+    // （2026-08-27修：舊版沒有這個保護，實測執行3次真的插入了3倍資料）
+    supabaseRequest2_('POST', path + '?on_conflict=legacy_id', chunk,
+      { Prefer: 'resolution=ignore-duplicates' });
     inserted += chunk.length;
   }
   return inserted;
