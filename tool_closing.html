@@ -1909,7 +1909,9 @@ async function syncDBFromGAS(silent){
   }catch(e){syncStatus='err';}
   updateSyncBadge();
 }
-async function pushDBToGAS(){
+// 2026-08-27 補：手機行動網路瞬斷偶爾造成單次請求失敗，失敗後1秒自動重試一次，
+// 重試也失敗才顯示錯誤（避免瞬斷被誤判成真的壞掉）
+async function pushDBToGAS(retrying){
   if(!gasUrl)return;
   try{
     const body=new URLSearchParams();
@@ -1918,8 +1920,12 @@ async function pushDBToGAS(){
     const res=await fetch(gasUrl,{method:'POST',body});
     const d=await res.json();
     if(d.status==='ok')showToast('✓ 資料庫已同步到雲端','ok');
+    else if(!retrying)setTimeout(function(){pushDBToGAS(true);},1000);
     else showToast('同步失敗：'+d.msg,'err');
-  }catch(e){showToast('同步失敗','err');}
+  }catch(e){
+    if(!retrying)setTimeout(function(){pushDBToGAS(true);},1000);
+    else showToast('同步失敗','err');
+  }
 }
 function updateSyncBadge(){
   const el=document.getElementById('syncBadge');
