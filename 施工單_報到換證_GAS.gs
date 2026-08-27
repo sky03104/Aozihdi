@@ -152,7 +152,9 @@ function doPost(e) {
             .map(function (v) { return String(v == null ? '' : v).trim(); }).join('§');
           var table = (sheetName === '動火申請查詢') ? 'fire_permits' : 'construction_orders';
           var isoTime = checkinTime.replace(' ', 'T') + ':00+08:00';
-          supabaseRequest3_('PATCH', '/rest/v1/' + table + '?dedupe_key=eq.' + encodeURIComponent(key),
+          // 2026-08-27踩坑：大寫'PATCH'被GAS的UrlFetchApp靜默忽略（不報錯但沒有
+          // 真的更新），實測用小寫'patch'才會真的執行，這裡務必小寫。
+          supabaseRequest3_('patch', '/rest/v1/' + table + '?dedupe_key=eq.' + encodeURIComponent(key),
             { checked_in_at: isoTime });
         } catch (syncErr) {
           console.error('同步Supabase報到時間失敗（不影響Sheets已成功更新）：' + syncErr.toString());
