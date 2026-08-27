@@ -198,6 +198,18 @@ function 遷移動火申請查詢_() {
 }
 
 // ============================
+// 診斷用：這個專案實際綁定的是哪份試算表、有哪些分頁
+// ============================
+function 診斷目前試算表() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return '這個專案沒有綁定任何試算表（getActiveSpreadsheet()回傳null，代表這是獨立腳本不是容器繫結腳本）';
+  var names = ss.getSheets().map(function (s) { return s.getName() + '（gid=' + s.getSheetId() + '）'; });
+  var msg = '試算表名稱：' + ss.getName() + '\n試算表ID：' + ss.getId() + '\n分頁清單：\n' + names.join('\n');
+  Logger.log(msg);
+  return msg;
+}
+
+// ============================
 // 主流程
 // ============================
 function 遷移施工單資料到Supabase() {
