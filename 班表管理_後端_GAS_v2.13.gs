@@ -3,12 +3,20 @@
 // 部署網址：https://script.google.com/macros/s/AKfycbzs56InZLeaHiRJhy1alNfQwDyH0mXEV9t_WJxzfjTjIhf68DHgMiWVQvVG6vKrRZ2x1w/exec
 // （早班晚班共用同一支，透過 SHIFT_CONFIG / payload.shift 分流，非天鷹保全APP帳號系統那支）
 //
-// 版本：2.14 新增（2026-08-27，SQL遷移階段3）：
+// 版本：2.14 新增（2026-08-27，SQL遷移階段3+5）：
 //   - handleUpdate、checkAndSwitchMonth_ 在 Sheets 寫入成功後，多呼叫一次
 //     同步目前線上班表到Supabase_()（定義於 班表管理_SQL讀取層.gs），把最新
 //     線上班表同步一份到 Supabase，避免 SQL 那邊變成過時的死資料。
 //     ⚠️ Sheets 目前仍是唯一權威來源，同步失敗只記 log，不會擋住 Sheets 這邊
 //     原本的正常運作。
+//   - 【重要】移除 handleUpdate、checkAndSwitchMonth_ 換月時複製整分頁當備份
+//     （原 v2.13 的 備份歷史班表_ 呼叫）。完整歷史現在由 Supabase 的
+//     schedule_versions 保存（換月時舊版本標記 superseded，資料不會消失），
+//     不需要 Sheets 再另外留一份，解決 TODO-31 提到的「隱藏分頁只增不減、
+//     長期會撐爆分頁數上限」問題。舊有的 _備份_ 分頁維持不動、不主動清除，
+//     只是不再產生新的。手動備份目前班表() 仍保留，供需要時手動執行。
+//     LINE小助手、自動排哨工具等直接讀Sheets的其他系統不受影響（它們讀的
+//     是「目前線上這份」，本來就跟備份分頁無關）。
 // 版本：2.13 新增（2026-08-09）：
 //   - 【重要】月初換月覆蓋線上班表「之前」先備份成隱藏分頁 _備份_{分頁名}_{yyyy-MM}
 //     原本每月1號凌晨排程會把上個月班表直接蓋掉且無任何備份，班表就此消失；
@@ -289,9 +297,11 @@ function handleUpdate(payload) {
       oldColors = tgtSheet.getRange('A4:AG30').getFontColors();
     }
 
-    // v2.13：換月上傳（直接蓋掉上個月）之前先留一份。
-    // 非換月的一般上傳是同月修訂，不備份，否則每改一次就多一個分頁。
-    if (isMonthSwitch) 備份歷史班表_(cfg, tgtSheet, liveYm);
+    // v2.14：SQL遷移階段5——不再於換月時複製整分頁當備份。
+    // 原因：完整歷史現在由 同步目前線上班表到Supabase_() 保存在 Supabase（換月時
+    // 舊版本會標記 superseded 保留，不會消失），不需要 Sheets 這邊再另外留一份，
+    // 否則隱藏分頁只會一直往上疊，長期會撐爆 Google Sheets 分頁數上限（TODO-31/36）。
+    // 舊的 _備份_ 分頁維持不動（不主動刪除），只是不再產生新的。
 
     copyRangeWithFormat(srcSheet, tgtSheet, 'A4:AG30');
 
@@ -611,8 +621,8 @@ function checkAndSwitchMonth_() {
       var liveYm = String(tgtSheet.getRange('Z1').getValue() || '').trim();
       if (liveYm === todayYm) continue;
 
-      // v2.13：蓋掉之前先留一份。這行沒有的話，上個月的班表就永遠消失了。
-      備份歷史班表_(cfg, tgtSheet, liveYm);
+      // v2.14：不再複製整分頁備份，理由同 handleUpdate 那處——完整歷史已由
+      // 同步目前線上班表到Supabase_() 保存在 Supabase，不需要 Sheets 再留一份。
 
       copyRangeWithFormat(stagingSheet, tgtSheet, 'A4:AG30');
       copyRangeWithFormat(stagingSheet, tgtSheet, 'C2:AG3');
