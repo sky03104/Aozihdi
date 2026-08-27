@@ -74,6 +74,15 @@ function 算日期_(ym, day) {
   return parts[0] + '-' + parts[1] + '-' + dd;
 }
 
+// 原始試算表固定31欄（對應每月最多31天），但月份不足31天時（如9月只有30天、
+// 2月更少）多出來的欄位是不存在的日期，不能硬存進去。
+function 該月實際天數_(ym) {
+  var parts = ym.split('-');
+  var y = parseInt(parts[0], 10);
+  var m = parseInt(parts[1], 10);
+  return new Date(y, m, 0).getDate(); // 下個月第0天＝這個月最後一天
+}
+
 // ============================
 // 建立或取得版本紀錄（避免重複執行時建立重複版本）
 // ============================
@@ -99,10 +108,12 @@ function 建立或取得版本_(shiftTypeForDb, ym, status, sourceLabel) {
 // 全部存起來（空白格 shift_code 存空字串）換取讀取時能完整還原，划算。
 function 轉為Entries_(rows, shiftTypeForDb, ym, versionId) {
   var entries = [];
+  var 天數 = 該月實際天數_(ym);
   for (var r = 0; r < rows.length; r++) {
     var row = rows[r];
     for (var i = 0; i < row.shifts.length; i++) {
       var day = i + 1;
+      if (day > 天數) continue; // 該月不存在的日期（例：9月的31號），跳過
       entries.push({
         shift_type: shiftTypeForDb,
         year_month: ym,
