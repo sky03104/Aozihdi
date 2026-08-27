@@ -126,12 +126,27 @@ function 遷移開店資料到Supabase() {
   return msg;
 }
 
+// 用 Prefer: count=exact 標頭問總筆數，不用真的把資料全撈下來，
+// 才不會撞到 Supabase 單次 GET 預設上限 1000 筆的限制
+// （這個限制連帶 limit= 查詢參數都蓋不過，只有 Prefer: count=exact 能問到真實總數）
+function supabaseCount2_(path) {
+  var cfg = supabaseConfig2_();
+  var headers = { apikey: cfg.key, Authorization: 'Bearer ' + cfg.key, Prefer: 'count=exact', Range: '0-0' };
+  var resp = UrlFetchApp.fetch(cfg.url + path, { method: 'get', headers: headers, muteHttpExceptions: true });
+  var code = resp.getResponseCode();
+  if (code >= 400) throw new Error('Supabase請求失敗（' + code + '）：' + resp.getContentText() + '｜path=' + path);
+  // Content-Range格式："0-0/4266"，斜線後面是總筆數
+  var contentRange = resp.getHeaders()['Content-Range'] || resp.getHeaders()['content-range'] || '';
+  var total = parseInt(contentRange.split('/')[1], 10);
+  return isNaN(total) ? -1 : total;
+}
+
 // ============================
 // 驗證用：核對Supabase筆數
 // ============================
 function 核對開店遷移結果() {
-  var rows = supabaseRequest2_('GET', '/rest/v1/opening_gate_logs?select=id&limit=100000');
-  var msg = 'opening_gate_logs Supabase共 ' + rows.length + ' 筆';
+  var total = supabaseCount2_('/rest/v1/opening_gate_logs?select=id');
+  var msg = 'opening_gate_logs Supabase共 ' + total + ' 筆';
   Logger.log(msg);
   return msg;
 }
