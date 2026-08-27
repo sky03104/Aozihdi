@@ -1,5 +1,12 @@
 /* ================================================================
    施工單 GAS — 修正版 v2.0（cec-up 上傳工具 / app 內資料上傳工具 的後端）
+
+   2026-08-27 SQL遷移階段3：doPost的getOrders action改呼叫
+   getOrders_含備援()（定義於同專案的 施工單_SQL讀取層.gs），優先讀
+   Supabase，失敗自動退回原本這支 getOrders(mode) 讀 Sheets。
+   ⚠️ 這個檔案要跟 施工單_SQL讀取層.gs、施工單_SQL遷移腳本.gs 貼在
+   同一個 Apps Script 專案裡，缺一支就會 ReferenceError（班表管理那次
+   踩過的坑，這次要記得）。
    試算表真實欄位 A~N：
      A=流水號 B=申請單位 C=廠商 D=月 E=日 F=進場時間 G=退場時間
      H=人數 I=監工 J=施工地點 K=施工項目 L=施工日期 M=退場日期 N=分頁來源/備註
@@ -305,7 +312,9 @@ function doPost(e) {
     const tz = Session.getScriptTimeZone();
 
     if (payload.action === 'getOrders') {
-      const result = getOrders(payload.mode);
+      // v2：優先讀Supabase（work_date索引查詢，不用整表撈），失敗自動退回讀
+      // Sheets（getOrders_含備援 定義於 施工單_SQL讀取層.gs）
+      const result = getOrders_含備援(payload.mode);
       return ContentService
         .createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
