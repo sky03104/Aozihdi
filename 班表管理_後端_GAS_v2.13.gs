@@ -3,6 +3,12 @@
 // 部署網址：https://script.google.com/macros/s/AKfycbzs56InZLeaHiRJhy1alNfQwDyH0mXEV9t_WJxzfjTjIhf68DHgMiWVQvVG6vKrRZ2x1w/exec
 // （早班晚班共用同一支，透過 SHIFT_CONFIG / payload.shift 分流，非天鷹保全APP帳號系統那支）
 //
+// 版本：2.14 新增（2026-08-27，SQL遷移階段3）：
+//   - handleUpdate、checkAndSwitchMonth_ 在 Sheets 寫入成功後，多呼叫一次
+//     同步目前線上班表到Supabase_()（定義於 班表管理_SQL讀取層.gs），把最新
+//     線上班表同步一份到 Supabase，避免 SQL 那邊變成過時的死資料。
+//     ⚠️ Sheets 目前仍是唯一權威來源，同步失敗只記 log，不會擋住 Sheets 這邊
+//     原本的正常運作。
 // 版本：2.13 新增（2026-08-09）：
 //   - 【重要】月初換月覆蓋線上班表「之前」先備份成隱藏分頁 _備份_{分頁名}_{yyyy-MM}
 //     原本每月1號凌晨排程會把上個月班表直接蓋掉且無任何備份，班表就此消失；
@@ -331,6 +337,13 @@ function handleUpdate(payload) {
     }
 
     SpreadsheetApp.flush();
+
+    // v2.14：SQL遷移階段3——Sheets寫入成功後，同步一份到Supabase，避免SQL側變成
+    // 過時的死資料。失敗只記log不擋Sheets這邊的正常流程（Sheets目前仍是權威來源）。
+    try { 同步目前線上班表到Supabase_(payload.shift); } catch (syncErr) {
+      console.error('同步Supabase失敗（不影響Sheets已成功更新）：' + syncErr.toString());
+    }
+
     return respond({
       success: true,
       message: cfg.label + '線上班表已更新完成' + (isMonthSwitch ? '（已切換為' + newYm + '）' : '')
@@ -604,6 +617,11 @@ function checkAndSwitchMonth_() {
       copyRangeWithFormat(stagingSheet, tgtSheet, 'C2:AG3');
       tgtSheet.getRange('Z1').setValue(stagingYm);
       SpreadsheetApp.flush();
+
+      // v2.14：同上，排程換月也要同步到Supabase，失敗只記log不擋換月流程。
+      try { 同步目前線上班表到Supabase_(key); } catch (syncErr) {
+        console.error('排程換月同步Supabase失敗（不影響Sheets已完成換月）：' + syncErr.toString());
+      }
 
       var notifyShiftType = (key === 'morning') ? 'early' : 'late';
       notifyMonthScheduleReleased_(notifyShiftType, stagingYm);
