@@ -105,5 +105,7 @@ GAS 用 `UrlFetchApp` 呼叫 Supabase 自動產生的 REST API。金鑰（servic
 - [x] 階段5：每日備份防護（2026-08-27）。`班表管理_SQL每日備份.gs`已部署，`設定每日備份觸發器`已執行，咖哩實機執行過`每日備份Supabase到雲端硬碟`並確認Drive出現備份檔。
 - ~~階段6（原規劃）：觀察期（Sheets停止當寫入來源）~~ 已依範圍決策取消
 - ~~階段7（原規劃）：收尾（完全停用Sheets）~~ 已依範圍決策取消
+- [x] 階段8：效能實測與修正（2026-08-27，分支`claude/schedule-perf-check`）。PR #254合併後咖哩回報「感覺載入速度沒有提升」，寫`測試讀取效能()`在同一次執行內分別計時比對，結果：**`getSchedule`改讀Supabase並沒有變快，反而更慢**——這支查詢範圍固定很小（27列×33欄），Sheets原本讀取熱機後只要18~25ms，Supabase每次都要750~800ms跨公司網路來回、不會隨重複呼叫變快。原始的效能推論（比照物流車輛統計那種隨資料量增大而變慢的O(n)全表掃描問題）套用到這支並不成立，班表管理的瓶頸從來就不是Sheets讀取速度。**修正**：`getSchedule`改回優先讀Sheets、Supabase當備援；`getScheduleByMonth`/`listScheduleMonths`維持Supabase優先不變（這兩支查歷史月份，Sheets備份分頁已停用，未來月份只有Supabase有資料，沒有退路也不必追求速度)。
+  - 📌 教訓：效能問題要先實測瓶頸在哪裡，不能直接套用別的工具的診斷結果。同樣是「班表相關」，`tool_logistics`是真的隨資料量增長而變慢（O(n)全表掃描），`班表管理`的讀取範圍固定很小、Sheets本身夠快，兩者的根本原因不同，解法也不該一樣。
 
-**本次搬遷到此告一段落。** 剩餘待辦：等下次真實換月後補驗`getScheduleByMonth`的backup分支（見階段3殘留缺口）；確認驗證無誤後開PR合併回main。
+**本次搬遷到此告一段落。** 剩餘待辦：等下次真實換月後補驗`getScheduleByMonth`的backup分支（見階段3殘留缺口）；`claude/schedule-perf-check`分支確認實機測試無誤後開PR合併回main。
