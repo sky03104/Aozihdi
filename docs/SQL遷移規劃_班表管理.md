@@ -82,12 +82,14 @@ GAS 用 `UrlFetchApp` 呼叫 Supabase 自動產生的 REST API。金鑰（servic
 | 2. 歷史資料搬遷 | 兩份試算表現有資料＋所有 `_備份_` 分頁，一次性轉存 Supabase | 月數/人數與原試算表逐項核對相符 |
 | 3. 只換讀＋寫入同步 | `getSchedule`／`getScheduleByMonth`／`listScheduleMonths_` 改讀 Supabase（失敗自動退回讀Sheets）；`handleUpdate`/`checkAndSwitchMonth_` 寫入Sheets成功後同步一份到Supabase | 新舊 API 回傳結果逐字比對相符；已正式接進 doGet 路由 |
 | 4. 收尾：停止Sheets端備份分頁 | 換月時不再複製整分頁備份（`備份歷史班表_`呼叫移除），完整歷史改由 Supabase `schedule_versions` 保存 | 之後每次換月，Sheets 分頁數不再增加；`手動備份目前班表()` 保留供緊急手動使用 |
+| 5. 每日備份防護 | 新增 `班表管理_SQL每日備份.gs`，每日凌晨3點把Supabase全部資料匯出成JSON存進Drive資料夾「天鷹保全_班表SQL備份」，保留30天自動清舊檔；順便每天實際查詢Supabase一次，避免免費方案7天無查詢自動暫停 | 咖哩實機執行`每日備份Supabase到雲端硬碟`確認Drive出現當天備份檔；`設定每日備份觸發器`已執行 |
 
 ~~原本規劃的「4.換寫（上傳直接寫Supabase）」「5.觀察期（Sheets停止當寫入來源）」「6.收尾（完全停用Sheets）」~~ **已依範圍決策取消，不執行**——Sheets 永久保留當唯一權威寫入來源，理由見上方「全專案消費者複查」。
 
 ## 五、風險與備援
 
-- Supabase 連不上：GAS 呼叫失敗要明確報錯，保留切回讀 Sheets 的備用路徑
+- Supabase 連不上：GAS 呼叫失敗要明確報錯，保留切回讀 Sheets 的備用路徑（僅對舊有已存在備份分頁的月份有效，新月份無Sheets端備份，詳見階段4）
+- Supabase 免費方案的政策/長期穩定性風險（非用量問題，是廠商政策說變就變的風險，如PlanetScale 2024砍免費方案前例）：已用每日自動備份到Drive緩解，就算Supabase帳號/方案出狀況，手上仍有近30天內的完整資料可還原
 - 過渡期是否要同步一份唯讀 Sheets 供咖哩肉眼核對：待決定，非必要但有助於驗收
 
 ## 六、進度追蹤
@@ -99,7 +101,8 @@ GAS 用 `UrlFetchApp` 呼叫 Supabase 自動產生的 REST API。金鑰（servic
 - [x] 階段3：只換讀＋寫入同步（2026-08-27）。`getSchedule`/`listScheduleMonths`/`getScheduleByMonth` 三支讀取API皆與Sheets原版逐字比對完全一致，早晚班皆驗證通過。**已正式接進doGet路由**：優先讀Supabase，任何失敗自動退回讀Sheets並記log（`讀取含備援_`）。`handleUpdate`/`checkAndSwitchMonth_`寫入Sheets成功後同步一份到Supabase。
   - ⚠️ 殘留驗證缺口：`getScheduleByMonth` 的「歷史備份」分支（status=superseded）目前無法用真實資料測到——現有備份月份跟線上月份剛好都是2026-08，查詢一律命中live分支。等下次真的換月（約9月1日）之後，兩邊月份不同了，要再跑一次`比對讀取結果`把backup分支也驗過。
 - [x] 階段4：收尾（2026-08-27）。移除`handleUpdate`/`checkAndSwitchMonth_`裡`備份歷史班表_`的呼叫，換月不再複製整分頁；完整歷史由Supabase保存。舊有`_備份_`分頁維持不動不主動清除。
-- ~~階段5：觀察期（Sheets停止當寫入來源）~~ 已依範圍決策取消
-- ~~階段6：收尾（完全停用Sheets）~~ 已依範圍決策取消
+- [x] 階段5：每日備份防護（2026-08-27）。`班表管理_SQL每日備份.gs`已部署，`設定每日備份觸發器`已執行，咖哩實機執行過`每日備份Supabase到雲端硬碟`並確認Drive出現備份檔。
+- ~~階段6（原規劃）：觀察期（Sheets停止當寫入來源）~~ 已依範圍決策取消
+- ~~階段7（原規劃）：收尾（完全停用Sheets）~~ 已依範圍決策取消
 
 **本次搬遷到此告一段落。** 剩餘待辦：等下次真實換月後補驗`getScheduleByMonth`的backup分支（見階段3殘留缺口）；確認驗證無誤後開PR合併回main。
