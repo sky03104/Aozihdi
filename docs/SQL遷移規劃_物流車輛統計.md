@@ -53,8 +53,10 @@ alter table logistics_records enable row level security;
 
 ## 六、進度追蹤
 
-- [ ] 階段1：建置
-- [ ] 階段2：歷史資料搬遷
-- [ ] 階段3：只換讀＋失敗備援
-- [ ] 階段4：換寫
+- [x] 階段1：建置（2026-08-27）
+- [x] 階段2：歷史資料搬遷（2026-08-27）。讀到3730列，略過空殼0筆，實際寫入3730筆，核對一致。
+- [x] 階段3：只換讀＋失敗備援（2026-08-27）。`比對getDay`/`比對getMonth`皆完全一致（差異僅出現在測試當下仍持續有新資料寫入的「今天」，屬預期中的時間差，非邏輯錯誤）。效能實測：讀Sheets 3010ms→讀Supabase 847ms。
+  - ⚠️ 踩坑記錄：`aggregateMonth_SQL`一開始沒有分頁，8月資料量已經超過Supabase單次GET上限1000筆，14日之後全部被截斷成0。比照打烊/開店/施工單的教訓，改用Range header分頁抓取（`supabaseRequestAll_`）解決，`getDay_SQL`也一併改用避免未來資料量增長時複發。
+  - ⚠️ 踩坑記錄：比對/效能測試工具一開始沒處理「Apps Script執行按鈕無法傳參數」的問題，導致用undefined測出的效能數字/比對結果沒有意義。改成沒帶參數時自動預設今天/這個月；另外比對成功的分支原本沒有Logger.log，執行紀錄看起來像沒反應，已修正兩種結果都印出來。
+- [x] 階段4：換寫（2026-08-27）。`addRecord`/`updateRecord`/`deleteRecord`全部改走Supabase（`id`定位），移除LockService+Script Properties流水號快取機制（Postgres bigserial自己保證唯一，不再需要）；`getDay`/`getMonth`/`exportMonth`改讀Supabase。快捷設定維持在Sheets不搬。`tool_logistics.html`內嵌GAS_CODE與`物流車輛統計_GAS.gs`已同步。PR #265已合併，待咖哩實機部署測試。
 - [ ] 階段5：每日備份防護
