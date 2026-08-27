@@ -155,6 +155,46 @@ function listScheduleMonths_SQL(e) {
 }
 
 // ============================
+// v2.16：getSchedule 短時間快取（30秒）
+// ────────────────────────────
+// getSchedule 這支查詢範圍固定很小，Sheets本身就夠快，真正拖慢的是 Apps
+// Script 平台本身每次冷啟動＋重新打開試算表的開銷（跟讀哪個資料庫無關）。
+// 加一層短時間快取：第一個人查詢照常走完整流程，接下來30秒內任何人再查
+// 直接吃快取，幾乎瞬間。所有會改動班表的地方（handleUpdate/
+// handleUpdateSchedule/handleDeleteStaff/checkAndSwitchMonth_）寫入成功
+// 後都會主動清掉快取，不用等30秒自然過期，一改就能查到最新的。
+// ============================
+var 班表快取秒數_ = 30;
+
+function 班表快取Key_(shiftKey) {
+  return 'schedule_' + (shiftKey || 'night');
+}
+
+function 清除班表快取_(shiftKey) {
+  try {
+    CacheService.getScriptCache().remove(班表快取Key_(shiftKey));
+  } catch (err) {
+    console.error('清除班表快取失敗（' + shiftKey + '）：' + err.toString());
+  }
+}
+
+function getScheduleData_含快取(e) {
+  var shiftKey = (e && e.parameter) ? e.parameter.shift : '';
+  var cache = CacheService.getScriptCache();
+  var key = 班表快取Key_(shiftKey);
+  var cached = cache.get(key);
+  if (cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+
+  var result = 讀取含備援_(e, getScheduleData, getScheduleData_SQL, 'getSchedule');
+  try {
+    cache.put(key, result.getContent(), 班表快取秒數_);
+  } catch (err) {
+    console.error('寫入班表快取失敗：' + err.toString());
+  }
+  return result;
+}
+
+// ============================
 // v2.14：把「目前線上這份」同步進 Supabase
 // ────────────────────────────
 // 呼叫時機：Sheets 寫入成功之後（handleUpdate、checkAndSwitchMonth_）。
