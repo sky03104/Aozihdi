@@ -3,6 +3,13 @@
 // 部署網址：https://script.google.com/macros/s/AKfycbzs56InZLeaHiRJhy1alNfQwDyH0mXEV9t_WJxzfjTjIhf68DHgMiWVQvVG6vKrRZ2x1w/exec
 // （早班晚班共用同一支，透過 SHIFT_CONFIG / payload.shift 分流，非天鷹保全APP帳號系統那支）
 //
+// 版本：2.15 修正（2026-08-27，SQL遷移效能實測後修正）：
+//   - 實測發現 getSchedule（目前線上這份，index.html日常在用）改讀Supabase
+//     沒有變快、反而變慢：這支範圍固定很小（27列x33欄），Sheets本來就快
+//     （熱機後18~25ms），Supabase每次都要多一段跨公司網路來回（實測
+//     750~800ms，不會隨重複呼叫變快）。改回優先讀Sheets，Supabase當備援。
+//     getScheduleByMonth/listScheduleMonths維持Supabase優先不變——那兩支
+//     查歷史月份，Sheets備份分頁機制已停用，未來月份只有Supabase有資料。
 // 版本：2.14 新增（2026-08-27，SQL遷移階段3+5）：
 //   - handleUpdate、checkAndSwitchMonth_ 在 Sheets 寫入成功後，多呼叫一次
 //     同步目前線上班表到Supabase_()（定義於 班表管理_SQL讀取層.gs），把最新
@@ -99,8 +106,13 @@ function doGet(e) {
   var action = (e && e.parameter) ? e.parameter.action : '';
 
   if (action === 'getSchedule') {
-    // v2.14：優先讀 Supabase，失敗自動退回讀 Sheets（讀取含備援_ 定義於 班表管理_SQL讀取層.gs）
-    return 讀取含備援_(e, getScheduleData_SQL, getScheduleData, 'getSchedule');
+    // v2.15：實測發現這支範圍固定很小（27列x33欄），Sheets本來就快（熱機後
+    // 18~25ms），改讀Supabase反而每次都要多一段跨公司網路來回（實測750~800ms，
+    // 不會變快）。改回優先讀Sheets，Supabase只當備援（讀取含備援_ 定義於
+    // 班表管理_SQL讀取層.gs）。getScheduleByMonth/listScheduleMonths維持
+    // Supabase優先不變——那兩支查的是歷史月份，Sheets備份分頁機制已停用，
+    // 未來月份只有Supabase有資料，沒有退路也不需要退路。
+    return 讀取含備援_(e, getScheduleData, getScheduleData_SQL, 'getSchedule');
   } else if (action === 'getScheduleByMonth') {
     return 讀取含備援_(e, getScheduleByMonth_SQL, getScheduleByMonth_, 'getScheduleByMonth');   // v2.13：指定月份（含歷史備份），請款工具用
   } else if (action === 'listScheduleMonths') {
