@@ -287,20 +287,20 @@ const NODES = [
   { id: 8, title: '班表查詢', topic: 'tools', pos: [1.495, 0.52, -2.5895], note: 'ScheduleApp；SHIFT_TYPES 班別代號（早/晚班）（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
   { id: 9, title: '緊急聯絡清單', topic: 'tools', pos: [2.5895, -0.52, 1.495], note: 'tpl-emergency；normalizePhone 補回開頭 0（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
   { id: 10, title: '資料上傳工具', topic: 'tools', pos: [-3.864, 0.0, 1.035], note: 'tpl-upload（base64 內嵌）；施工單/班表/哨表，SheetJS 解析 Excel；獨立版見 cec-up(id32)（2026-07-15 咖哩手繪佈局微調：弗蘭奇工房往左移＋外圈整體拉開1.3倍間距；2026-07-15 再調：頂視圖角度轉到165°避開id5/id137同扇形擠壓）' },
-  { id: 11, title: '簽到/車輛/工作', topic: 'tools', pos: [-2.5895, -0.52, 1.495], note: 'tool_signin / tool_car / tool_work；施工單查詢(id9)新增正職/兼職個人白名單(workAllowedIds)，組長以上不受影響，tool_work.html 自帶檢查防貼網址繞過（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
+  { id: 11, title: '簽到/車輛/工作', topic: 'tools', pos: [-2.5895, -0.52, 1.495], note: 'tool_signin / tool_car / tool_work；施工單查詢新增正職/兼職個人白名單(workAllowedIds)，組長以上不受影響，tool_work.html 自帶檢查防貼網址繞過（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）。2026-08-27 tool_work.html搜尋/歷史查詢改走GAS(id47)伺服器端篩選Supabase(id68)取代整表gviz下載，前端parseGvizTable等既有解析邏輯完全不變（TODO-38，PR #258）' },
   { id: 12, title: '請假申請', topic: 'tools', pos: [-2.5895, -0.52, -1.495], note: 'liff_leave + 雲端請假清單（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
 
   // ── 東海／後端 GAS ──
   { id: 13, title: '事故/表揚 GAS v3.1', topic: 'backend', pos: [1.6891, 1.2961, 0.0], note: 'action 分流 report/feedback/updateStatus/deleteRow/getReports/getFeedback；狀態/處置欄；新資料自動轉發LINE推播給主管/管理員' },
   { id: 14, title: '帳號/請假 GAS', topic: 'backend', pos: [0.8592, 1.9478, 0.6421], note: 'ACCOUNT_GAS_URL；登入/帳號申請/請假審核；getDirectives/saveDirectives 讀寫宣導事項試算表(id66)' },
-  { id: 15, title: '打烊/開店 GAS', topic: 'backend', pos: [0.5627, 1.138, 1.9043], note: '進出記錄 + _SharedDB（廠商/監工/檢查者即時同步）；2026-07-06 開店 GAS 補 updateRow/deleteRow（今日頁編輯刪除，先前漏接一律失敗）' },
+  { id: 15, title: '打烊/開店 GAS', topic: 'backend', pos: [0.5627, 1.138, 1.9043], note: '進出記錄 + _SharedDB（廠商/監工/檢查者即時同步）；2026-07-06 開店 GAS 補 updateRow/deleteRow（今日頁編輯刪除，先前漏接一律失敗）。2026-08-27 SQL遷移：「進出資料表」權威改為Supabase(closing_gate_logs/opening_gate_logs，見id18/19)，一般登錄/updateExitTime/updateRow/deleteRow全改走Supabase(id定位，取代原本不穩健的列號定位)；Sheets版「進出資料表」改為按需刷新的快取——切換預覽分頁或exportDailyExcel前才從Supabase整批刷新回來，讓「打烊後/開店前」即時核對報表的公式維持正常運作；PR #259已合併，尚缺每日備份' },
   { id: 16, title: '照片上傳處理', topic: 'backend', pos: [1.0723, 1.8817, -0.8901], note: 'saveImages_；公告夾不可寫退回執行帳號夾；setSharing 非致命' },
 
   // ── 北海／資料儲存 ──
   { id: 17, title: '主試算表', topic: 'data', pos: [-1.6891, 1.2961, -0.0], note: '事故報告 / 匿名表揚檢舉 分頁；主鍵純數字列號' },
-  { id: 18, title: '打烊資料庫', topic: 'data', pos: [-0.8592, 1.9478, -0.6421], note: '廠商/監工/檢查者/施工類型（開店打烊共用）' },
-  { id: 19, title: '開店試算表', topic: 'data', pos: [-0.5627, 1.138, -1.9043], note: '開店前/B1F餐廳/4F餐廳 分頁' },
-  { id: 20, title: '班表資料', topic: 'data', pos: [-1.0723, 1.8817, 0.8901], note: '班別代號 SHIFT_TYPES / WORK_SHIFT / OFF_TYPES。線上班表分頁固定一份（當月），A4:AG30＝姓名+31天代號，Z1 存年月 yyyy/MM。2026-08-09 起換月覆蓋前會自動存成隱藏備份分頁 _備份_{分頁名}_{yyyy-MM}，歷史月份可經 getScheduleByMonth 取回（請款工具靠此讀上個月）' },
+  { id: 18, title: '打烊資料庫', topic: 'data', pos: [-0.8592, 1.9478, -0.6421], note: '廠商/監工/檢查者/施工類型（開店打烊共用，維持在Sheets不搬——量小固定不會隨時間增長）；2026-08-27起「進出資料表」權威已搬到Supabase(id85的closing_gate_logs)，此處Sheets同名分頁只保留最近一次被刷新的內容，見id15' },
+  { id: 19, title: '開店試算表', topic: 'data', pos: [-0.5627, 1.138, -1.9043], note: '開店前/B1F餐廳/4F餐廳 分頁；2026-08-27起「進出資料表」權威已搬到Supabase(id85的opening_gate_logs)，此處Sheets同名分頁只保留最近一次被刷新的內容，見id15' },
+  { id: 20, title: '班表資料', topic: 'data', pos: [-1.0723, 1.8817, 0.8901], note: '班別代號 SHIFT_TYPES / WORK_SHIFT / OFF_TYPES。線上班表分頁固定一份（當月），A4:AG30＝姓名+31天代號，Z1 存年月 yyyy/MM。⚠️2026-08-27起：原本換月覆蓋前存成隱藏備份分頁(_備份_*)的機制已停用，改由Supabase(id85)的schedule_entries/schedule_versions保存全部歷史月份，getScheduleByMonth/listScheduleMonths改讀那裡；當月Sheets仍是getSchedule日常查詢的權威來源（實測比Supabase快，見id46）' },
   { id: 21, title: 'localStorage 本地', topic: 'data', pos: [-2.2085, 0.8995, 0.1129], note: 'hsh_session_user / hsh_favs / hsh_shops 等' },
   { id: 22, title: 'Drive 公告資料夾', topic: 'data', pos: [-1.4062, 1.7406, -0.9428], note: '照片統一存放（1K_RR…）；共用政策可能擋公開連結' },
 
@@ -338,10 +338,10 @@ const NODES = [
   { id: 37, title: '物流車輛統計', topic: 'tools', pos: [2.5895, -0.52, -1.495], note: 'tool_logistics.html 獨立檔（iframe src）；三分類(1.9噸/3.5噸/8噸以上)登記＋快捷一鍵送出＋單日查詢＋整月統計；可修改/刪除；全員開放(id18)，快捷管理限 admin（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
 
   // ── 東海／後端 GAS ──
-  { id: 38, title: '物流統計 GAS', topic: 'backend', pos: [0.7926, 0.6153, 2.252], note: '物流車輛統計_GAS.gs（獨立部署）；add/update/delete/getDay/getMonth/exportMonth＋getShortcuts/addShortcut/updateShortcut/deleteShortcut；時間戳伺服器端蓋、主鍵 max(ID)+1' },
+  { id: 38, title: '物流統計 GAS', topic: 'backend', pos: [0.7926, 0.6153, 2.252], note: '物流車輛統計_GAS.gs（獨立部署）；getShortcuts/addShortcut/updateShortcut/deleteShortcut（快捷設定，量小固定，維持在Sheets）。2026-08-27 SQL遷移：add/update/delete/getDay/getMonth/exportMonth全改走Supabase(id39，id定位)，移除原本LockService+Script Properties流水號快取機制（Postgres bigserial自己保證唯一）；PR #265已合併，待咖哩實機部署測試，尚缺每日備份' },
 
   // ── 北海／資料儲存 ──
-  { id: 39, title: '物流試算表', topic: 'data', pos: [-1.4474, 1.543, 1.332], note: '新建試算表；物流車輛紀錄分頁(A~H)＋快捷設定分頁(A~C)＋YYYY-MM 月統計分頁（exportMonth 產生）；工號欄純文字保開頭0' },
+  { id: 39, title: '物流試算表', topic: 'data', pos: [-1.4474, 1.543, 1.332], note: '新建試算表；快捷設定分頁(A~C)＋YYYY-MM 月統計分頁（exportMonth 產生，邏輯不變只是資料來源換成Supabase）；工號欄純文字保開頭0。2026-08-27起「物流車輛紀錄」權威已搬到Supabase(id85的logistics_records)，原本的物流車輛紀錄分頁(A~H)不再是資料來源' },
 
   // ── 東海／後端 GAS ──
   { id: 40, title: '航海日誌 GAS', topic: 'backend', pos: [1.4474, 1.543, -1.332], note: '航海日誌_GAS.gs v2.0；logTask/getActive/checkKick/forceLogout；CacheService 快取 10 秒 + 30 天自動清理；brain_map 每 10 秒輪詢畫即時人物' },
@@ -355,8 +355,8 @@ const NODES = [
   { id: 43, title: '交接事項 GAS', topic: 'backend', pos: [1.1915, 2.2311, -0.1222], note: '帶班交接_GAS.gs（獨立部署）；add/update/delete/getAll；建立人+建立時間、最後修改人+時間伺服器端蓋章，主鍵 max(ID)+1' },
   { id: 44, title: '哨表產生 GAS', topic: 'backend', pos: [1.8958, 1.2979, 1.1353], note: '哨表產生_GAS.gs（獨立部署）；getEmployeeNames/getGuardPostConfig/saveGuardPostConfig/getMonthlyRoster；讀早晚班月班表算當日在職名單、讀寫哨點設定分頁；上傳寫入哨表另沿用哨表上傳_GAS_v6.gs' },
   { id: 45, title: '缺班調班紀錄 GAS', topic: 'backend', pos: [0.5772, 2.099, 1.4062], note: '缺班調班紀錄_GAS.gs（獨立部署）；getRecords/addRecord/deleteRecord；每個 action 都驗登入通行證＋角色需隊長以上(captain/executive/admin)，才向主 App 打 verifySession；主鍵 max(ID)+1' },
-  { id: 46, title: '班表管理 GAS', topic: 'backend', pos: [1.6916, 1.0127, -1.7242], note: '班表管理_後端_GAS_v2.13.gs（早晚班共用一支，靠 SHIFT_CONFIG / payload.shift 分流）。upload/update/updateSchedule/updateShiftSettings/deleteStaff（POST）＋ getSchedule/getScheduleByMonth/listScheduleMonths/getShiftSettings（GET）。線上班表分頁固定只有一份（早班班表／晚班班表），下月班表先進「_待生效」，每日00:00~01:00排程 checkAndSwitchMonth_ 於1號自動切換。⚠️2026-08-09 前切換時直接覆蓋、舊月班表永久消失；v2.13 起兩個覆蓋點（排程換月、上傳換月）覆蓋前先備份成隱藏分頁 _備份_{分頁名}_{yyyy-MM}——只新增不刪除、同月已存在則跳過保留最早那份、備份失敗只記log不中斷換月。備份僅對部署後的月份有效，部署當下需手動跑一次 手動備份目前班表()' },
-  { id: 47, title: '空節點 #47', topic: 'backend', pos: [1.8028, 1.916, -0.2784], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
+  { id: 46, title: '班表管理 GAS', topic: 'backend', pos: [1.6916, 1.0127, -1.7242], note: '班表管理_後端_GAS_v2.13.gs（早晚班共用一支，靠 SHIFT_CONFIG / payload.shift 分流）。upload/update/updateSchedule/updateShiftSettings/deleteStaff（POST）＋ getSchedule/getScheduleByMonth/listScheduleMonths/getShiftSettings（GET）。線上班表分頁固定只有一份（早班班表／晚班班表），下月班表先進「_待生效」，每日00:00~01:00排程 checkAndSwitchMonth_ 於1號自動切換。⚠️2026-08-09 前切換時直接覆蓋、舊月班表永久消失；v2.13 起兩個覆蓋點（排程換月、上傳換月）覆蓋前先備份成隱藏分頁 _備份_{分頁名}_{yyyy-MM}——只新增不刪除、同月已存在則跳過保留最早那份、備份失敗只記log不中斷換月。備份僅對部署後的月份有效，部署當下需手動跑一次 手動備份目前班表()。2026-08-27起此隱藏備份機制已由Supabase(id85)取代並停用，見id20。getSchedule日常查詢實測Sheets較快(18-25ms vs Supabase 750-1800ms)維持讀Sheets優先＋1小時快取，Supabase當備援；getScheduleByMonth/listScheduleMonths(歷史月份，會持續成長)改為Supabase優先' },
+  { id: 47, title: '施工單管理 GAS', topic: 'backend', pos: [1.8028, 1.916, -0.2784], note: '施工單時間修正_完整修正版.gs；2026-08-27 SQL遷移：construction_orders/fire_permits 兩表，dedupe_key 唯一鍵取代原本記憶體 Set 去重（一次解決過去3次去重bug根因）；getOrders 改讀含備援(Supabase失敗退回Sheets)；新增 getWorkOrders action 給 tool_work.html 搜尋/歷史查詢用（active/date/search 三種模式，回傳格式比照gviz table讓前端零改動，TODO-38）；上傳/新增仍雙寫Sheets（tool_work.html尚未完全停用Sheets）；報到換證另一支獨立GAS(施工單_報到換證_GAS.gs)寫入後PATCH同步checked_in_at' },
   { id: 48, title: '空節點 #48', topic: 'backend', pos: [2.2774, 0.6941, 1.2103], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 49, title: '空節點 #49', topic: 'backend', pos: [0.8967, 1.686, 1.902], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 50, title: '空節點 #50', topic: 'backend', pos: [0.8356, 2.409, -0.9436], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
@@ -380,7 +380,7 @@ const NODES = [
   { id: 65, title: '交接事項試算表', topic: 'data', pos: [-0.5772, 2.099, -1.4062], note: '新建試算表；交接事項分頁(A~I)：事項ID/內容/狀態/建立人工號/姓名/時間/最後修改人工號/姓名/時間' },
   { id: 66, title: '宣導事項試算表', topic: 'data', pos: [-1.6916, 1.0127, 1.7242], note: '獨立於主試算表；「宣導事項＆教育訓練」，DIRECTIVE_SHEET_ID 已回填；首頁「宣導事項」按鈕讀寫，待GAS重新部署生效' },
   { id: 67, title: '缺班調班紀錄試算表', topic: 'data', pos: [-1.8028, 1.916, 0.2784], note: '新建試算表；紀錄分頁(A~J)：ID/日期/工號/姓名/時數(可正可負)/原因/備註/登記人工號/姓名/時間；部署前需把 GAS 的 SPREADSHEET_ID 換成這份試算表的 ID' },
-  { id: 68, title: '空節點 #68', topic: 'data', pos: [-2.2774, 0.6941, -1.2103], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
+  { id: 68, title: '施工單/動火 Supabase', topic: 'data', pos: [-2.2774, 0.6941, -1.2103], note: 'construction_orders / fire_permits 兩表；range-overlap比對 work_date/exit_date（跨日施工每天都要出現，供每天按報到換證，非精確日期比對）；每日自動備份到雲端硬碟（天鷹保全_施工單SQL備份）' },
   { id: 69, title: '空節點 #69', topic: 'data', pos: [-0.8967, 1.686, -1.902], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 70, title: '空節點 #70', topic: 'data', pos: [-0.8356, 2.409, 0.9436], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 71, title: '空節點 #71', topic: 'data', pos: [-2.3002, 1.4137, 0.4766], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
@@ -400,7 +400,7 @@ const NODES = [
 
   // ── 南海／部署監控 ──
   // ↳ 空節點（預留，外圍）
-  { id: 85, title: '空節點 #85', topic: 'infra', pos: [1.4713, -1.5006, -1.354], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
+  { id: 85, title: 'Supabase 資料庫', topic: 'infra', pos: [1.4713, -1.5006, -1.354], note: 'Supabase 專案 narilpgjmjncladkquly（Postgres+PostgREST）；2026-08起陸續承接施工單/班表歷史/打烊開店/物流車輛的「累積型資料」權威來源，取代原本無限成長的 Sheets 分頁；RLS 開啟不設政策，只有 service_role 金鑰能存取；GAS 用 UrlFetchApp 打 REST API，apikey+Authorization 兩個 header 都要帶，HTTP 方法字串一律小寫（大寫 PATCH/DELETE 會被靜默忽略，踩過多次）；新版 sb_secret_ 金鑰有瀏覽器偵測會擋 GAS，一律用 legacy service_role JWT；PostgREST 單次 GET 預設上限1000筆，抓全部要用 limit+offset 分頁或 Range header' },
   { id: 86, title: '空節點 #86', topic: 'infra', pos: [2.4522, -0.5795, -0.2514], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 87, title: '空節點 #87', topic: 'infra', pos: [1.5663, -1.7985, 0.938], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
   { id: 88, title: '空節點 #88', topic: 'infra', pos: [0.9193, -0.925, 2.2396], note: '預留節點，未來新增功能可直接替換此節點的 title/note/pos 重新啟用' },
@@ -532,6 +532,8 @@ const EDGES = [
   [0, 141],
   // 無線電管理：主控台→工具（獨立GAS與試算表）；每個 action 打回主 App 登入系統驗 token+角色
   [0, 142], [142, 1],
+  // Supabase SQL遷移：施工單/班表歷史/打烊開店/物流四個工具陸續接上同一個Supabase專案(id85)
+  [11, 47], [47, 68], [85, 68], [85, 46], [85, 20], [85, 15], [85, 18], [85, 19], [85, 38], [85, 39],
 ];
 
 // === BRAIN_MAP_DATA_END ===
