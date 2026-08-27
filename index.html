@@ -71,7 +71,7 @@ const REPORT_GAS_URL      = 'https://script.google.com/macros/s/AKfycbwHXlwTMmJy
 // 任何工具（index.html或任一tool_*.html）的前端有改動 → 整數+1；
 // 任何工具的後端（內嵌GAS_CODE或獨立.gs檔）有改動 → 小數+1。
 // 純視覺標示，方便比對現場看到的是不是最新版本，改完任何工具記得同步更新這裡。
-const APP_VERSION = '5.0';
+const APP_VERSION = '6.0';
 
 // PWA版本自動偵測（2026-08-27新增）：定期重新抓index.html比對APP_VERSION，
 // 版本不同就跳提示讓使用者自己按更新，不強制自動重整（避免打字打到一半被reload）
@@ -3237,9 +3237,9 @@ function App() {
                         React.createElement("div", { className: "divider-line" }),
                         React.createElement("span", { className: "divider-text" }, "\u6216"),
                         React.createElement("div", { className: "divider-line" })),
-                    React.createElement("button", { className: "btn-outline", onClick: () => setPage("register") }, "\u7533\u8ACB\u65B0\u5E33\u865F")),
-                React.createElement("div", { style: { marginTop: 20, fontSize: 11, color: 'var(--muted)', textAlign: 'center' } }, "\u00A9 TIANYING SECURITY \u00B7 INTERNAL SYSTEM")),
-            React.createElement("div", { style: { position: 'fixed', right: 12, bottom: 8, fontSize: 10, color: 'var(--muted)', letterSpacing: 1, zIndex: 2 } }, "v" + APP_VERSION)));
+                    React.createElement("button", { className: "btn-outline", onClick: () => setPage("register") }, "\u7533\u8ACB\u65B0\u5E33\u865F"),
+                    React.createElement("div", { style: { marginTop: 18, textAlign: 'center', fontSize: 14, fontWeight: 700, color: 'var(--gold)', letterSpacing: 1 } }, "\u7248\u672C\u865F v" + APP_VERSION)),
+                React.createElement("div", { style: { marginTop: 20, fontSize: 11, color: 'var(--muted)', textAlign: 'center' } }, "\u00A9 TIANYING SECURITY \u00B7 INTERNAL SYSTEM"))));
     if (page === "register")
         return (React.createElement("div", { className: "app" },
             React.createElement("style", null, css),
