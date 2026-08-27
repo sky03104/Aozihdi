@@ -37,13 +37,14 @@ function supabaseConfig_() {
 
 function supabaseRequest_(method, path, body, extraHeaders) {
   var cfg = supabaseConfig_();
-  // 2026-08-27 踩坑：Supabase 新版 secret key 會偵測 User-Agent，判斷像瀏覽器就直接
-  // 401 拒絕（防止開發者把 secret key 誤放進前端網頁）。GAS 的 UrlFetchApp 預設 UA
-  // 剛好被誤判，這裡明確表明自己是伺服器端腳本，不是瀏覽器。
+  // 2026-08-27 踩坑：Supabase 新版 secret key（sb_secret_開頭）會偵測 User-Agent，
+  // 判斷像瀏覽器就401拒絕；GAS 的 UrlFetchApp 沒辦法自訂 User-Agent（Google 平台
+  // 長年限制，設定值會被忽略），永遠會被誤判。改用「Legacy service_role key」
+  // （JWT格式，eyJ開頭），這把沒有瀏覽器偵測機制，GAS 呼叫完全正常。
   var headers = {
     apikey: cfg.key,
-    'Content-Type': 'application/json',
-    'User-Agent': 'TianyingSecurityGAS/1.0 (server-side; not a browser)'
+    Authorization: 'Bearer ' + cfg.key,
+    'Content-Type': 'application/json'
   };
   if (extraHeaders) {
     for (var k in extraHeaders) headers[k] = extraHeaders[k];
