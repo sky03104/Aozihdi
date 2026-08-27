@@ -17,5 +17,19 @@ create table logistics_records (
 
 create index logistics_records_created_at on logistics_records (created_at);
 
+-- 2026-08-27 補：「封存本月統計」用，取代原本每月新增一個Sheets分頁的做法
+-- （會無限累積分頁），改成存這張表，同月重複封存用 year_month 唯一鍵覆蓋，不累積。
+create table logistics_monthly_reports (
+  id bigserial primary key,
+  year_month text not null unique,
+  days jsonb not null,
+  total_t19 integer not null,
+  total_t35 integer not null,
+  total_t80 integer not null,
+  total_sum integer not null,
+  generated_at timestamptz not null default now()
+);
+
 -- 安全設定：跟其他工具一樣，關閉一般網頁金鑰的存取，只有伺服器端 secret key 能讀寫
 alter table logistics_records enable row level security;
+alter table logistics_monthly_reports enable row level security;

@@ -1,9 +1,9 @@
 // ============================
 // 物流車輛統計 — 獨立 GAS（天鷹保全）
 // 綁定試算表：物流車輛統計
-// 分頁：物流車輛紀錄（已搬遷至Supabase logistics_records，Sheets不再是權威來源，
-//       僅exportMonth寫入月統計分頁時使用）、快捷設定（管理員設定的快捷組合，
-//       量小固定未搬遷，仍在Sheets）
+// 分頁：物流車輛紀錄（已搬遷至Supabase logistics_records，Sheets不再是權威來源）、
+//       快捷設定（管理員設定的快捷組合，量小固定未搬遷，仍在Sheets）
+// 封存的月統計存Supabase logistics_monthly_reports，不寫回試算表分頁
 // 快捷欄位：A快捷ID | B分類 | C數量
 // ============================
 
@@ -183,27 +183,25 @@ function getMonth(e) {
   return jsonRes({ status: 'ok', month: e.parameter.month, days: agg.days, totals: agg.totals });
 }
 
-// 產生試算表月統計分頁：action=exportMonth&month=YYYY-MM（資料來源Supabase，寫入邏輯不變）
+// 封存本月統計：action=exportMonth&month=YYYY-MM
+// 存進 Supabase logistics_monthly_reports（不寫回試算表分頁，避免每月累積一個分頁）。
+// 同月重複封存用 on_conflict=year_month 覆蓋上一次結果，不會重複灌資料。
 function exportMonth(e) {
   var m = monthParts_(e.parameter.month);
   if (!m) return jsonRes({ status: 'error', msg: '月份格式無效（需 YYYY-MM）' });
   var agg = aggregateMonth_(m.year, m.month);
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheetName = e.parameter.month + ' 月統計';
-  var sheet = ss.getSheetByName(sheetName);
-  if (sheet) sheet.clear(); else sheet = ss.insertSheet(sheetName);
+  supabaseRequest_('post', '/rest/v1/logistics_monthly_reports?on_conflict=year_month', [{
+    year_month: e.parameter.month,
+    days: agg.days,
+    total_t19: agg.totals.t19,
+    total_t35: agg.totals.t35,
+    total_t80: agg.totals.t80,
+    total_sum: agg.totals.sum,
+    generated_at: Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd'T'HH:mm:ssXXX")
+  }], { Prefer: 'resolution=merge-duplicates' });
 
-  var out = [['日期', '1.9噸', '3.5噸', '8噸以上', '合計']];
-  for (var i = 0; i < agg.days.length; i++) {
-    var d = agg.days[i];
-    out.push([m.month + '/' + d.day, d.t19, d.t35, d.t80, d.sum]);
-  }
-  out.push(['合計', agg.totals.t19, agg.totals.t35, agg.totals.t80, agg.totals.sum]);
-  sheet.getRange(1, 1, out.length, 5).setValues(out);
-  sheet.getRange(1, 1, 1, 5).setFontWeight('bold');
-  sheet.getRange(out.length, 1, 1, 5).setFontWeight('bold');
-  return jsonRes({ status: 'ok', sheetName: sheetName });
+  return jsonRes({ status: 'ok', month: e.parameter.month });
 }
 
 // 整月彙總（含沒資料的日子，補 0 方便交報表），改讀Supabase一次查整月範圍本地端彙總
