@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>天鷹保全｜物流車輛統計</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Share+Tech+Mono&display=swap');
 :root{
@@ -213,6 +214,7 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Sans TC','Microsof
     </div>
     <div id="monthBody"><div class="empty-note">選擇月份後載入</div></div>
     <button class="export-btn" id="exportBtn" onclick="exportMonthSheet()" style="display:none;">📤 產生試算表月統計分頁</button>
+    <button class="export-btn" id="screenshotBtn" onclick="exportMonthScreenshot()" style="display:none;margin-top:8px;">📸 匯出整月截圖（可用LINE分享）</button>
   </div>
 </div>
 
@@ -653,6 +655,7 @@ async function loadMonth(){
   if (needGas()) return;
   el('monthBody').innerHTML = '<div class="loading">⏳ 統計中…</div>';
   el('exportBtn').style.display = 'none';
+  el('screenshotBtn').style.display = 'none';
   try {
     const r = await apiGet({ action:'getMonth', month:month });
     if (r.status!=='ok'){ el('monthBody').innerHTML = '<div class="empty-note">載入失敗：'+x(r.msg||'')+'</div>'; return; }
@@ -664,8 +667,68 @@ async function loadMonth(){
     html += '<tr class="totalrow"><td>合計</td><td>'+r.totals.t19+'</td><td>'+r.totals.t35+'</td><td>'+r.totals.t80+'</td><td>'+r.totals.sum+'</td></tr></table>';
     el('monthBody').innerHTML = html;
     el('exportBtn').style.display = 'block';
+    el('screenshotBtn').style.display = 'block';
   } catch(e){
     el('monthBody').innerHTML = '<div class="empty-note">連線失敗，請檢查網路</div>';
+  }
+}
+// 把目前整月統計表格截成一張圖，優先用系統分享面板（可直接選LINE），
+// 手機不支援分享檔案時退回開新分頁讓使用者自己長按儲存
+async function exportMonthScreenshot(){
+  const month = el('monthInp').value || thisMonth();
+  const tableHtml = el('monthBody').innerHTML;
+  if (!tableHtml || tableHtml.indexOf('<table') === -1){ showToast('請先載入整月統計','err'); return; }
+
+  const btn = el('screenshotBtn');
+  const oldText = btn.textContent;
+  btn.textContent = '⏳ 產生截圖中…';
+  btn.disabled = true;
+
+  // 建一個乾淨的白底容器（不含按鈕/日期選擇器），畫面外渲染後再截圖
+  const capture = document.createElement('div');
+  capture.style.cssText = 'position:fixed;left:-9999px;top:0;width:420px;background:#fff;color:#1a1a1a;padding:20px;font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;';
+  capture.innerHTML =
+    '<div style="text-align:center;font-size:20px;font-weight:900;margin-bottom:4px;">天鷹保全・物流車輛統計</div>' +
+    '<div style="text-align:center;font-size:15px;color:#555;margin-bottom:14px;">'+month.replace('-','年')+'月</div>' +
+    tableHtml;
+  const style = document.createElement('style');
+  style.textContent = 'table.mtable{width:100%;border-collapse:collapse;font-size:13px;}'
+    + 'table.mtable th,table.mtable td{border:1px solid #ddd;padding:5px 4px;text-align:center;}'
+    + 'table.mtable th{background:#FB923C;color:#fff;}'
+    + 'table.mtable tr.totalrow{font-weight:900;background:#fff3e6;}'
+    + 'table.mtable td.sumcell{font-weight:700;color:#c2650a;}';
+  capture.appendChild(style);
+  document.body.appendChild(capture);
+
+  try {
+    const canvas = await html2canvas(capture, { backgroundColor:'#ffffff', scale:2 });
+    document.body.removeChild(capture);
+
+    canvas.toBlob(async (blob) => {
+      btn.textContent = oldText;
+      btn.disabled = false;
+      if (!blob){ showToast('截圖產生失敗','err'); return; }
+      const fileName = month+'月物流車輛統計.png';
+      const file = new File([blob], fileName, { type:'image/png' });
+
+      if (navigator.canShare && navigator.canShare({ files:[file] })) {
+        try {
+          await navigator.share({ files:[file], title:'物流車輛統計', text:month+'月物流車輛統計' });
+          return;
+        } catch(shareErr) {
+          if (shareErr && shareErr.name === 'AbortError') return; // 使用者自己取消分享，不用提示錯誤
+        }
+      }
+      // 不支援分享或分享失敗：開新分頁顯示圖片，手機可長按「儲存圖片」再自行傳LINE
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      showToast('已開啟截圖，長按圖片可儲存後傳送','ok');
+    }, 'image/png');
+  } catch(err) {
+    if (capture.parentNode) document.body.removeChild(capture);
+    btn.textContent = oldText;
+    btn.disabled = false;
+    showToast('截圖失敗：'+err.message,'err');
   }
 }
 async function exportMonthSheet(){
