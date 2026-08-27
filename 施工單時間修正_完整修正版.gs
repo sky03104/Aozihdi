@@ -341,6 +341,18 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (payload.action === 'getWorkOrders') {
+      // v2：tool_work.html 搜尋/歷史查詢改走這支，取代整表gviz下載
+      // （getWorkOrders_SQL 定義於 施工單_SQL搜尋歷史.gs）。這支若拋出
+      // 例外，doPost外層catch會接住回傳{success:false,...}，前端負責
+      // 偵測這種非gviz格式的回應並自動退回原本直接讀gviz的路徑
+      // （tool_work.html的fetchSheetFromGAS_含備援）。
+      const result = getWorkOrders_SQL(payload.sheet, payload.mode, payload.search, payload.histDate);
+      return ContentService
+        .createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     function _parseTime(raw, fallbackMonth, fallbackDay) {
       const fbM = _numVal(fallbackMonth), fbD = _numVal(fallbackDay);
       const lines = String(raw || "").split(/\r?\n/);
