@@ -245,10 +245,56 @@ function 比對單一班別_(shiftKey) {
   return shiftKey + '：發現 ' + 差異.length + ' 處差異 ❌\n' + 差異.join('\n');
 }
 
+// 比對 listScheduleMonths（月份清單）
+function 比對月份清單_(shiftKey) {
+  var eFake = { parameter: { shift: shiftKey } };
+  var oldResult = JSON.parse(listScheduleMonths_(eFake).getContent());
+  var newResult = JSON.parse(listScheduleMonths_SQL(eFake).getContent());
+
+  var 差異 = [];
+  if (oldResult.liveYm !== newResult.liveYm) 差異.push('liveYm不一致：舊=' + oldResult.liveYm + ' 新=' + newResult.liveYm);
+  if (JSON.stringify(oldResult.months.slice().sort()) !== JSON.stringify(newResult.months.slice().sort())) {
+    差異.push('months不一致：舊=' + JSON.stringify(oldResult.months) + ' 新=' + JSON.stringify(newResult.months));
+  }
+  if (JSON.stringify(oldResult.backups.slice().sort()) !== JSON.stringify(newResult.backups.slice().sort())) {
+    差異.push('backups不一致：舊=' + JSON.stringify(oldResult.backups) + ' 新=' + JSON.stringify(newResult.backups));
+  }
+  if (差異.length === 0) {
+    return shiftKey + '（月份清單）：完全一致 ✅ liveYm=' + oldResult.liveYm + ' months=' + JSON.stringify(oldResult.months);
+  }
+  return shiftKey + '（月份清單）：發現差異 ❌\n' + 差異.join('\n');
+}
+
+// 比對 getScheduleByMonth（拿目前線上月份去查，至少驗證 live 分支；
+// 若之後有實際換月產生的歷史備份月份，可以把 ym 換成那個月再測一次 backup 分支）
+function 比對指定月份_(shiftKey, ymSlash) {
+  var eFake = { parameter: { shift: shiftKey, ym: ymSlash } };
+  var oldData = JSON.parse(getScheduleByMonth_(eFake).getContent());
+  var newData = JSON.parse(getScheduleByMonth_SQL(eFake).getContent());
+
+  if (oldData.success !== newData.success) {
+    return shiftKey + ' ' + ymSlash + '：success不一致 舊=' + oldData.success + ' 新=' + newData.success;
+  }
+  if (!oldData.success) {
+    return shiftKey + ' ' + ymSlash + '：兩邊都查不到（一致）✅';
+  }
+  if (oldData.source !== newData.source) {
+    return shiftKey + ' ' + ymSlash + '：source不一致 舊=' + oldData.source + ' 新=' + newData.source;
+  }
+  if (JSON.stringify(oldData.rows) !== JSON.stringify(newData.rows)) {
+    return shiftKey + ' ' + ymSlash + '：rows內容不一致 ❌（用 比對單一班別_ 那套邏輯細查）';
+  }
+  return shiftKey + ' ' + ymSlash + '（來源:' + oldData.source + '）：完全一致 ✅';
+}
+
 function 比對讀取結果() {
   var 結果 = [];
   for (var key in SHIFT_CONFIG) {
     結果.push(比對單一班別_(key));
+    結果.push(比對月份清單_(key));
+
+    var liveYm = String(resolveTargetSheet(SHIFT_CONFIG[key]).getRange('Z1').getValue() || '').trim();
+    if (liveYm) 結果.push(比對指定月份_(key, liveYm));
   }
   var msg = 結果.join('\n\n');
   Logger.log(msg);
