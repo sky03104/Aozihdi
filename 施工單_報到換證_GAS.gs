@@ -55,6 +55,24 @@ function supabaseRequest3_(method, path, body, extraHeaders) {
   return text ? JSON.parse(text) : null;
 }
 
+// 診斷用：直接發一次PATCH請求，把完整的HTTP狀態碼跟回應內容印出來，
+// 不透過supabaseRequest3_（它只在code>=400才報錯，看不到細節）
+function 診斷PATCH請求() {
+  var cfg = supabaseConfig3_();
+  var key = '1F§警衛室§8§27§0800§2000§1§謝志遠§警衛室§識別證檢查';
+  var url = cfg.url + '/rest/v1/construction_orders?dedupe_key=eq.' + encodeURIComponent(key);
+  var options = {
+    method: 'patch',
+    headers: { apikey: cfg.key, Authorization: 'Bearer ' + cfg.key, 'Content-Type': 'application/json' },
+    payload: JSON.stringify({ checked_in_at: '2026-08-27T13:31:00+08:00' }),
+    muteHttpExceptions: true
+  };
+  var resp = UrlFetchApp.fetch(url, options);
+  var msg = 'URL: ' + url + '\nHTTP狀態碼: ' + resp.getResponseCode() + '\n回應內容: ' + resp.getContentText();
+  Logger.log(msg);
+  return msg;
+}
+
 // 診斷用：看「1F 警衛室 識別證檢查」這筆在Sheets裡實際存的型別跟值，
 // 跟Supabase比對鍵的組成方式是否吻合
 function 診斷報到資料型別() {
