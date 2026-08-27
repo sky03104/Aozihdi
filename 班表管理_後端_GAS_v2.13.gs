@@ -3,6 +3,24 @@
 // 部署網址：https://script.google.com/macros/s/AKfycbzs56InZLeaHiRJhy1alNfQwDyH0mXEV9t_WJxzfjTjIhf68DHgMiWVQvVG6vKrRZ2x1w/exec
 // （早班晚班共用同一支，透過 SHIFT_CONFIG / payload.shift 分流，非天鷹保全APP帳號系統那支）
 //
+// 版本：2.16 新增（2026-08-27，效能優化+補同步缺口）：
+//   - getSchedule 加一層1小時短時間快取（CacheService，定義於
+//     班表管理_SQL讀取層.gs的getScheduleData_含快取），緩解Apps Script平台
+//     本身每次冷啟動+重新打開試算表的開銷（跟讀哪個資料庫無關，無法完全消除，
+//     只能降低被觸發的頻率）。
+//   - handleUpdate/checkAndSwitchMonth_ 寫入成功後主動清除對應快取，不用等
+//     1小時自然過期，一改就能查到最新的。
+//   - 補上 handleUpdateSchedule（手動改格子）、handleDeleteStaff（刪除人員）
+//     這兩支之前漏掉的同步到Supabase呼叫——原本只有「上傳xlsx」那條路徑有
+//     同步，直接在畫面上手動改格子/刪人不會同步，導致Supabase跟Sheets
+//     可能對不起來，現在兩處都補上。
+// 版本：2.15 修正（2026-08-27，SQL遷移效能實測後修正）：
+//   - 實測發現 getSchedule（目前線上這份，index.html日常在用）改讀Supabase
+//     沒有變快、反而變慢：這支範圍固定很小（27列x33欄），Sheets本來就快
+//     （熱機後18~25ms），Supabase每次都要多一段跨公司網路來回（實測
+//     750~800ms，不會隨重複呼叫變快）。改回優先讀Sheets，Supabase當備援。
+//     getScheduleByMonth/listScheduleMonths維持Supabase優先不變——那兩支
+//     查歷史月份，Sheets備份分頁機制已停用，未來月份只有Supabase有資料。
 // 版本：2.14 新增（2026-08-27，SQL遷移階段3+5）：
 //   - handleUpdate、checkAndSwitchMonth_ 在 Sheets 寫入成功後，多呼叫一次
 //     同步目前線上班表到Supabase_()（定義於 班表管理_SQL讀取層.gs），把最新
@@ -99,8 +117,16 @@ function doGet(e) {
   var action = (e && e.parameter) ? e.parameter.action : '';
 
   if (action === 'getSchedule') {
-    // v2.14：優先讀 Supabase，失敗自動退回讀 Sheets（讀取含備援_ 定義於 班表管理_SQL讀取層.gs）
-    return 讀取含備援_(e, getScheduleData_SQL, getScheduleData, 'getSchedule');
+    // v2.15：實測發現這支範圍固定很小（27列x33欄），Sheets本來就快（熱機後
+    // 18~25ms），改讀Supabase反而每次都要多一段跨公司網路來回（實測750~800ms，
+    // 不會變快）。改回優先讀Sheets，Supabase只當備援（讀取含備援_ 定義於
+    // 班表管理_SQL讀取層.gs）。getScheduleByMonth/listScheduleMonths維持
+    // Supabase優先不變——那兩支查的是歷史月份，Sheets備份分頁機制已停用，
+    // 未來月份只有Supabase有資料，沒有退路也不需要退路。
+    // v2.16：真正拖慢的是Apps Script平台每次冷啟動＋重新打開試算表的開銷，
+    // 跟讀哪個資料庫無關，加一層1小時短時間快取緩解（getScheduleData_含快取
+    // 定義於 班表管理_SQL讀取層.gs）。
+    return getScheduleData_含快取(e);
   } else if (action === 'getScheduleByMonth') {
     return 讀取含備援_(e, getScheduleByMonth_SQL, getScheduleByMonth_, 'getScheduleByMonth');   // v2.13：指定月份（含歷史備份），請款工具用
   } else if (action === 'listScheduleMonths') {
@@ -354,6 +380,7 @@ function handleUpdate(payload) {
     try { 同步目前線上班表到Supabase_(payload.shift); } catch (syncErr) {
       console.error('同步Supabase失敗（不影響Sheets已成功更新）：' + syncErr.toString());
     }
+    清除班表快取_(payload.shift); // v2.16：寫入後主動清快取，不用等1小時自然過期
 
     return respond({
       success: true,
@@ -633,6 +660,7 @@ function checkAndSwitchMonth_() {
       try { 同步目前線上班表到Supabase_(key); } catch (syncErr) {
         console.error('排程換月同步Supabase失敗（不影響Sheets已完成換月）：' + syncErr.toString());
       }
+      清除班表快取_(key); // v2.16：換月後主動清快取
 
       var notifyShiftType = (key === 'morning') ? 'early' : 'late';
       notifyMonthScheduleReleased_(notifyShiftType, stagingYm);
@@ -754,6 +782,14 @@ function handleUpdateSchedule(payload) {
       }
     }
     SpreadsheetApp.flush();
+
+    // v2.16：這支之前漏掉同步到Supabase＋清快取（只有上傳xlsx那條路徑有做），
+    // 導致直接在畫面上手動改格子時Supabase會跟Sheets對不起來，現在補上。
+    try { 同步目前線上班表到Supabase_(payload.shift); } catch (syncErr) {
+      console.error('同步Supabase失敗（不影響Sheets已成功更新）：' + syncErr.toString());
+    }
+    清除班表快取_(payload.shift);
+
     return respond({ success: true, updated: updated, added: added, skipped: skipped });
   } catch (err) {
     return respond({ success: false, error: err.message });
@@ -781,6 +817,13 @@ function handleDeleteStaff(payload) {
     rng.setValue('');
     rng.setFontColor('#000000');
     SpreadsheetApp.flush();
+
+    // v2.16：同上，補同步到Supabase＋清快取
+    try { 同步目前線上班表到Supabase_(payload.shift); } catch (syncErr) {
+      console.error('同步Supabase失敗（不影響Sheets已成功更新）：' + syncErr.toString());
+    }
+    清除班表快取_(payload.shift);
+
     return respond({ success: true, deleted: true });
   } catch (err) {
     return respond({ success: false, error: err.message });

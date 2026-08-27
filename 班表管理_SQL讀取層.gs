@@ -155,6 +155,46 @@ function listScheduleMonths_SQL(e) {
 }
 
 // ============================
+// v2.16：getSchedule 短時間快取（1小時）
+// ────────────────────────────
+// getSchedule 這支查詢範圍固定很小，Sheets本身就夠快，真正拖慢的是 Apps
+// Script 平台本身每次冷啟動＋重新打開試算表的開銷（跟讀哪個資料庫無關）。
+// 加一層短時間快取：第一個人查詢照常走完整流程，接下來1小時內任何人再查
+// 直接吃快取，幾乎瞬間。所有會改動班表的地方（handleUpdate/
+// handleUpdateSchedule/handleDeleteStaff/checkAndSwitchMonth_）寫入成功
+// 後都會主動清掉快取，不用等1小時自然過期，一改就能查到最新的。
+// ============================
+var 班表快取秒數_ = 3600; // 1小時。寫入時會主動清快取（見下方），設長一點沒關係
+
+function 班表快取Key_(shiftKey) {
+  return 'schedule_' + (shiftKey || 'night');
+}
+
+function 清除班表快取_(shiftKey) {
+  try {
+    CacheService.getScriptCache().remove(班表快取Key_(shiftKey));
+  } catch (err) {
+    console.error('清除班表快取失敗（' + shiftKey + '）：' + err.toString());
+  }
+}
+
+function getScheduleData_含快取(e) {
+  var shiftKey = (e && e.parameter) ? e.parameter.shift : '';
+  var cache = CacheService.getScriptCache();
+  var key = 班表快取Key_(shiftKey);
+  var cached = cache.get(key);
+  if (cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+
+  var result = 讀取含備援_(e, getScheduleData, getScheduleData_SQL, 'getSchedule');
+  try {
+    cache.put(key, result.getContent(), 班表快取秒數_);
+  } catch (err) {
+    console.error('寫入班表快取失敗：' + err.toString());
+  }
+  return result;
+}
+
+// ============================
 // v2.14：把「目前線上這份」同步進 Supabase
 // ────────────────────────────
 // 呼叫時機：Sheets 寫入成功之後（handleUpdate、checkAndSwitchMonth_）。
@@ -215,6 +255,45 @@ function 讀取含備援_(e, sqlFn, sheetsFn, label) {
     console.error('SQL讀取（' + label + '）發生例外，改用Sheets：' + err.toString());
   }
   return sheetsFn(e);
+}
+
+// ============================
+// 效能測試：同一次執行裡分別計時「讀Sheets」跟「讀Supabase」，排除網路
+// 環境誤差，兩邊放同一把尺上比才準。在編輯器直接執行 測試讀取效能() 看結果。
+// ============================
+function 測試單一班別效能_(shiftKey) {
+  var eFake = { parameter: { shift: shiftKey } };
+
+  var t1 = new Date().getTime();
+  getScheduleData(eFake); // 讀 Sheets
+  var t2 = new Date().getTime();
+  getScheduleData_SQL(eFake); // 讀 Supabase
+  var t3 = new Date().getTime();
+
+  return shiftKey + '：讀Sheets耗時 ' + (t2 - t1) + 'ms　讀Supabase耗時 ' + (t3 - t2) + 'ms';
+}
+
+function 測試讀取效能() {
+  var 結果 = [];
+  for (var key in SHIFT_CONFIG) {
+    // 各測3次取平均，單次測量容易被偶發的網路延遲誤導
+    var sheetsTimes = [], sqlTimes = [];
+    for (var i = 0; i < 3; i++) {
+      var eFake = { parameter: { shift: key } };
+      var t1 = new Date().getTime();
+      getScheduleData(eFake);
+      var t2 = new Date().getTime();
+      getScheduleData_SQL(eFake);
+      var t3 = new Date().getTime();
+      sheetsTimes.push(t2 - t1);
+      sqlTimes.push(t3 - t2);
+    }
+    var avg = function (arr) { return Math.round(arr.reduce(function (a, b) { return a + b; }, 0) / arr.length); };
+    結果.push(key + '：讀Sheets平均 ' + avg(sheetsTimes) + 'ms（' + sheetsTimes.join(',') + '）　讀Supabase平均 ' + avg(sqlTimes) + 'ms（' + sqlTimes.join(',') + '）');
+  }
+  var msg = 結果.join('\n');
+  Logger.log(msg);
+  return msg;
 }
 
 // ============================
