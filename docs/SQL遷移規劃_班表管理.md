@@ -81,7 +81,8 @@ GAS 用 `UrlFetchApp` 呼叫 Supabase 自動產生的 REST API。金鑰（servic
 - [x] 階段2：歷史資料搬遷（2026-08-27，共6個版本：晚班/早班各線上+備份+待生效；經核對遷移結果與直接查詢Supabase雙重驗證，人數/內容抽查皆正確，紅字排休語意正確轉換）
   - ⚠️ 踩坑記錄：Supabase 新版 `sb_secret_` 金鑰有瀏覽器偵測機制，GAS 的 `UrlFetchApp` 無法自訂 User-Agent（Google平台長年限制）會被誤判擋下，改用 legacy `service_role` JWT 金鑰解決，且**REST請求必須同時帶 `apikey` 與 `Authorization: Bearer` 兩個標頭**，只帶 apikey 會被當成匿名身份、被RLS規則擋成回傳空陣列（非報錯，容易誤判為資料遺失）。Phase 3 讀取程式碼務必兩個標頭都帶。
   - ⚠️ 踩坑記錄：原本略過空白格節省空間，會導致「整月都沒排班的人」在資料庫消失，讀取重組時漏人；已修正為全部存（含空白格），換取讀取完整性。原始試算表固定31欄對應每月最多31天，月份不足31天時（如9月30天）多出欄位是不存在的日期，直接存會被資料庫拒絕，已加該月實際天數判斷跳過。修正後6個版本明細筆數皆為「人數×該月天數」整除，確認資料矩形完整無缺漏。
-- [ ] 階段3：只換讀
+- [x] 階段3：只換讀（2026-08-27，`getSchedule`/`listScheduleMonths`/`getScheduleByMonth` 三支讀取API皆與Sheets原版逐字比對完全一致，早晚班皆驗證通過；已在handleUpdate/checkAndSwitchMonth_加上寫入後同步Supabase機制，避免SQL側過時。**尚未接進doGet路由，正式流量仍讀Sheets**，這批是「建置+驗證通過」，實際切換讀取來源是下一步。
+  - ⚠️ 殘留驗證缺口：`getScheduleByMonth` 的「歷史備份」分支（status=superseded）目前無法用真實資料測到——現有備份月份跟線上月份剛好都是2026-08，查詢一律命中live分支。等下次真的換月（約9月1日）之後，兩邊月份不同了，要再跑一次`比對讀取結果`把backup分支也驗過。
 - [ ] 階段4：換寫
 - [ ] 階段5：觀察期
 - [ ] 階段6：收尾
