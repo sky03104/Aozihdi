@@ -77,7 +77,7 @@ GAS 用 `UrlFetchApp` 呼叫 Supabase 自動產生的 REST API。金鑰（servic
 
 ## 六、進度追蹤
 
-- [ ] 階段1：建置
+- [x] 階段1：建置（2026-08-27，Supabase 專案 `narilpgjmjncladkquly`，三張表建立完成，讀寫刪皆驗證成功，RLS 阻擋無金鑰請求已確認生效）
 - [ ] 階段2：歷史資料搬遷
 - [ ] 階段3：只換讀
 - [ ] 階段4：換寫
