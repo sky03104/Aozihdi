@@ -91,11 +91,12 @@ function doGet(e) {
   var action = (e && e.parameter) ? e.parameter.action : '';
 
   if (action === 'getSchedule') {
-    return getScheduleData(e);
+    // v2.14：優先讀 Supabase，失敗自動退回讀 Sheets（讀取含備援_ 定義於 班表管理_SQL讀取層.gs）
+    return 讀取含備援_(e, getScheduleData_SQL, getScheduleData, 'getSchedule');
   } else if (action === 'getScheduleByMonth') {
-    return getScheduleByMonth_(e);   // v2.13：指定月份（含歷史備份），請款工具用
+    return 讀取含備援_(e, getScheduleByMonth_SQL, getScheduleByMonth_, 'getScheduleByMonth');   // v2.13：指定月份（含歷史備份），請款工具用
   } else if (action === 'listScheduleMonths') {
-    return listScheduleMonths_(e);   // v2.13：列出有哪些月份可用
+    return 讀取含備援_(e, listScheduleMonths_SQL, listScheduleMonths_, 'listScheduleMonths');   // v2.13：列出有哪些月份可用
   } else if (action === 'getShiftSettings') {
     return getShiftSettings_();
   }

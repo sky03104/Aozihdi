@@ -200,6 +200,24 @@ function 同步目前線上班表到Supabase_(shiftKey) {
 }
 
 // ============================
+// v2.14：讀取含備援——doGet 路由用這支，優先讀 Supabase，任何失敗
+// （連不上／查無資料／格式錯誤）都自動退回讀 Sheets，並留一筆 log
+// 方便之後追蹤 Supabase 是不是常常在跳針。
+// Sheets 目前仍是唯一權威來源，這個備援機制在階段6收尾前都要留著。
+// ============================
+function 讀取含備援_(e, sqlFn, sheetsFn, label) {
+  try {
+    var sqlResp = sqlFn(e);
+    var sqlData = JSON.parse(sqlResp.getContent());
+    if (sqlData.success) return sqlResp;
+    console.error('SQL讀取（' + label + '）回報失敗，改用Sheets：' + (sqlData.error || '未知原因'));
+  } catch (err) {
+    console.error('SQL讀取（' + label + '）發生例外，改用Sheets：' + err.toString());
+  }
+  return sheetsFn(e);
+}
+
+// ============================
 // 比對工具：把「讀Sheets」跟「讀Supabase」的結果拿來對，逐欄比對差異
 // 在 Apps Script 編輯器直接執行 比對讀取結果() 看執行紀錄
 // ============================
