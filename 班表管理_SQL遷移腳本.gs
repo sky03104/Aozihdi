@@ -94,13 +94,14 @@ function 建立或取得版本_(shiftTypeForDb, ym, status, sourceLabel) {
 }
 
 // 把 讀班表分頁_() 回傳的 rows（{roleStr,name,shifts:[31格]}）攤平成明細列
+// 2026-08-27 修正：原本跳過空白格不存，會導致「整個月都沒排班的人」在資料庫裡
+// 完全消失，讀取時無法重組出這個人，跟原始試算表對不起來。資料量很小，
+// 全部存起來（空白格 shift_code 存空字串）換取讀取時能完整還原，划算。
 function 轉為Entries_(rows, shiftTypeForDb, ym, versionId) {
   var entries = [];
   for (var r = 0; r < rows.length; r++) {
     var row = rows[r];
     for (var i = 0; i < row.shifts.length; i++) {
-      var code = row.shifts[i];
-      if (!code || code === '-') continue; // 空白格不用存
       var day = i + 1;
       entries.push({
         shift_type: shiftTypeForDb,
@@ -110,7 +111,7 @@ function 轉為Entries_(rows, shiftTypeForDb, ym, versionId) {
         row_index: r,
         role: row.roleStr,
         emp_name: row.name,
-        shift_code: code,
+        shift_code: row.shifts[i] || '',
         version_id: versionId
       });
     }
