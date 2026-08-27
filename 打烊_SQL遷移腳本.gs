@@ -13,8 +13,15 @@
 //      （獨立的Apps Script專案，要重新設定一次，不會沿用其他工具的）
 //   2. 執行 遷移打烊資料到Supabase()，看執行紀錄確認結果
 //
-// 不會動到 Sheets 原始資料，只讀不寫，執行幾次都安全（用legacy_id
-// 判斷是否已搬過，重複執行不會重複灌資料）。
+// 不會動到 Sheets 原始資料，只讀不寫。
+//
+// ⚠️ 2026-08-27 踩坑記錄：原本想用 legacy_id（A欄流水號）當唯一鍵防止
+// 重複執行重複灌資料，但A欄流水號歷史上出過 #NUM!/Infinity 溢位 bug
+// （見CLAUDE.md TODO-33），舊資料裡可能殘留「不同筆真實紀錄卻共用同一個
+// 壞掉的A欄值」的情況——拿它當唯一鍵會把這些不同紀錄誤判成重複而silently
+// 丟棄（實測真的少了7筆）。改用「執行前檢查Supabase是否已有資料」擋下
+// 重複執行，不會誤殺任何一筆真實資料；代價是**故意要重跑一次**（例如發現
+// 資料錯誤要重灌）時，必須先手動truncate清空，不能只是重新執行這支腳本。
 // ════════════════════════════════════════════════════════════
 
 function supabaseConfig2_() {
@@ -53,16 +60,27 @@ function 轉為ISO時間戳2_(v) {
   return Utilities.formatDate(v, 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX");
 }
 
+// 用 Prefer: count=exact 標頭問總筆數，不用真的把資料全撈下來，
+// 才不會撞到 Supabase 單次 GET 預設上限 1000 筆的限制
+// （這個限制連帶 limit= 查詢參數都蓋不過，只有 Prefer: count=exact 能問到真實總數）
+function supabaseCount2_(path) {
+  var cfg = supabaseConfig2_();
+  var headers = { apikey: cfg.key, Authorization: 'Bearer ' + cfg.key, Prefer: 'count=exact', Range: '0-0' };
+  var resp = UrlFetchApp.fetch(cfg.url + path, { method: 'get', headers: headers, muteHttpExceptions: true });
+  var code = resp.getResponseCode();
+  if (code >= 400) throw new Error('Supabase請求失敗（' + code + '）：' + resp.getContentText() + '｜path=' + path);
+  // Content-Range格式："0-0/4266"，斜線後面是總筆數
+  var contentRange = resp.getHeaders()['Content-Range'] || resp.getHeaders()['content-range'] || '';
+  var total = parseInt(contentRange.split('/')[1], 10);
+  return isNaN(total) ? -1 : total;
+}
+
 function 批次寫入2_(path, rows) {
   var BATCH = 200;
   var inserted = 0;
   for (var i = 0; i < rows.length; i += BATCH) {
     var chunk = rows.slice(i, i + BATCH);
-    // on_conflict + resolution=ignore-duplicates：等同 ON CONFLICT DO NOTHING，
-    // 靠legacy_id唯一約束擋掉重複，重複執行這支腳本不會重複灌資料
-    // （2026-08-27修：舊版沒有這個保護，實測執行3次真的插入了3倍資料）
-    supabaseRequest2_('POST', path + '?on_conflict=legacy_id', chunk,
-      { Prefer: 'resolution=ignore-duplicates' });
+    supabaseRequest2_('POST', path, chunk);
     inserted += chunk.length;
   }
   return inserted;
@@ -120,9 +138,49 @@ function 診斷目前試算表() {
 }
 
 // ============================
+// 診斷用：A欄流水號（legacy_id）在原始資料裡是否有重複值
+// 只是提供人工判斷用，不影響遷移流程本身
+// ============================
+function 診斷打烊legacyId重複() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('進出資料表');
+  if (!sheet) throw new Error('找不到分頁：進出資料表');
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return '無資料';
+
+  var data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+  var seen = {};
+  var dups = [];
+  for (var i = 0; i < data.length; i++) {
+    var row = data[i];
+    if (String(row[1]).trim() === '' && String(row[2]).trim() === '' && String(row[3]).trim() === '') continue;
+    var raw = row[0];
+    if (typeof raw !== 'number' || !isFinite(raw)) continue;
+    var id = Math.floor(raw);
+    var sheetRowNum = i + 2;
+    if (seen[id]) {
+      dups.push('A欄=' + id + '：第' + seen[id] + '列 與 第' + sheetRowNum + '列');
+    } else {
+      seen[id] = sheetRowNum;
+    }
+  }
+  var msg = dups.length === 0 ? '無重複' : dups.join('\n');
+  Logger.log(msg);
+  return msg;
+}
+
+// ============================
 // 主流程
+// ⚠️ 執行前會檢查Supabase是否已有資料，避免重複執行造成重複灌資料。
+//    真的要重跑（例如發現資料有誤要重灌），先到Supabase SQL Editor
+//    執行 truncate table closing_gate_logs restart identity; 再跑這支。
 // ============================
 function 遷移打烊資料到Supabase() {
+  var existing = supabaseCount2_('/rest/v1/closing_gate_logs?select=id');
+  if (existing > 0) {
+    throw new Error('closing_gate_logs 已有 ' + existing + ' 筆資料，為避免重複灌資料已中止。'
+      + '若確定要重跑，請先在Supabase SQL Editor執行 truncate table closing_gate_logs restart identity; 再重新執行這支。');
+  }
   var con = 遷移打烊進出資料_();
   var inserted = 批次寫入2_('/rest/v1/closing_gate_logs', con.rows);
   var msg = '進出資料表：讀到' + (con.rows.length + con.skippedEmpty) + '列，'
@@ -130,21 +188,6 @@ function 遷移打烊資料到Supabase() {
     + '實際寫入' + inserted + '筆';
   Logger.log(msg);
   return msg;
-}
-
-// 用 Prefer: count=exact 標頭問總筆數，不用真的把資料全撈下來，
-// 才不會撞到 Supabase 單次 GET 預設上限 1000 筆的限制
-// （這個限制連帶 limit= 查詢參數都蓋不過，只有 Prefer: count=exact 能問到真實總數）
-function supabaseCount2_(path) {
-  var cfg = supabaseConfig2_();
-  var headers = { apikey: cfg.key, Authorization: 'Bearer ' + cfg.key, Prefer: 'count=exact', Range: '0-0' };
-  var resp = UrlFetchApp.fetch(cfg.url + path, { method: 'get', headers: headers, muteHttpExceptions: true });
-  var code = resp.getResponseCode();
-  if (code >= 400) throw new Error('Supabase請求失敗（' + code + '）：' + resp.getContentText() + '｜path=' + path);
-  // Content-Range格式："0-0/4266"，斜線後面是總筆數
-  var contentRange = resp.getHeaders()['Content-Range'] || resp.getHeaders()['content-range'] || '';
-  var total = parseInt(contentRange.split('/')[1], 10);
-  return isNaN(total) ? -1 : total;
 }
 
 // ============================
