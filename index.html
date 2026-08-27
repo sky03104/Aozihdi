@@ -66,6 +66,12 @@ const CLOSING_PAGE_URL    = 'https://sky03104.github.io/tianying-security/tool_c
 const UPLOAD_PAGE_URL     = 'https://sky03104.github.io/tianying-security/tool_upload.html'; // 資料上傳工具：獨立檔，iframe 串接（2026-07-26 起改用獨立檔；原內嵌 base64 版本缺少 2026-07-15 內容比對防呆，已隨此次抽換自動補上）
 const EMERGENCY_PAGE_URL  = 'https://sky03104.github.io/tianying-security/tool_emergency.html'; // 緊急聯絡清單：獨立檔，iframe 串接（2026-07-26 起改用獨立檔；原內嵌 base64 版本缺少登入通行證驗證，已隨此次抽換自動補上）
 const REPORT_GAS_URL      = 'https://script.google.com/macros/s/AKfycbwHXlwTMmJyA79Cuzdh2IPRnBLUWm2YPEqXn5XJj4GVEUlCnNIv8hgRTJ7Xr198hZxG/exec'; // 事故報告／匿名表揚共用 GAS（主管待審卡片讀清單）
+
+// 全專案共用版本號，只在登入頁顯示（2026-08-27新增）。格式「整數.小數」：
+// 任何工具（index.html或任一tool_*.html）的前端有改動 → 整數+1；
+// 任何工具的後端（內嵌GAS_CODE或獨立.gs檔）有改動 → 小數+1。
+// 純視覺標示，方便比對現場看到的是不是最新版本，改完任何工具記得同步更新這裡。
+const APP_VERSION = '1.0';
 // ─── COLOR TOKENS ────────────────────────────────────────────────
 // Primary: Deep Navy #0A0F1E   Surface: #111827   Card: #1A2235
 // Gold:    #C9A227              Amber:   #F0C040   Red:  #E53E3E
@@ -1384,7 +1390,8 @@ function ok(obj) {
                     React.createElement("div", null,
                         React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.text } }, u.name),
                         React.createElement("div", { style: { fontSize: 11, color: C.textMute } }, ROLES[u.role])),
-                    ROLE_LV[u.role] >= ROLE_LV["leader"] && React.createElement("span", { style: { marginLeft: "auto", fontSize: 10, color: C.success, background: "rgba(74,222,128,0.1)", padding: "2px 8px", borderRadius: 4 } }, "\u53EF\u7DE8\u8F2F")))))));
+                    ROLE_LV[u.role] >= ROLE_LV["leader"] && React.createElement("span", { style: { marginLeft: "auto", fontSize: 10, color: C.success, background: "rgba(74,222,128,0.1)", padding: "2px 8px", borderRadius: 4 } }, "\u53EF\u7DE8\u8F2F"))))),
+                React.createElement("div", { style: { fontSize: 10, color: C.textMute, letterSpacing: 1, marginTop: 24 } }, "v" + APP_VERSION)));
         /* ── DayView ── */
         function DayView({ dayNum }) {
             const wk = isWk(dayNum);
