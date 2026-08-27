@@ -7,6 +7,12 @@
    ⚠️ 這個檔案要跟 施工單_SQL讀取層.gs、施工單_SQL遷移腳本.gs 貼在
    同一個 Apps Script 專案裡，缺一支就會 ReferenceError（班表管理那次
    踩過的坑，這次要記得）。
+
+   2026-08-27 SQL遷移階段4（雙寫）：doPost 寫入施工單/動火申請成功後，
+   同步寫進Supabase（_syncToSupabase）。⚠️ 刻意維持Sheets也照常寫入
+   （雙寫，非取代）——因為 tool_work.html 的搜尋/歷史查詢功能還沒搬，
+   仍直接讀Sheets，若停止寫入會讀到過時資料。之後那個功能也搬完，才
+   考慮要不要真正停用Sheets寫入。
    試算表真實欄位 A~N：
      A=流水號 B=申請單位 C=廠商 D=月 E=日 F=進場時間 G=退場時間
      H=人數 I=監工 J=施工地點 K=施工項目 L=施工日期 M=退場日期 N=分頁來源/備註
@@ -378,6 +384,27 @@ function doPost(e) {
       return Utilities.formatDate(new Date(currentYear, Number(m) - 1, Number(d)), tz, "yyyy/M/d");
     }
 
+    // 把 "yyyy/M/d" 格式轉成 Postgres 用的 "yyyy-MM-dd"，空字串回傳null
+    function _toIsoDate(s) {
+      if (!s) return null;
+      var p = String(s).split('/');
+      if (p.length !== 3) return null;
+      return p[0] + '-' + ('0' + p[1]).slice(-2) + '-' + ('0' + p[2]).slice(-2);
+    }
+
+    // v2.16：SQL遷移階段4——同步寫入Supabase，Sheets仍照常寫入不受影響。
+    // 失敗只記log不擋Sheets這邊的正常流程（Sheets目前仍是雙寫來源之一，
+    // tool_work.html的搜尋/歷史查詢功能還沒搬，仍需要Sheets持續更新）。
+    function _syncToSupabase(path, rows) {
+      try {
+        if (rows.length === 0) return;
+        supabaseRequest2_('POST', path + '?on_conflict=dedupe_key', rows,
+          { Prefer: 'resolution=ignore-duplicates' });
+      } catch (err) {
+        console.error('同步Supabase失敗（' + path + '，不影響Sheets已成功寫入）：' + err.toString());
+      }
+    }
+
     function _buildKeys(sheet, startCol, totalCols, keyColIndexes) {
       const lastRow = sheet.getLastRow();
       const keys = new Set();
@@ -404,6 +431,7 @@ function doPost(e) {
       idValues.forEach(v => { const n = Number(v); if (!isNaN(n) && n > maxId) maxId = n; });
 
       const writeData = [];
+      const supabaseRows = [];
       let skipped = 0;
 
       payload.rows.forEach(r => {
@@ -430,10 +458,18 @@ function doPost(e) {
           entryDate, exitDate,
           ''            // ★ N 欄不再寫分頁名（不可靠又是雜訊）；留空給人工備註用
         ]);
+        supabaseRows.push({
+          apply_unit: String(r[0] || ''), vendor: String(r[1] || ''),
+          work_date: _toIsoDate(entryDate), entry_time: f.time, exit_time: g.time,
+          headcount: r[6] === '' || r[6] == null ? null : Number(r[6]),
+          supervisor: String(r[7] || ''), location: String(r[8] || ''), item: String(r[9] || ''),
+          exit_date: _toIsoDate(exitDate), note: '', dedupe_key: key
+        });
       });
 
       if (writeData.length > 0)
         sheet.getRange(sheet.getLastRow() + 1, 1, writeData.length, 14).setValues(writeData);
+      _syncToSupabase('/rest/v1/construction_orders', supabaseRows);
 
       result.construction = { inserted: writeData.length, skipped };
     }
@@ -446,6 +482,7 @@ function doPost(e) {
       const existingKeys = _buildKeys(sheet, 2, 10, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
       const writeData = [];
+      const supabaseRows = [];
       let skipped = 0;
 
       payload.fireRows.forEach(r => {
@@ -471,10 +508,18 @@ function doPost(e) {
           r[10],
           entryDate, exitDate,
         ]);
+        supabaseRows.push({
+          apply_unit: String(r[0] || ''), vendor: String(r[1] || ''),
+          work_date: _toIsoDate(entryDate), entry_time: f.time, exit_time: g.time,
+          headcount: r[6] === '' || r[6] == null ? null : Number(r[6]),
+          supervisor: String(r[7] || ''), location: String(r[8] || ''), item: String(r[9] || ''),
+          equipment: String(r[10] || ''), exit_date: _toIsoDate(exitDate), dedupe_key: key
+        });
       });
 
       if (writeData.length > 0)
         sheet.getRange(sheet.getLastRow() + 1, 2, writeData.length, 13).setValues(writeData);
+      _syncToSupabase('/rest/v1/fire_permits', supabaseRows);
 
       result.fire = { inserted: writeData.length, skipped };
     }
