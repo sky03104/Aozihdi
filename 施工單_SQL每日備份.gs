@@ -21,10 +21,27 @@ function 取得施工單備份資料夾_() {
   return DriveApp.createFolder(施工單備份資料夾名稱_);
 }
 
+// Supabase/PostgREST預設一次最多回傳1000筆，資料量早就超過這個數字，
+// 不分頁抓的話備份會悄悄漏資料（實測過：施工單4302筆只抓到1000筆）。
+// 用limit+offset分頁抓到抓不滿一頁為止。
+function supabase分頁抓全部_(path) {
+  var all = [];
+  var pageSize = 1000;
+  var offset = 0;
+  while (true) {
+    var sep = path.indexOf('?') === -1 ? '?' : '&';
+    var page = supabaseRequest2_('GET', path + sep + 'limit=' + pageSize + '&offset=' + offset);
+    all = all.concat(page);
+    if (page.length < pageSize) break;
+    offset += pageSize;
+  }
+  return all;
+}
+
 function 每日備份施工單Supabase到雲端硬碟() {
   try {
-    var construction = supabaseRequest2_('GET', '/rest/v1/construction_orders?select=*');
-    var fire = supabaseRequest2_('GET', '/rest/v1/fire_permits?select=*');
+    var construction = supabase分頁抓全部_('/rest/v1/construction_orders?select=*');
+    var fire = supabase分頁抓全部_('/rest/v1/fire_permits?select=*');
     var payload = {
       匯出時間: new Date().toISOString(),
       construction_orders: construction,
