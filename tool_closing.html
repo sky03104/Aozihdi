@@ -1182,7 +1182,34 @@ function showCopyText(){
 
 // GAS CODE
 const GAS_CODE=`// ============================
-// 原有功能：每日匯出Excel（不需修改）
+// Supabase 連線（closing_gate_logs 是進出資料的權威來源，
+// Sheets「進出資料表」只在匯出時刷新，不再即時寫入，避免累積長大）
+// ============================
+function supabaseConfig_() {
+  var props = PropertiesService.getScriptProperties();
+  var url = props.getProperty('SUPABASE_URL');
+  var key = props.getProperty('SUPABASE_SECRET_KEY');
+  if (!url || !key) throw new Error('請先在「專案設定 → Script Properties」設定 SUPABASE_URL 與 SUPABASE_SECRET_KEY');
+  return { url: url.replace(/\\/+$/, ''), key: key };
+}
+
+function supabaseRequest_(method, path, body, extraHeaders) {
+  var cfg = supabaseConfig_();
+  var headers = { apikey: cfg.key, Authorization: 'Bearer ' + cfg.key, 'Content-Type': 'application/json' };
+  if (extraHeaders) { for (var k in extraHeaders) headers[k] = extraHeaders[k]; }
+  var options = { method: method, headers: headers, muteHttpExceptions: true };
+  if (body !== undefined) options.payload = JSON.stringify(body);
+  var resp = UrlFetchApp.fetch(cfg.url + path, options);
+  var code = resp.getResponseCode();
+  var text = resp.getContentText();
+  if (code >= 400) throw new Error('Supabase請求失敗（' + code + '）：' + text + '｜path=' + path);
+  return text ? JSON.parse(text) : null;
+}
+
+// ============================
+// 每日匯出Excel：先把「進出資料表」清空重貼當時 Supabase 最新資料
+// （含編輯/刪除後的結果），再跑既有的整份試算表匯出流程。
+// 「進出資料表」只留當次匯出的班次資料，不會累積長大。
 // ============================
 function exportDailyExcel() {
   var folderId = "1JaWrMWQQBGGt1BGGaUKqnwTVKQ9De8Na";
@@ -1192,6 +1219,12 @@ function exportDailyExcel() {
   if (!sheet) throw new Error("找不到工作表：打烊後");
   var reportDate = new Date();
   reportDate.setDate(reportDate.getDate() - 1);
+
+  // 班次時段：reportDate 20:00 ~ reportDate+1 08:00（晚班跨夜時段）
+  var shiftStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate(), 20, 0, 0);
+  var shiftEnd = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate() + 1, 8, 0, 0);
+  刷新進出資料表_(shiftStart, shiftEnd);
+
   var fileName = (reportDate.getMonth()+1)+"月"+reportDate.getDate()+"日漢神巨蛋非營業時間 打烊後 進出管制表.xlsx";
   var oldFiles = folder.getFilesByName(fileName);
   while (oldFiles.hasNext()) oldFiles.next().setTrashed(true);
@@ -1207,10 +1240,42 @@ function exportDailyExcel() {
   SpreadsheetApp.flush();
 }
 
+// 把「進出資料表」清空並重新貼上指定時段內、Supabase目前最新的資料
+// （含編輯/刪除後的結果），供「打烊後」分頁的既有公式與匯出使用
+function 刷新進出資料表_(shiftStart, shiftEnd) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('進出資料表');
+  if (!sheet) throw new Error('找不到分頁：進出資料表');
+
+  var fmt = function (d) { return Utilities.formatDate(d, 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX"); };
+  var path = '/rest/v1/closing_gate_logs'
+    + '?created_at=gte.' + encodeURIComponent(fmt(shiftStart))
+    + '&created_at=lte.' + encodeURIComponent(fmt(shiftEnd))
+    + '&order=created_at.asc';
+  var rows = supabaseRequest_('get', path);
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow >= 2) sheet.getRange(2, 1, lastRow - 1, 12).clearContent();
+  if (rows.length === 0) return;
+
+  var values = rows.map(function (r) {
+    return [
+      r.id, r.shop_code || '', r.floor || '', r.shop_name || '',
+      r.headcount || '', r.supervisor || '', r.entry_time || '',
+      r.location || '', r.work_type || '', r.exit_time || '',
+      r.inspector || '', new Date(r.created_at)
+    ];
+  });
+  sheet.getRange(2, 1, values.length, 12).setValues(values);
+  // L欄顯示格式 yyyy/M/d HH:mm:ss，底層仍是數值，可供 FILTER 公式比較
+  sheet.getRange(2, 12, values.length, 1).setNumberFormat('yyyy/M/d HH:mm:ss');
+}
+
 // ============================
-// 快速登錄工具 API
-// 欄位：A紀錄ID | B專櫃ID | C樓層 | D專櫃名稱 | E人數 | F監工
-//       G進場時間 | H施工地點 | I施工項目 | J退場時間 | K檢查者 | L建立時間
+// 快速登錄工具 API：新增/編輯/刪除/今日查詢全部改走 Supabase。
+// 對應欄位：closing_gate_logs.shop_code/floor/shop_name/headcount/
+//           supervisor/entry_time/location/work_type/exit_time/
+//           inspector/created_at（專櫃代號仍查 Sheets「專櫃表」，未搬遷）
 // ============================
 function doPost(e) {
   try {
@@ -1238,38 +1303,28 @@ function doPost(e) {
 
     // 一般進出資料寫入
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheetNm = e.parameter.sheetName || '進出資料表';
-    var sheet = ss.getSheetByName(sheetNm);
-    if (!sheet) return jsonRes({status:'error', msg:'找不到分頁: '+sheetNm});
-
     var rows = JSON.parse(e.parameter.rows);
-    var now = new Date();
-    var added = 0;
-    var nextId = nextRecordId_(sheet);
+    var now = Utilities.formatDate(new Date(), 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX");
 
-    rows.forEach(function(r) {
+    var toInsert = rows.map(function(r) {
       var shopCode = getOrCreateShopCode(ss, r.shop, r.floor);
-      var nextRow = sheet.getLastRow() + 1;
-      sheet.getRange(nextRow, 1, 1, 12).setValues([[
-        nextId++,
-        shopCode,
-        r.floor || '',
-        r.shop || '',
-        parseInt(r.count) || 1,
-        r.supervisor || '',
-        r.entryTime || '',
-        r.location || '',
-        r.workType || '',
-        r.exitTime || '',
-        r.inspector || '',
-        now
-      ]]);
-      // L欄顯示格式 yyyy/M/d HH:mm:ss，底層仍是數值，可供 FILTER 公式比較
-      sheet.getRange(nextRow, 12).setNumberFormat('yyyy/M/d HH:mm:ss');
-      added++;
+      return {
+        shop_code: shopCode,
+        floor: r.floor || '',
+        shop_name: r.shop || '',
+        headcount: parseInt(r.count) || 1,
+        supervisor: r.supervisor || '',
+        entry_time: r.entryTime || '',
+        location: r.location || '',
+        work_type: r.workType || '',
+        exit_time: r.exitTime || '',
+        inspector: r.inspector || '',
+        created_at: now
+      };
     });
+    supabaseRequest_('post', '/rest/v1/closing_gate_logs', toInsert);
 
-    return jsonRes({status:'ok', added:added});
+    return jsonRes({status:'ok', added: toInsert.length});
   } catch(err) {
     return jsonRes({status:'error', msg:err.toString()});
   }
@@ -1288,102 +1343,94 @@ function doGet(e) {
     return getDB();
   }
 
+  // 「預覽」分頁：把目前這班的資料刷新進「進出資料表」，供打烊後分頁的
+  // 既有公式／gviz預覽讀取（Sheets不再即時寫入，改成前端切到預覽分頁時
+  // 按需刷新，見前端 refreshPreview()）
+  if (action === 'refreshPreview') {
+    try {
+      var win = 算目前班次時段_();
+      刷新進出資料表_(win.start, win.end);
+      return jsonRes({status:'ok'});
+    } catch(err) {
+      return jsonRes({status:'error', msg:err.toString()});
+    }
+  }
+
   return jsonRes({status:'ok', msg:'天鷹保全 API 正常 ✓'});
 }
 
-// ============================
-// 今日紀錄：依當班時段撈資料
-// 當班時段定義：
+// 計算「目前這班」的當班時段起訖：
 //   20:00 以後 → 今天 20:00 ~ 明天 08:00
 //   08:00 以前 → 昨天 20:00 ~ 今天 08:00
+function 算目前班次時段_() {
+  var now = new Date();
+  var nowHour = now.getHours();
+  if (nowHour >= 20) {
+    return {
+      start: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 20, 0, 0),
+      end:   new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 8, 0, 0)
+    };
+  }
+  return {
+    start: new Date(now.getFullYear(), now.getMonth(), now.getDate()-1, 20, 0, 0),
+    end:   new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0, 0)
+  };
+}
+
+// ============================
+// 今日紀錄：依當班時段撈資料，改讀 Supabase（用created_at索引查詢，
+// 不用整表撈）
 // ============================
 function getTodayRows(e) {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheetNm = (e && e.parameter && e.parameter.sheet) ? e.parameter.sheet : '進出資料表';
-    var sheet = ss.getSheetByName(sheetNm);
-    if (!sheet) return jsonRes({status:'error', msg:'找不到分頁: '+sheetNm});
+    var win = 算目前班次時段_();
+    var shiftStart = win.start, shiftEnd = win.end;
 
-    var now = new Date();
-    var nowHour = now.getHours();
+    var fmt = function (d) { return Utilities.formatDate(d, 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX"); };
+    var path = '/rest/v1/closing_gate_logs'
+      + '?created_at=gte.' + encodeURIComponent(fmt(shiftStart))
+      + '&created_at=lte.' + encodeURIComponent(fmt(shiftEnd))
+      + '&order=created_at.desc';
+    var rows = supabaseRequest_('get', path);
 
-    // 計算當班時段起訖
-    var shiftStart, shiftEnd;
-    if (nowHour >= 20) {
-      // 今晚班：今天 20:00 ~ 明天 08:00
-      shiftStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 20, 0, 0);
-      // 2026-08-08 修：原本寫 (…getDate()+1, 0, 0) ＝ 隔天 00:00（午夜），
-      // 少給一個參數導致「時」被當成 0。結果凌晨00:00後登錄的資料一律被濾掉，
-      // 今日分頁看不到也無法編輯。班別定義是晚班到隔天 08:00，故補成 8, 0, 0。
-      shiftEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 8, 0, 0);
-    } else {
-      // 今早班（跨夜）：昨天 20:00 ~ 今天 08:00
-      shiftStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()-1, 20, 0, 0);
-      // 同上：原本 (…getDate(), 0, 0) ＝ 今天 00:00（午夜），同樣少給參數。
-      // 凌晨查詢時，剛剛登錄的資料反而落在時段外，這是最常被抱怨的情況。
-      shiftEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0, 0);
-    }
-
-    var lastRow = sheet.getLastRow();
-    if (lastRow < 2) return jsonRes({status:'ok', rows:[]});
-
-    var data = sheet.getRange(2, 1, lastRow-1, 12).getValues();
-    var result = [];
-
-    for (var i = 0; i < data.length; i++) {
-      var createdAt = data[i][11]; // L欄，Date 物件
-      if (!(createdAt instanceof Date)) continue;
-      if (createdAt < shiftStart || createdAt > shiftEnd) continue;
-
-      // 格式化時間顯示
-      var entryVal = data[i][6];
-      var exitVal  = data[i][9];
-
-      result.push({
-        rowNum:  i + 2,           // 試算表實際列號
-        id:      data[i][0],
-        floor:   data[i][2],
-        shop:    data[i][3],
-        count:   data[i][4],
-        sup:     data[i][5],
-        entry:   fmtTimeVal(entryVal),
-        loc:     data[i][7],
-        wtype:   data[i][8],
-        exit:    fmtTimeVal(exitVal),
-        ins:     data[i][10],
-        created: Utilities.formatDate(createdAt, 'Asia/Taipei', 'HH:mm:ss')
-      });
-    }
-
-    // 最新的排在前面
-    result.reverse();
+    var result = rows.map(function (r) {
+      return {
+        rowNum:  r.id,            // Supabase的id，編輯/刪除用這個定位
+        id:      r.id,
+        floor:   r.floor,
+        shop:    r.shop_name,
+        count:   r.headcount,
+        sup:     r.supervisor,
+        entry:   fmtTimeVal(r.entry_time),
+        loc:     r.location,
+        wtype:   r.work_type,
+        exit:    fmtTimeVal(r.exit_time),
+        ins:     r.inspector,
+        created: Utilities.formatDate(new Date(r.created_at), 'Asia/Taipei', 'HH:mm:ss')
+      };
+    });
     return jsonRes({status:'ok', rows:result});
 
   } catch(err) {
-    return jsonRes({status:'error', msg:err.toString()});
+    return jsonRes({status:'error', msg:'讀取失敗：'+err.toString()});
   }
 }
 
 // ============================
-// 補填退場時間（直接更新試算表指定列）
+// 補填退場時間（Supabase id定位）
 // ============================
 function updateExitTime(e) {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheetNm = e.parameter.sheet || '進出資料表';
-    var sheet = ss.getSheetByName(sheetNm);
-    if (!sheet) return jsonRes({status:'error', msg:'找不到分頁: '+sheetNm});
+    var id = parseInt(e.parameter.rowNum);
+    if (isNaN(id) || id < 1) return jsonRes({status:'error', msg:'ID無效'});
 
-    var rowNum   = parseInt(e.parameter.rowNum);
     var exitTime = e.parameter.exitTime || '';  // "HH:MM:SS"
     var inspector = e.parameter.inspector || '';
+    var patch = {};
+    if (exitTime) patch.exit_time = exitTime;
+    if (inspector) patch.inspector = inspector;
 
-    if (isNaN(rowNum) || rowNum < 2) return jsonRes({status:'error', msg:'列號無效'});
-
-    // J欄（第10欄）= 退場時間，K欄（第11欄）= 檢查者
-    if (exitTime) sheet.getRange(rowNum, 10).setValue(exitTime);
-    if (inspector) sheet.getRange(rowNum, 11).setValue(inspector);
-
+    supabaseRequest_('patch', '/rest/v1/closing_gate_logs?id=eq.' + id, patch);
     return jsonRes({status:'ok'});
   } catch(err) {
     return jsonRes({status:'error', msg:err.toString()});
@@ -1391,32 +1438,25 @@ function updateExitTime(e) {
 }
 
 // ============================
-// 「今日」分頁編輯／刪除整筆（2026-07-30 補：原本只有前端送 action=updateRow/deleteRow，
-// 後端沒有對應分支，一定會落到最後的預設寫入邏輯 JSON.parse(undefined) 直接拋錯，
-// 導致「今日」分頁編輯/刪除 100% 失敗）
+// 「今日」分頁編輯整筆（Supabase id定位）
 // ============================
 function updateRow(e) {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheetNm = e.parameter.sheet || '進出資料表';
-    var sheet = ss.getSheetByName(sheetNm);
-    if (!sheet) return jsonRes({status:'error', msg:'找不到分頁: '+sheetNm});
+    var id = parseInt(e.parameter.rowNum);
+    if (isNaN(id) || id < 1) return jsonRes({status:'error', msg:'ID無效'});
 
-    var rowNum = parseInt(e.parameter.rowNum);
-    if (isNaN(rowNum) || rowNum < 2) return jsonRes({status:'error', msg:'列號無效'});
-
-    // C~K 欄：樓層/廠商/人數/監工/進場/施工地點/施工項目/退場/檢查者（A id、B專櫃代碼、L建立時間不動）
-    sheet.getRange(rowNum, 3, 1, 9).setValues([[
-      e.parameter.floor || '',
-      e.parameter.shop || '',
-      parseInt(e.parameter.count) || 1,
-      e.parameter.supervisor || '',
-      e.parameter.entryTime || '',
-      e.parameter.location || '',
-      e.parameter.workType || '',
-      e.parameter.exitTime || '',
-      e.parameter.inspector || ''
-    ]]);
+    var patch = {
+      floor: e.parameter.floor || '',
+      shop_name: e.parameter.shop || '',
+      headcount: parseInt(e.parameter.count) || 1,
+      supervisor: e.parameter.supervisor || '',
+      entry_time: e.parameter.entryTime || '',
+      location: e.parameter.location || '',
+      work_type: e.parameter.workType || '',
+      exit_time: e.parameter.exitTime || '',
+      inspector: e.parameter.inspector || ''
+    };
+    supabaseRequest_('patch', '/rest/v1/closing_gate_logs?id=eq.' + id, patch);
 
     return jsonRes({status:'ok'});
   } catch(err) {
@@ -1424,17 +1464,15 @@ function updateRow(e) {
   }
 }
 
+// ============================
+// 「今日」分頁刪除整筆（Supabase id定位）
+// ============================
 function deleteRow(e) {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheetNm = e.parameter.sheet || '進出資料表';
-    var sheet = ss.getSheetByName(sheetNm);
-    if (!sheet) return jsonRes({status:'error', msg:'找不到分頁: '+sheetNm});
+    var id = parseInt(e.parameter.rowNum);
+    if (isNaN(id) || id < 1) return jsonRes({status:'error', msg:'ID無效'});
 
-    var rowNum = parseInt(e.parameter.rowNum);
-    if (isNaN(rowNum) || rowNum < 2) return jsonRes({status:'error', msg:'列號無效'});
-
-    sheet.deleteRow(rowNum);
+    supabaseRequest_('delete', '/rest/v1/closing_gate_logs?id=eq.' + id);
     return jsonRes({status:'ok'});
   } catch(err) {
     return jsonRes({status:'error', msg:err.toString()});
@@ -1483,7 +1521,7 @@ function setDB(dbJson) {
 }
 
 // ============================
-// 查詢或新增專櫃代號
+// 查詢或新增專櫃代號（維持在 Sheets，未搬遷——量小固定不隨時間增長）
 // ============================
 function getOrCreateShopCode(ss, name, floor) {
   try {
@@ -1512,31 +1550,6 @@ function getOrCreateShopCode(ss, name, floor) {
   } catch(err) {
     return name;
   }
-}
-
-// ============================
-// 工具函式
-// ============================
-// 純數字流水號主鍵（CLAUDE.md 規範：禁用 UUID/隨機英數）。
-// 掃描 A 欄既有最大數字值 +1；舊資料若殘留隨機英數 id 會被忽略跳過，不影響新流水號。
-function nextRecordId_(sheet) {
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return 1;
-  var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  var max = 0;
-  for (var i = 0; i < ids.length; i++) {
-    var raw = ids[i][0];
-    // 2026-08-08 修：舊版只用 !isNaN() 擋，但 isNaN(Infinity) 是 false ＝ Infinity 會被放行。
-    // 舊 genId() 產生的隨機碼有少數長得像科學記號（例如 948e0715 → 948×10^715），
-    // Sheets 讀進來會溢位成 Infinity，被誤當成「最大的 id」，導致 nextId = Infinity+1 = Infinity，
-    // 寫回試算表就顯示 #NUM!，而且 Infinity++ 永遠是 Infinity → 整批全壞、之後每批都壞。
-    if (typeof raw !== 'number' || !isFinite(raw)) continue; // 文字/錯誤值/無限大 一律跳過
-    var n = Math.floor(raw);
-    // 只採信「合理範圍的流水號」：正整數且不超過一千萬（實際筆數才數千，
-    // 上限用來擋掉舊隨機碼被誤讀成的巨大數字，例如 94800000）
-    if (n > 0 && n <= 10000000 && n > max) max = n;
-  }
-  return max + 1;
 }
 
 function jsonRes(obj) {
@@ -2133,10 +2146,16 @@ function conQuickSend(idx, type) {
 init();
 
 /* ── 預覽用 gviz/tq 資料查詢端點（比 /preview 可靠，資料查詢不受快取影響）── */
+// 2026-08-27 改：進出資料表改成Supabase當權威來源、不再即時寫入Sheets，
+// 「打烊後」分頁的公式抓的是這份表，所以切到預覽分頁時要先請後端把目前
+// 這班的資料刷新進「進出資料表」，公式才有正確資料可以顯示，再重載iframe。
 const PREVIEW_BASE_URL='https://docs.google.com/spreadsheets/d/1TnN3iJb1w9XTuw0-QuNrtXEOa71KCCy7y8Q3_1b1FmI/gviz/tq?tqx=out:html&range=A2:I';
 function refreshPreview(silent){
   const frame = document.getElementById('previewFrame');
-  if(frame){ frame.src=PREVIEW_BASE_URL+'&t='+Date.now(); if(!silent)showToast('🔄 預覽已刷新','ok'); }
+  if(!gasUrl){ if(frame) frame.src=PREVIEW_BASE_URL+'&t='+Date.now(); return; }
+  fetch(gasUrl+'?action=refreshPreview').catch(function(){}).then(function(){
+    if(frame){ frame.src=PREVIEW_BASE_URL+'&t='+Date.now(); if(!silent)showToast('🔄 預覽已刷新','ok'); }
+  });
 }
 </script>
 <!-- ===== 施工單查詢浮動按鈕 ===== -->
