@@ -99,10 +99,16 @@ function getMonth_SQL(monthStr) {
   return { status: 'ok', month: monthStr, days: agg.days, totals: agg.totals };
 }
 
+// 沒帶參數時預設今天/這個月，方便直接用Apps Script的「執行」按鈕測試
+// （執行按鈕沒辦法傳參數進去，一律是undefined，用這個預設值繞過去）
+function 今天字串_() { return Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd'); }
+function 這個月字串_() { return Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM'); }
+
 // ============================
 // 比對工具：拿目前的實際查詢結果，新舊兩邊比對
 // ============================
 function 比對getDay(dateStr) {
+  dateStr = dateStr || 今天字串_();
   var oldResult = JSON.parse(getDay({ parameter: { date: dateStr } }).getContent());
   var newResult = getDay_SQL(dateStr);
 
@@ -115,18 +121,21 @@ function 比對getDay(dateStr) {
   var onlyOld = oldKeys.filter(function (k) { return !newSet[k]; });
   var onlyNew = newKeys.filter(function (k) { return !oldSet[k]; });
 
+  var msg;
   if (onlyOld.length === 0 && onlyNew.length === 0) {
-    return dateStr + '：完全一致 ✅（共 ' + (oldResult.rows || []).length + ' 筆）';
+    msg = dateStr + '：完全一致 ✅（共 ' + (oldResult.rows || []).length + ' 筆）';
+  } else {
+    var diffs = [];
+    if (onlyOld.length > 0) diffs.push('舊有新無 ' + onlyOld.length + ' 筆 → ' + onlyOld.join(' | '));
+    if (onlyNew.length > 0) diffs.push('新有舊無 ' + onlyNew.length + ' 筆 → ' + onlyNew.join(' | '));
+    msg = dateStr + '：發現差異 ❌\n' + diffs.join('\n');
   }
-  var diffs = [];
-  if (onlyOld.length > 0) diffs.push('舊有新無 ' + onlyOld.length + ' 筆 → ' + onlyOld.join(' | '));
-  if (onlyNew.length > 0) diffs.push('新有舊無 ' + onlyNew.length + ' 筆 → ' + onlyNew.join(' | '));
-  var msg = dateStr + '：發現差異 ❌\n' + diffs.join('\n');
   Logger.log(msg);
   return msg;
 }
 
 function 比對getMonth(monthStr) {
+  monthStr = monthStr || 這個月字串_();
   var oldResult = JSON.parse(getMonth({ parameter: { month: monthStr } }).getContent());
   var newResult = getMonth_SQL(monthStr);
 
@@ -137,10 +146,12 @@ function 比對getMonth(monthStr) {
       diffs.push('第' + o.day + '天：舊(' + o.t19 + ',' + o.t35 + ',' + o.t80 + ') 新(' + n.t19 + ',' + n.t35 + ',' + n.t80 + ')');
     }
   }
+  var msg;
   if (diffs.length === 0) {
-    return monthStr + '：完全一致 ✅（合計' + oldResult.totals.sum + '）';
+    msg = monthStr + '：完全一致 ✅（合計' + oldResult.totals.sum + '）';
+  } else {
+    msg = monthStr + '：發現差異 ❌\n' + diffs.join('\n');
   }
-  var msg = monthStr + '：發現差異 ❌\n' + diffs.join('\n');
   Logger.log(msg);
   return msg;
 }
@@ -149,12 +160,13 @@ function 比對getMonth(monthStr) {
 // 效能測試：同一次執行分別計時，避免受網路環境影響
 // ============================
 function 測試getDay效能(dateStr) {
+  dateStr = dateStr || 今天字串_();
   var t1 = new Date().getTime();
   getDay({ parameter: { date: dateStr } });
   var t2 = new Date().getTime();
   getDay_SQL(dateStr);
   var t3 = new Date().getTime();
-  var msg = '讀Sheets耗時 ' + (t2 - t1) + 'ms　讀Supabase耗時 ' + (t3 - t2) + 'ms';
+  var msg = dateStr + '：讀Sheets耗時 ' + (t2 - t1) + 'ms　讀Supabase耗時 ' + (t3 - t2) + 'ms';
   Logger.log(msg);
   return msg;
 }
