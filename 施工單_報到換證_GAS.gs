@@ -55,6 +55,24 @@ function supabaseRequest3_(method, path, body, extraHeaders) {
   return text ? JSON.parse(text) : null;
 }
 
+// 測試用：在編輯器直接執行這個函式，模擬對「1F 警衛室 識別證檢查」那筆
+// 按報到換證，把結果跟過程中的錯誤都印在執行紀錄，不用去點Executions
+// 介面裡的每一筆。
+function 測試報到同步() {
+  var fakeE = {
+    postData: {
+      contents: JSON.stringify({
+        sheet: '施工單查詢',
+        id: '10522'
+      })
+    }
+  };
+  var result = doPost(fakeE);
+  var msg = 'doPost回傳：' + result.getContent();
+  Logger.log(msg);
+  return msg;
+}
+
 function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
