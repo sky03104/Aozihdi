@@ -17,6 +17,21 @@
 
 詳細出處見本次規劃的探索記錄（GAS 檔案：`班表管理_後端_GAS_v2.13.gs`）。
 
+### ⚠️ 2026-08-27 全專案消費者複查（範圍決策的依據）
+
+執行到階段3後，咖哩陸續提出「請假申請」「LINE小助手」「自動排哨工具」「給會計的彙整表」，派 Explore agent 徹底掃過全專案，發現比原始探索更多消費者：
+
+**已涵蓋、走 v2.13 這支 GAS（受本次搬遷影響，安全）**：
+- `index.html` 班表管理工具、`tool_billing.html` 請款、`tool_upload.html` 上傳——皆直接呼叫 v2.13 部署網址
+
+**完全獨立、直接讀 Sheets，不受本次搬遷影響（也不需要受影響）**：
+- **LINE 小助手**（`天鷹保全APP_後端_GAS.gs`，獨立部署）：自己一份 `SCHEDULE_SHEETS_` 常數，`getScheduleSheet_()`/`readEmployeeShiftsFromSheet_()` 供 LINE 查「今日/明日/本週/本月班表」直接讀 Sheets
+- **自動排哨工具**（`哨表產生_GAS.gs`，獨立部署）：`getMonthlyRoster()` 讀當日班別代號算出在職名單，直接讀 Sheets
+- **給會計的月彙整表**（`1zVoI7-zshz2zhhcR0sOT6xVzhwFGdIrhc3KxQ5A0PV4`，咖哩另外維護）：純 `IMPORTRANGE`／`XLOOKUP`／`CHOOSECOLS` 公式直接抓兩份試算表儲存格，**沒有任何程式碼**，只要 Sheets 內容正確就永遠正常
+- 舊的 `onScheduleEdit_` onEdit 觸發器：程式碼看起來已被新的差異推播機制取代（`班表管理_後端_GAS_v2.13.gs` 寫入成功後直接呼叫 LINE小助手推播，不再依賴 Sheets 被編輯這件事本身觸發），但無法百分之百確定 Apps Script 專案的「觸發器」頁面是否真的清空——不影響目前決策，若之後真要動 Sheets 寫入行為才需要查證
+
+**範圍決策（2026-08-27，咖哩與AI討論後決定）**：**不追求完全停用 Sheets**。理由：要做到那一步，還要另外改 2 支獨立 GAS 專案（LINE小助手、排哨工具），風險（LINE通知、排哨邏輯）大於效益。改為：**Sheets 永久保留當唯一權威來源，Supabase 只當「讀取效能加速層」**，LINE小助手、排哨工具、會計彙整表全部維持現狀不動。原本想解決的兩個目標改用這個方式達成：讀取效能→已用 Supabase 讀取層解決；備份分頁無限增長→不需要停用 Sheets，只要不再讓 Sheets 端複製整分頁備份即可（完整歷史已經在 Supabase 的 schedule_versions 裡）。
+
 ## 二、目標資料表設計（Supabase / Postgres）
 
 ### schedule_entries（取代寬表格 A4:AG30）
@@ -59,16 +74,16 @@
 
 GAS 用 `UrlFetchApp` 呼叫 Supabase 自動產生的 REST API。金鑰（service_role key）存在 GAS 指令碼屬性（`PropertiesService`），不寫進程式碼、不流向前端瀏覽器。前端網址與回傳 JSON 格式維持不變，index.html / tool_billing.html / tool_guard_gen.html **不需要改動**。
 
-## 四、分階段執行
+## 四、分階段執行（2026-08-27 依範圍決策修訂）
 
 | 階段 | 內容 | 完成定義 |
 |---|---|---|
 | 1. 建置 | Supabase 建三張表；GAS 設定連線金鑰 | 測試資料寫入再讀出成功 |
 | 2. 歷史資料搬遷 | 兩份試算表現有資料＋所有 `_備份_` 分頁，一次性轉存 Supabase | 月數/人數與原試算表逐項核對相符 |
-| 3. 只換讀 | `getSchedule`／`getScheduleByMonth`／`listScheduleMonths_` 改讀 Supabase，回傳格式不變；Sheets 暫時仍是寫入來源 | 新舊 API 回傳結果逐字比對數個月份皆相符 |
-| 4. 換寫 | 上傳流程改寫入 Supabase，含換月判斷、差異通知邏輯 | 實際上傳一份月班表，寫入正確、備份/通知邏輯正確觸發 |
-| 5. 觀察期 | Sheets 停止當寫入來源，保留備援 | 咖哩實際使用數天無異常 |
-| 6. 收尾 | 停用複製分頁備份機制 | 確認所有歷史月份已在 Supabase，分頁數不再增加 |
+| 3. 只換讀＋寫入同步 | `getSchedule`／`getScheduleByMonth`／`listScheduleMonths_` 改讀 Supabase（失敗自動退回讀Sheets）；`handleUpdate`/`checkAndSwitchMonth_` 寫入Sheets成功後同步一份到Supabase | 新舊 API 回傳結果逐字比對相符；已正式接進 doGet 路由 |
+| 4. 收尾：停止Sheets端備份分頁 | 換月時不再複製整分頁備份（`備份歷史班表_`呼叫移除），完整歷史改由 Supabase `schedule_versions` 保存 | 之後每次換月，Sheets 分頁數不再增加；`手動備份目前班表()` 保留供緊急手動使用 |
+
+~~原本規劃的「4.換寫（上傳直接寫Supabase）」「5.觀察期（Sheets停止當寫入來源）」「6.收尾（完全停用Sheets）」~~ **已依範圍決策取消，不執行**——Sheets 永久保留當唯一權威寫入來源，理由見上方「全專案消費者複查」。
 
 ## 五、風險與備援
 
@@ -81,8 +96,10 @@ GAS 用 `UrlFetchApp` 呼叫 Supabase 自動產生的 REST API。金鑰（servic
 - [x] 階段2：歷史資料搬遷（2026-08-27，共6個版本：晚班/早班各線上+備份+待生效；經核對遷移結果與直接查詢Supabase雙重驗證，人數/內容抽查皆正確，紅字排休語意正確轉換）
   - ⚠️ 踩坑記錄：Supabase 新版 `sb_secret_` 金鑰有瀏覽器偵測機制，GAS 的 `UrlFetchApp` 無法自訂 User-Agent（Google平台長年限制）會被誤判擋下，改用 legacy `service_role` JWT 金鑰解決，且**REST請求必須同時帶 `apikey` 與 `Authorization: Bearer` 兩個標頭**，只帶 apikey 會被當成匿名身份、被RLS規則擋成回傳空陣列（非報錯，容易誤判為資料遺失）。Phase 3 讀取程式碼務必兩個標頭都帶。
   - ⚠️ 踩坑記錄：原本略過空白格節省空間，會導致「整月都沒排班的人」在資料庫消失，讀取重組時漏人；已修正為全部存（含空白格），換取讀取完整性。原始試算表固定31欄對應每月最多31天，月份不足31天時（如9月30天）多出欄位是不存在的日期，直接存會被資料庫拒絕，已加該月實際天數判斷跳過。修正後6個版本明細筆數皆為「人數×該月天數」整除，確認資料矩形完整無缺漏。
-- [x] 階段3：只換讀（2026-08-27，`getSchedule`/`listScheduleMonths`/`getScheduleByMonth` 三支讀取API皆與Sheets原版逐字比對完全一致，早晚班皆驗證通過；已在handleUpdate/checkAndSwitchMonth_加上寫入後同步Supabase機制，避免SQL側過時。**尚未接進doGet路由，正式流量仍讀Sheets**，這批是「建置+驗證通過」，實際切換讀取來源是下一步。
+- [x] 階段3：只換讀＋寫入同步（2026-08-27）。`getSchedule`/`listScheduleMonths`/`getScheduleByMonth` 三支讀取API皆與Sheets原版逐字比對完全一致，早晚班皆驗證通過。**已正式接進doGet路由**：優先讀Supabase，任何失敗自動退回讀Sheets並記log（`讀取含備援_`）。`handleUpdate`/`checkAndSwitchMonth_`寫入Sheets成功後同步一份到Supabase。
   - ⚠️ 殘留驗證缺口：`getScheduleByMonth` 的「歷史備份」分支（status=superseded）目前無法用真實資料測到——現有備份月份跟線上月份剛好都是2026-08，查詢一律命中live分支。等下次真的換月（約9月1日）之後，兩邊月份不同了，要再跑一次`比對讀取結果`把backup分支也驗過。
-- [ ] 階段4：換寫
-- [ ] 階段5：觀察期
-- [ ] 階段6：收尾
+- [x] 階段4：收尾（2026-08-27）。移除`handleUpdate`/`checkAndSwitchMonth_`裡`備份歷史班表_`的呼叫，換月不再複製整分頁；完整歷史由Supabase保存。舊有`_備份_`分頁維持不動不主動清除。
+- ~~階段5：觀察期（Sheets停止當寫入來源）~~ 已依範圍決策取消
+- ~~階段6：收尾（完全停用Sheets）~~ 已依範圍決策取消
+
+**本次搬遷到此告一段落。** 剩餘待辦：等下次真實換月後補驗`getScheduleByMonth`的backup分支（見階段3殘留缺口）；確認驗證無誤後開PR合併回main。
