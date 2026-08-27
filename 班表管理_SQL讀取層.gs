@@ -218,6 +218,45 @@ function 讀取含備援_(e, sqlFn, sheetsFn, label) {
 }
 
 // ============================
+// 效能測試：同一次執行裡分別計時「讀Sheets」跟「讀Supabase」，排除網路
+// 環境誤差，兩邊放同一把尺上比才準。在編輯器直接執行 測試讀取效能() 看結果。
+// ============================
+function 測試單一班別效能_(shiftKey) {
+  var eFake = { parameter: { shift: shiftKey } };
+
+  var t1 = new Date().getTime();
+  getScheduleData(eFake); // 讀 Sheets
+  var t2 = new Date().getTime();
+  getScheduleData_SQL(eFake); // 讀 Supabase
+  var t3 = new Date().getTime();
+
+  return shiftKey + '：讀Sheets耗時 ' + (t2 - t1) + 'ms　讀Supabase耗時 ' + (t3 - t2) + 'ms';
+}
+
+function 測試讀取效能() {
+  var 結果 = [];
+  for (var key in SHIFT_CONFIG) {
+    // 各測3次取平均，單次測量容易被偶發的網路延遲誤導
+    var sheetsTimes = [], sqlTimes = [];
+    for (var i = 0; i < 3; i++) {
+      var eFake = { parameter: { shift: key } };
+      var t1 = new Date().getTime();
+      getScheduleData(eFake);
+      var t2 = new Date().getTime();
+      getScheduleData_SQL(eFake);
+      var t3 = new Date().getTime();
+      sheetsTimes.push(t2 - t1);
+      sqlTimes.push(t3 - t2);
+    }
+    var avg = function (arr) { return Math.round(arr.reduce(function (a, b) { return a + b; }, 0) / arr.length); };
+    結果.push(key + '：讀Sheets平均 ' + avg(sheetsTimes) + 'ms（' + sheetsTimes.join(',') + '）　讀Supabase平均 ' + avg(sqlTimes) + 'ms（' + sqlTimes.join(',') + '）');
+  }
+  var msg = 結果.join('\n');
+  Logger.log(msg);
+  return msg;
+}
+
+// ============================
 // 比對工具：把「讀Sheets」跟「讀Supabase」的結果拿來對，逐欄比對差異
 // 在 Apps Script 編輯器直接執行 比對讀取結果() 看執行紀錄
 // ============================
