@@ -473,6 +473,30 @@ function fetchSheetJsonp(name){
 }
 
 /* ══════════════════════════════════════════
+   改走 Supabase（透過 CON_GAS_URL 的 getWorkOrders action）
+   mode='active'：初次載入用，近期範圍；mode='date'/'search'：歷史查詢用
+   後端回傳格式刻意組成跟gviz table一樣，直接丟給 parseGvizTable() 解析，
+   失敗（連不上/格式不對）自動退回原本直接讀 gviz 的路徑，維持免登入。
+══════════════════════════════════════════ */
+function fetchSheetFromGAS_含備援(name, mode, extra){
+  var body = Object.assign({ action:'getWorkOrders', sheet:name, mode:mode }, extra||{});
+  return fetch(CON_GAS_URL, {
+    method:'POST',
+    headers:{ 'Content-Type':'text/plain' },
+    body: JSON.stringify(body)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if(!data || !Array.isArray(data.cols)) throw new Error('回應格式不是預期的gviz結構');
+    return parseGvizTable(data);
+  })
+  .catch(function(err){
+    console.warn('讀Supabase失敗，退回直接讀Sheets：', err);
+    return fetchSheetJsonp(name);
+  });
+}
+
+/* ══════════════════════════════════════════
    解析 gviz table
 ══════════════════════════════════════════ */
 function parseGvizTable(table){
@@ -1101,8 +1125,41 @@ function switchView(v){
   });
   render();
 }
-function onSearch(v){ S.search=v; render(); }
-function onDateChange(v){ S.histDate=v; render(); }
+function onSearch(v){
+  S.search=v; render();
+  if(S.view==='history') 觸發歷史擴充查詢_();
+}
+function onDateChange(v){
+  S.histDate=v; render();
+  if(S.view==='history') 觸發歷史擴充查詢_();
+}
+
+/* ══════════════════════════════════════════
+   歷史分頁的搜尋/日期查詢：初次載入只抓近期範圍（見loadAll的mode='active'），
+   不涵蓋久遠的歷史資料。使用者在歷史分頁輸入日期或關鍵字時，另外向
+   Supabase查一次，查到的結果併入既有資料（去重後）,filterRows既有邏輯
+   不用改就能篩出來顯示。搜尋文字加440ms防抖，避免每打一個字就送一次查詢。
+══════════════════════════════════════════ */
+var 歷史搜尋計時器_ = null;
+function 觸發歷史擴充查詢_(){
+  clearTimeout(歷史搜尋計時器_);
+  歷史搜尋計時器_ = setTimeout(async function(){
+    var mode, extra;
+    if(S.histDate){ mode='date'; extra={histDate:S.histDate}; }
+    else if(S.search.trim()){ mode='search'; extra={search:S.search.trim()}; }
+    else return; // 沒有搜尋條件，初次載入的近期範圍本來就涵蓋「近三日」預設畫面
+
+    var key = S.tab;
+    var sheetName = key==='con' ? SN.con : SN.hot;
+    try {
+      var extraRows = await fetchSheetFromGAS_含備援(sheetName, mode, extra);
+      S.data[key] = dedupeRows(S.data[key].concat(extraRows));
+      render();
+    } catch(e){
+      console.warn('歷史擴充查詢失敗（不影響已載入的近期資料）：', e);
+    }
+  }, 440);
+}
 
 function setSpinning(v){
   S.spinning=v;
@@ -1171,11 +1228,11 @@ async function loadAll(silent){
   setSpinning(true);
   try {
     if(!silent) document.getElementById('sp-msg').textContent='載入施工單…';
-    S.data.con = dedupeRows(await fetchSheetJsonp(SN.con));
+    S.data.con = dedupeRows(await fetchSheetFromGAS_含備援(SN.con, 'active'));
   } catch(e){ if(!silent) S.errors.con = e.message; }
   try {
     if(!silent) document.getElementById('sp-msg').textContent='載入動火申請…';
-    S.data.hot = dedupeRows(await fetchSheetJsonp(SN.hot));
+    S.data.hot = dedupeRows(await fetchSheetFromGAS_含備援(SN.hot, 'active'));
   } catch(e){ if(!silent) S.errors.hot = e.message; }
   S.loading=false;
   setSpinning(false);
