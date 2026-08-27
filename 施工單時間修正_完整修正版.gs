@@ -185,8 +185,11 @@ function onOpen() {
 //      dedupeRows 同一套規則：監工+施工項目完全相同分桶，桶內廠商/地點寬鬆比對＋施工區間重疊
 //      才視為重複；拿不準的邊界案例一律不合併（漏抓比多顯示嚴重）。
 function getOrders(mode) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('施工單查詢');
+  // 2026-08-27：getSheetByName('施工單查詢') 手動執行時會拋出詭異的
+  // 「Sheet 38985608 not found」（一個數字，疑似分頁名稱含看不見的特殊
+  // 字元），改用 依gid取分頁_()（定義於同專案的 施工單_SQL遷移腳本.gs，
+  // gid=0 已用診斷函式確認過）繞過名稱比對。
+  var sheet = 依gid取分頁_(0);
   if (!sheet) return { status: 'error', msg: '找不到分頁：施工單查詢' };
 
   var data = sheet.getDataRange().getValues();
