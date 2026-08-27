@@ -6,7 +6,7 @@
 //       created_at 索引查詢，不用像現在整表撈再篩。
 //
 // ⚠️ 這支只處理讀取比對，還沒接進正式 doGet 路由——先跑
-//    比對getTodayRows_() 和 測試getTodayRows效能() 確認新舊結果一致、
+//    比對getTodayRows() 和 測試getTodayRows效能() 確認新舊結果一致、
 //    效能有改善，咖哩確認後才把 doGet 的 getTodayRows action 改呼叫
 //    getTodayRows_含備援()（階段4跟寫入/匯出一起接上）。
 //
@@ -68,7 +68,7 @@ function getTodayRows_含備援(e) {
 // ============================
 // 比對工具：拿目前的實際查詢結果，新舊兩邊比對
 // ============================
-function 比對getTodayRows_() {
+function 比對getTodayRows() {
   var oldResult = JSON.parse(getTodayRows({ parameter: {} }).getContent());
   var newRows = getTodayRows_SQL();
 
