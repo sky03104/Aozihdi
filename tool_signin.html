@@ -6,6 +6,7 @@
   <title>過夜車輛登記 · 天鷹保全</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script>
 const WORKFLOW_GAS_URL='https://script.google.com/macros/s/AKfycbzxjedGAbxj3G85zkybqoFoB-P7uQ9ycqdJZ7mzQ2Ax-vaxKgOTG60120PlGPbcNJpR/exec';
 function logWorkflow(tool,actionType,status){
@@ -318,6 +319,7 @@ function logWorkflow(tool,actionType,status){
 
   <div class="sq-summary" id="sqSummary"></div>
   <div class="wl-list" id="sqResultList"></div>
+  <button class="wl-save-btn" id="sqShareBtn" onclick="exportSearchScreenshot()" style="display:none;background:linear-gradient(135deg,#6366F1,#818CF8);margin-top:4px"><i class="ti ti-share"></i> 匯出查詢結果截圖</button>
 </div>
 
 <input type="file" id="camInp" accept="image/*" capture="environment" style="display:none"/>
@@ -497,6 +499,8 @@ function saveWhitelist(){
 // ═══════ 查詢歷史紀錄（2026-08-28 新增） ═══════
 // 這支只呼叫 GAS 的 searchVehicleLogs action，之後後端換成查Supabase時前端完全不用改。
 var sqMode='date';
+var sqLastRows=[]; // 匯出截圖用：記住最近一次查詢的結果與條件說明
+var sqLastQueryLabel='';
 function openSearch(){
   showS(3);
   var dateInp=document.getElementById('sqDateInp');
@@ -506,6 +510,7 @@ function openSearch(){
   }
   document.getElementById('sqResultList').innerHTML='';
   document.getElementById('sqSummary').textContent='';
+  document.getElementById('sqShareBtn').style.display='none';
 }
 function setSearchMode(mode){
   sqMode=mode;
@@ -517,16 +522,20 @@ function setSearchMode(mode){
   document.getElementById('sqKeywordLbl').style.display=mode==='plate'?'block':'none';
 }
 function runSearch(){
-  var body={action:'searchVehicleLogs',mode:sqMode,typeLabel:document.getElementById('sqTypeInp').value};
+  var typeLabel=document.getElementById('sqTypeInp').value;
+  var body={action:'searchVehicleLogs',mode:sqMode,typeLabel:typeLabel};
   if(sqMode==='date'){
     body.date=document.getElementById('sqDateInp').value;
     if(!body.date){showToast('⚠️ 請選擇日期');return;}
+    sqLastQueryLabel='日期：'+body.date+'　類型：'+(typeLabel||'全部');
   }else{
     body.keyword=document.getElementById('sqKeywordInp').value.trim();
     if(!body.keyword){showToast('⚠️ 請輸入車牌關鍵字');return;}
+    sqLastQueryLabel='車牌關鍵字：'+body.keyword+'　類型：'+(typeLabel||'全部');
   }
   document.getElementById('sqSummary').textContent='查詢中…';
   document.getElementById('sqResultList').innerHTML='';
+  document.getElementById('sqShareBtn').style.display='none';
   fetch(PLATE_GAS_URL,{method:'POST',body:JSON.stringify(body)})
     .then(function(r){return r.json();})
     .then(function(j){
@@ -536,8 +545,10 @@ function runSearch(){
     .catch(function(){document.getElementById('sqSummary').textContent='';document.getElementById('sqResultList').innerHTML='<div class="wl-empty">網路錯誤，查詢失敗</div>';});
 }
 function renderSearchResults(rows,truncated){
+  sqLastRows=rows;
   document.getElementById('sqSummary').textContent='共 '+rows.length+' 筆'+(truncated?'（結果太多，僅顯示最新300筆，請縮小查詢範圍）':'');
   var list=document.getElementById('sqResultList');
+  document.getElementById('sqShareBtn').style.display=rows.length?'block':'none';
   if(!rows.length){list.innerHTML='<div class="wl-empty">查無紀錄</div>';return;}
   list.innerHTML=rows.map(function(r){
     return '<div class="wl-item"><span class="sq-item-time">'+escHtml(r.time.slice(5))+'</span>'+
@@ -545,6 +556,66 @@ function renderSearchResults(rows,truncated){
       '<span class="wl-item-type">'+escHtml(r.type)+'</span>'+
       '<span class="sq-item-op">'+escHtml(r.operator)+'</span></div>';
   }).join('');
+}
+
+// 把目前查詢結果截成一張圖，優先用系統分享面板（PWA可直接選LINE分享），
+// 不支援分享檔案時退回開新分頁讓使用者自己長按儲存（同tool_logistics.html的做法）
+async function exportSearchScreenshot(){
+  if(!sqLastRows.length){showToast('⚠️ 沒有可匯出的查詢結果');return;}
+  var btn=document.getElementById('sqShareBtn');
+  var oldText=btn.innerHTML;
+  btn.innerHTML='⏳ 產生截圖中…';
+  btn.disabled=true;
+
+  var rowsHtml=sqLastRows.map(function(r){
+    return '<tr><td>'+escHtml(r.time)+'</td><td>'+escHtml(r.type)+'</td>'+
+      '<td style="font-weight:800;letter-spacing:1px;">'+escHtml(r.plate)+'</td><td>'+escHtml(r.operator)+'</td></tr>';
+  }).join('');
+
+  var capture=document.createElement('div');
+  capture.style.cssText='position:fixed;left:-9999px;top:0;width:420px;background:#fff;color:#1a1a1a;padding:20px;font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;';
+  capture.innerHTML=
+    '<div style="text-align:center;font-size:20px;font-weight:900;margin-bottom:4px;">天鷹保全・過夜車輛查詢紀錄</div>'+
+    '<div style="text-align:center;font-size:13px;color:#555;margin-bottom:4px;">'+escHtml(sqLastQueryLabel)+'</div>'+
+    '<div style="text-align:center;font-size:13px;color:#555;margin-bottom:14px;">共 '+sqLastRows.length+' 筆</div>'+
+    '<table class="sqtable"><tr><th>時間</th><th>類型</th><th>車牌</th><th>登記人</th></tr>'+rowsHtml+'</table>';
+  var style=document.createElement('style');
+  style.textContent='table.sqtable{width:100%;border-collapse:collapse;font-size:12px;}'
+    +'table.sqtable th,table.sqtable td{border:1px solid #ddd;padding:5px 4px;text-align:center;color:#1a1a1a;}'
+    +'table.sqtable th{background:#818CF8;color:#fff;}';
+  capture.appendChild(style);
+  document.body.appendChild(capture);
+
+  try{
+    var canvas=await html2canvas(capture,{backgroundColor:'#ffffff',scale:2});
+    document.body.removeChild(capture);
+
+    canvas.toBlob(async function(blob){
+      btn.innerHTML=oldText;
+      btn.disabled=false;
+      if(!blob){showToast('截圖產生失敗');return;}
+      var fileName='過夜車輛查詢紀錄.png';
+      var file=new File([blob],fileName,{type:'image/png'});
+
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        try{
+          await navigator.share({files:[file],title:'過夜車輛查詢紀錄',text:sqLastQueryLabel});
+          return;
+        }catch(shareErr){
+          if(shareErr && shareErr.name==='AbortError')return; // 使用者自己取消分享，不用提示錯誤
+        }
+      }
+      // 不支援分享或分享失敗：開新分頁顯示圖片，手機可長按「儲存圖片」再自行傳LINE
+      var url=URL.createObjectURL(blob);
+      window.open(url,'_blank');
+      showToast('已開啟截圖，長按圖片可儲存後傳送');
+    },'image/png');
+  }catch(err){
+    if(capture.parentNode)document.body.removeChild(capture);
+    btn.innerHTML=oldText;
+    btn.disabled=false;
+    showToast('⚠️ 截圖失敗：'+(err&&err.message?err.message:err));
+  }
 }
 
 function openCam(type){
