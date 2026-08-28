@@ -707,7 +707,7 @@ async function startOCR(file){
     document.getElementById('procThumb').src=c.previewUrl;
     setBar(35);setLbl('AI 辨識中…');
 
-    var res=await fetch(PLATE_GAS_URL,{method:'POST',body:JSON.stringify({action:'recognizePlate',imageBase64:c.dataUrl.split(',')[1],mimeType:'image/jpeg'})});
+    var res=await fetch(PLATE_GAS_URL,{method:'POST',body:JSON.stringify({action:'recognizePlate',imageBase64:c.dataUrl.split(',')[1],mimeType:'image/jpeg',type:curType})});
     setBar(90);
     var json=await res.json();
     setBar(100);

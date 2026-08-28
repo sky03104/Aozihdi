@@ -217,10 +217,26 @@ function doPost(e) {
       // 代表問題不是特定模型，而是兩者都吃的共同參數壞掉——已移除 generationConfig 裡的
       // thinkingConfig（那是給支援「思考」的模型用的欄位，-latest 別名現在指到的版本
       // 顯然不吃這個欄位）。
-      var MODELS = [
-        'gemini-flash-latest',      // 主力（現指 3.5-flash，最準）
-        'gemini-flash-lite-latest'  // 備援（額度較高，換速度換準度）
-      ];
+      // 2026-08-28新增：依登記類型分散主力模型——RPD免費額度是「每個模型各自算」
+      // （AI Studio實測：3.6/3.7 Flash各20次/日，3.5 Flash Lite有500次/日），三種
+      // 類型固定用同一個主力模型時，額度是三種類型共用同一份20次，很快就撞頂；
+      // 改成各類型指定不同主力，等於把20+20+500的額度分開用，總量大幅拉高。
+      // ⚠️寫死版本號的風險：這幾支模型未來仍可能被Google下架（車牌辨識已經因為
+      // 這樣壞過3次，見上面歷史記錄），所以指定版本只當「優先」，鏈尾一定留
+      // -latest別名當安全網——就算指定的版本某天真的收掉，還能自動退到當時還活著
+      // 的版本，不會讓某個類型直接壞掉。
+      var TYPE_PRIMARY_MODEL_ = {
+        car: 'gemini-3.6-flash',        // 館內汽車
+        park: 'gemini-3.7-flash',       // 新莊停車場
+        moto: 'gemini-3.5-flash-lite'   // 館內機車（額度最寬鬆，機車連拍量通常最大）
+      };
+      var ALL_PINNED_MODELS_ = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.5-flash-lite'];
+      var preferredModel = TYPE_PRIMARY_MODEL_[payload.type];
+      var MODELS = [];
+      if (preferredModel) MODELS.push(preferredModel);
+      ALL_PINNED_MODELS_.forEach(function (m) { if (MODELS.indexOf(m) === -1) MODELS.push(m); });
+      MODELS.push('gemini-flash-latest');      // 安全網：目前最新穩定版
+      MODELS.push('gemini-flash-lite-latest'); // 安全網：額度較高的版本
       var lastError = '';
       var deadKeys = {}; // 金鑰無效/沒權限 → 之後的模型也不用再試這把
       for (var mi = 0; mi < MODELS.length; mi++) {
