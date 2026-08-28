@@ -66,7 +66,7 @@ alter table vehicle_overnight_logs enable row level security;
 | 4. 換寫（雙寫） | `vehicleReg`/`updatePlate` 改成 Supabase＋Sheets 都寫，`updatePlate` 改用 `id` 定位（Supabase）＋原本列號定位（Sheets）兩邊都要更新到 | 實際登記一筆、修改一筆，Supabase 與 Sheets 兩邊資料一致 |
 | 5. 寄信換讀＋失敗備援 | `sendDailySummary` 改用 `created_at` 區間查 Supabase，失敗自動退回原本整表撈 Sheets 篩選當天窗口的舊邏輯 | 手動觸發測試信，內容與改版前一致；模擬 Supabase 查詢失敗（改錯金鑰測試）確認能正確退回 Sheets 且信件內容仍正確 |
 | 6. 每日備份防護 | 比照其他工具，新增每日自動備份 Supabase 到 Drive | 咖哩確認 Drive 出現備份檔 |
-| 7. Sheets 定期清除 | **只有前面都完成、確認查詢/寄信都改讀 Supabase 且穩定運作後才能做這步**——新增排程（例如每月一次），批次刪除 Sheets 三個登記分頁裡超過90天的舊列（用 LockService 上鎖避免跟寫入衝突），保留90天當寄信失敗時的備援緩衝，不清光 | 咖哩確認排程執行後 Sheets 只留最近90天資料，Supabase 完整歷史不受影響 |
+| 7. Sheets 定期清除 | **只有前面都完成、確認查詢/寄信都改讀 Supabase 且穩定運作後才能做這步**——新增**每日**排程，批次刪除 Sheets 三個登記分頁裡超過3天的舊列（用 LockService 上鎖避免跟寫入衝突），保留3天當寄信失敗時的備援緩衝，不清光。⚠️2026-08-28咖哩決定把緩衝從90天縮到3天——保留天數變短，清除頻率要跟著改成**每日**（不是每月），否則清除前 Sheets 還是會長到一個月以上，緩衝天數形同虛設 | 咖哩確認排程執行後 Sheets 只留最近3天資料，Supabase 完整歷史不受影響 |
 
 ## 七、風險與備援
 
@@ -82,4 +82,4 @@ alter table vehicle_overnight_logs enable row level security;
 - [ ] 階段4：換寫（雙寫）
 - [ ] 階段5：寄信換讀＋失敗備援
 - [ ] 階段6：每日備份防護
-- [ ] 階段7：Sheets 定期清除（90天保留）
+- [ ] 階段7：Sheets 定期清除（每日排程，3天保留）
