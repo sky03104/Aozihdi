@@ -71,7 +71,7 @@ const REPORT_GAS_URL      = 'https://script.google.com/macros/s/AKfycbwHXlwTMmJy
 // 任何工具（index.html或任一tool_*.html）的前端有改動 → 整數+1；
 // 任何工具的後端（內嵌GAS_CODE或獨立.gs檔）有改動 → 小數+1。
 // 純視覺標示，方便比對現場看到的是不是最新版本，改完任何工具記得同步更新這裡。
-const APP_VERSION = '12.3';
+const APP_VERSION = '13.3';
 
 // PWA版本自動偵測（2026-08-27新增）：定期重新抓index.html比對APP_VERSION，
 // 版本不同就跳提示讓使用者自己按更新，不強制自動重整（避免打字打到一半被reload）
@@ -871,7 +871,7 @@ function ok(obj) {
        MonthView/HoursView/StaffView/UploadView 會被視為全新元件、整個砍掉重建
        （症狀：月班表捲動到後面日期，過幾秒就抖一下——2026-07-20 診斷實測證實
        每7秒重建一次，跟公告跑馬燈interval完全對上）。 */
-    const ScheduleApp = React.memo(function ScheduleApp({ currentUser: outerUser, externalScheduleData, onExternalApplied }) {
+    const ScheduleApp = React.memo(function ScheduleApp({ currentUser: outerUser, externalScheduleData, onExternalApplied, userDb }) {
         /* ── 角色對應表：主程式 role → 班表工具 role ── */
         const ROLE_MAP = {
             fulltime: 'staff', parttime: 'staff',
@@ -981,6 +981,29 @@ function ok(obj) {
                 await fetch(asUrl, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ action: "updateStaffEmpIds", list: nStaff.map(s => ({ name: s.name, empId: s.empId || '' })) }) });
             } catch (e) { /* 離線：本機已更新，待下次連線時人工確認 */ }
+        };
+        /* ── 2026-08-28新增：「員工工號對照」還是空的（第一次用）時，自動用姓名比對
+           帳號設定把工號抓進來，省得逐一手動輸入。只信任「狀態啟用」且「工號是純
+           數字」的帳號，同名撞到兩個以上符合條件的帳號時寧可跳過不猜，交給人工到
+           「員工工號對照」分頁補——目前現場帳號都已啟用、工號都是純數字，這個
+           限制不會漏掉真正該抓到的人，但保留給未來萬一資料變複雜時的安全網。 ── */
+        const autoFillStaffEmpIds_ = (staffList) => {
+            if (!userDb) return;
+            const accounts = Object.entries(userDb).map(([empId, rec]) => ({ empId, ...rec }));
+            const map = {};
+            let filled = 0;
+            staffList.forEach(s => {
+                const matches = accounts.filter(a => a.name === s.name && a.status === 'active' && /^\d+$/.test(String(a.empId || '')));
+                if (matches.length === 1) {
+                    map[s.name] = matches[0].empId;
+                    filled++;
+                }
+            });
+            if (!filled) return;
+            staffEmpIdMapRef.current = map;
+            setStaff(prev => prev.map(s => ({ ...s, empId: map[s.name] || s.empId || '' })));
+            syncStaffEmpIds(staffList.map(s => ({ name: s.name, empId: map[s.name] || '' })));
+            T(`🔧 已自動比對 ${filled} 位員工的工號`);
         };
         /* ── 共用：從線上班表（試算表）載入最新資料並套用 ──
            GAS v2.2 起會辨識紅字「休」並回傳「排休」，APP 內以獨立班別顯示；
@@ -1134,6 +1157,11 @@ function ok(obj) {
                     setSched(合.sched);
                     if (夜 && 早) T(`📅 已載入案場班表（早班＋晚班共 ${合.staff.length} 人）`);
                     else T(`📅 案場班表：只讀到${夜 ? '晚班' : (早 ? '早班' : '本機快取')}（${合.staff.length} 人）`);
+                    // 2026-08-28新增：「員工工號對照」還是空的（第一次用這功能）時，
+                    // 自動用姓名比對帳號設定把工號抓進來，省得逐一手動輸入。
+                    if (Object.keys(staffEmpIdMapRef.current).length === 0) {
+                        autoFillStaffEmpIds_(合.staff);
+                    }
                 }
                 if (asUrl) {
                     try {
@@ -3832,7 +3860,7 @@ function App() {
                     activeToolId === 'aiwork' && '📋 施工單查詢',
                      activeToolId === 'car' && '🅿️ 停車場車位數計算')),
             activeToolId === 'schedule' && (React.createElement("div", { style: { flex: 1, overflow: 'auto' } },
-                React.createElement(ScheduleApp, { currentUser: currentUser, externalScheduleData: externalScheduleData, onExternalApplied: handleExternalApplied }))),
+                React.createElement(ScheduleApp, { currentUser: currentUser, externalScheduleData: externalScheduleData, onExternalApplied: handleExternalApplied, userDb: userDb }))),
             activeToolId === 'closing' && (React.createElement("iframe", { src: CLOSING_PAGE_URL, style: { flex: 1, border: 'none', width: '100%', height: '100%' }, title: "\u6253\u70CA\u5F8C\u9032\u51FA\u5FEB\u901F\u767B\u9304" })),
             activeToolId === 'opening' && (React.createElement("iframe", { src: OPENING_PAGE_URL, style: { flex: 1, border: 'none', width: '100%', height: '100%' }, title: "\u958B\u5E97\u524D\u9032\u51FA\u5FEB\u901F\u767B\u9304" })),
             activeToolId === 'upload' && (React.createElement("iframe", { src: UPLOAD_PAGE_URL, style: { flex: 1, border: 'none', width: '100%', height: '100%' }, title: "\u8CC7\u6599\u4E0A\u50B3\u5DE5\u5177" })),
