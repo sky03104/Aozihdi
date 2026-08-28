@@ -81,6 +81,7 @@ function searchVehicleLogs_SQL(payload) {
 
   var rows = supaRows.map(function (r) {
     return {
+      id: r.id, // 2026-08-28新增：供前端「刪除這筆」按鈕精準定位用
       time: Utilities.formatDate(new Date(r.created_at), 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss'),
       type: r.type_label,
       plate: r.plate,

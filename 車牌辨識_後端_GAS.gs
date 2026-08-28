@@ -424,6 +424,12 @@ function doPost(e) {
       return jsonOut(searchHandler(payload));
     }
 
+    // --- 功能 F: 刪除一筆歷史登記紀錄（查詢歷史紀錄畫面的刪除按鈕）---
+    // 2026-08-28新增：Sheets、Supabase兩邊都刪，維持雙寫架構下兩邊一致。
+    if (payload.action === 'deleteVehicleLog') {
+      return jsonOut(deleteVehicleLog_(payload));
+    }
+
     // --- 功能 C: 修正已登記的車牌（辨識錯誤但已送出時，前端「最近登記」列表可就地編輯）---
     if (payload.action === 'updatePlate') {
       var ss2 = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -579,6 +585,69 @@ function _syncUpdatePlateToSupabase_(supabaseId, newPlate) {
   } catch (err) {
     console.error('過夜車輛修正車牌同步Supabase失敗：' + err.toString());
   }
+}
+
+// 2026-08-28新增：刪除一筆過夜車輛登記，Sheets、Supabase兩邊都刪。
+// payload需要：type（分頁/type_label名稱）、time（'yyyy-MM-dd HH:mm:ss'）、plate、
+// operator，以及id（若這筆是從Supabase查到的，有id定位最準；沒有id時退回用
+// 時間+車牌比對找列，這種情況只會發生在Supabase查詢失敗、退回讀Sheets查到的筆）。
+function deleteVehicleLog_(payload) {
+  var typeLabel = String(payload.type || '').trim();
+  var timeStr = String(payload.time || '').trim();
+  var plate = String(payload.plate || '').trim().toUpperCase();
+  var supabaseId = payload.id || null;
+
+  var sheetDeleted = false;
+  try {
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sheet = ss.getSheetByName(typeLabel);
+    if (sheet) {
+      var lastRow = sheet.getLastRow();
+      if (lastRow >= 2) {
+        var data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+        for (var i = data.length - 1; i >= 0; i--) {
+          var rowTs = data[i][0];
+          var rowTimeStr = (rowTs instanceof Date)
+            ? Utilities.formatDate(rowTs, 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss')
+            : String(rowTs || '');
+          var rowPlate = String(data[i][2] || '').trim().toUpperCase();
+          if (rowTimeStr === timeStr && rowPlate === plate) {
+            sheet.deleteRow(i + 2);
+            sheetDeleted = true;
+            break;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('刪除過夜車輛登記(Sheets)失敗：' + err.toString());
+  }
+
+  var supabaseDeleted = false;
+  if (typeof supabaseRequest_ === 'function') {
+    try {
+      if (supabaseId) {
+        supabaseRequest_('delete', '/rest/v1/vehicle_overnight_logs?id=eq.' + encodeURIComponent(supabaseId));
+      } else if (timeStr && plate && typeLabel) {
+        // 沒有id（罕見：這筆是Supabase查詢失敗時退回讀Sheets查到的），用時間+車牌+
+        // 類型比對刪除，三者同時吻合的機率極低會誤刪別筆。
+        var iso = 轉為ISO時間戳_過夜車輛_ ? 轉為ISO時間戳_過夜車輛_(timeStr) : null;
+        if (iso) {
+          supabaseRequest_('delete', '/rest/v1/vehicle_overnight_logs?created_at=eq.' + encodeURIComponent(iso)
+            + '&plate=eq.' + encodeURIComponent(plate) + '&type_label=eq.' + encodeURIComponent(typeLabel));
+        }
+      }
+      supabaseDeleted = true;
+    } catch (err) {
+      console.error('刪除過夜車輛登記(Supabase)失敗：' + err.toString());
+      supabaseDeleted = false;
+    }
+  }
+
+  if (!sheetDeleted && !supabaseDeleted) {
+    return { success: false, error: '兩邊都找不到這筆資料，可能已經被刪過了' };
+  }
+  return { success: true, sheetDeleted: sheetDeleted, supabaseDeleted: supabaseDeleted };
 }
 
 /* ═════════════════════════════════════════════

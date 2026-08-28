@@ -550,12 +550,32 @@ function renderSearchResults(rows,truncated){
   var list=document.getElementById('sqResultList');
   document.getElementById('sqShareBtn').style.display=rows.length?'block':'none';
   if(!rows.length){list.innerHTML='<div class="wl-empty">查無紀錄</div>';return;}
-  list.innerHTML=rows.map(function(r){
+  list.innerHTML=rows.map(function(r,i){
     return '<div class="wl-item"><span class="sq-item-time">'+escHtml(r.time.slice(5))+'</span>'+
       '<span class="sq-item-plate">'+escHtml(r.plate)+'</span>'+
       '<span class="wl-item-type">'+escHtml(r.type)+'</span>'+
-      '<span class="sq-item-op">'+escHtml(r.operator)+'</span></div>';
+      '<span class="sq-item-op">'+escHtml(r.operator)+'</span>'+
+      '<button class="wl-item-del" onclick="deleteSearchResultRow('+i+')" title="刪除這筆"><i class="ti ti-trash"></i></button></div>';
   }).join('');
+}
+
+// 2026-08-28新增：刪除查詢結果裡的其中一筆，Sheets、Supabase兩邊都會刪除，無法復原。
+function deleteSearchResultRow(i){
+  var r=sqLastRows[i];
+  if(!r)return;
+  if(!confirm('確定要刪除這筆登記嗎？\n'+r.time+'　'+r.type+'　'+r.plate+'\n（Sheets與Supabase兩邊都會刪除，無法復原）'))return;
+  fetch(PLATE_GAS_URL,{method:'POST',body:JSON.stringify({action:'deleteVehicleLog',time:r.time,type:r.type,plate:r.plate,operator:r.operator,id:r.id||''})})
+    .then(function(res){return res.json();})
+    .then(function(j){
+      if(j.success){
+        showToast('✅ 已刪除 '+r.plate);
+        sqLastRows.splice(i,1);
+        renderSearchResults(sqLastRows.slice(),false);
+      }else{
+        showToast('⚠️ 刪除失敗：'+(j.error||'未知錯誤'));
+      }
+    })
+    .catch(function(){showToast('⚠️ 網路錯誤，刪除失敗');});
 }
 
 // 把一組（單一類型）的查詢結果渲染成圖片Blob，供exportSearchScreenshot分類型呼叫
