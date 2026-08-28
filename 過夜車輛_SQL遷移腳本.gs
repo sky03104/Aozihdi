@@ -157,3 +157,16 @@ function 核對過夜車輛遷移結果() {
   Logger.log(msg);
   return msg;
 }
+
+// ============================
+// 驗證用：查Supabase最新幾筆（測試雙寫時用，不用開Supabase網站也能核對）
+// ============================
+function 查詢過夜車輛Supabase最新幾筆(limit) {
+  limit = limit || 5;
+  var rows = supabaseRequest_('get', '/rest/v1/vehicle_overnight_logs?select=*&order=created_at.desc&limit=' + limit);
+  var msg = rows.map(function (r) {
+    return 'id=' + r.id + '｜' + r.type_label + '｜' + r.plate + '｜' + r.operator + '｜' + r.created_at;
+  }).join('\n');
+  Logger.log(msg);
+  return msg;
+}
