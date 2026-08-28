@@ -231,7 +231,11 @@ function doPost(e) {
         moto: 'gemini-3.5-flash-lite'   // 館內機車（額度最寬鬆，機車連拍量通常最大）
       };
       var ALL_PINNED_MODELS_ = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.5-flash-lite'];
-      var preferredModel = TYPE_PRIMARY_MODEL_[payload.type];
+      // 2026-08-28補：payload.type沒送到（例如前端頁面還沒更新到最新版、GitHub Pages
+      // 快取還沒換過來）時，寧可預設優先選額度最寬鬆的3.5-flash-lite，也不要照陣列
+      // 原始順序先去踩3.6/3.7 Flash的地雷——類型資訊缺失時的預設值選錯，代價比其他
+      // 情況都嚴重（等於完全沒有分流效果，三種類型全部擠回原本共用20次額度的老路）。
+      var preferredModel = TYPE_PRIMARY_MODEL_[payload.type] || 'gemini-3.5-flash-lite';
       var MODELS = [];
       if (preferredModel) MODELS.push(preferredModel);
       ALL_PINNED_MODELS_.forEach(function (m) { if (MODELS.indexOf(m) === -1) MODELS.push(m); });
