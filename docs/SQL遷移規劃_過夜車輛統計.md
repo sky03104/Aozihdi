@@ -82,6 +82,6 @@ alter table vehicle_overnight_logs enable row level security;
   - ⚠️ 踩坑記錄：遷移腳本一開始誤用 `SpreadsheetApp.getActiveSpreadsheet()`，但這支GAS專案是獨立腳本不是容器繫結腳本（跟施工單/物流不同），咖哩實測噴出 `Cannot read properties of null (reading 'getSheetByName')`。改用主檔案原本就在用的 `SpreadsheetApp.openById(SPREADSHEET_ID)` 後重跑成功。
 - [x] 階段3：換讀＋失敗備援（查詢功能）（2026-08-28）。`比對searchVehicleLogs()` 完全一致 ✅（共66筆）；`測試searchVehicleLogs效能()` 讀Sheets 3315ms → 讀Supabase 496ms，快約6.7倍。
 - [ ] 階段4：換寫（雙寫）（**待咖哩驗證**：實際登記一筆＋修正一筆車牌，確認 Supabase 與 Sheets 兩邊一致）
-- [ ] 階段5：寄信換讀＋失敗備援 — 資料比對已過（**待咖哩驗證**：`比對每日寄信統計資料()` 完全一致 ✅（共66筆），還差 `testDailySummary()` 實際收信確認信件內容正常）
+- [x] 階段5：寄信換讀＋失敗備援（2026-08-28）。`比對每日寄信統計資料()` 完全一致 ✅（共66筆）；`testDailySummary()` 實際收信，咖哩確認信件內容正常。
 - [ ] 階段6：每日備份防護（**待咖哩執行**：跑 `設定過夜車輛每日備份觸發器()`，隔天確認 Drive 出現備份檔）
 - [ ] 階段7：Sheets 定期清除（每日排程，3天保留）——**尚未寫程式碼**，要等階段1~6都確認穩定運作後才能開始（原因見第三節）
