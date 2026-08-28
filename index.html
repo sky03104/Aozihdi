@@ -71,7 +71,7 @@ const REPORT_GAS_URL      = 'https://script.google.com/macros/s/AKfycbwHXlwTMmJy
 // 任何工具（index.html或任一tool_*.html）的前端有改動 → 整數+1；
 // 任何工具的後端（內嵌GAS_CODE或獨立.gs檔）有改動 → 小數+1。
 // 純視覺標示，方便比對現場看到的是不是最新版本，改完任何工具記得同步更新這裡。
-const APP_VERSION = '13.3';
+const APP_VERSION = '14.3';
 
 // PWA版本自動偵測（2026-08-27新增）：定期重新抓index.html比對APP_VERSION，
 // 版本不同就跳提示讓使用者自己按更新，不強制自動重整（避免打字打到一半被reload）
@@ -982,28 +982,50 @@ function ok(obj) {
                     body: JSON.stringify({ action: "updateStaffEmpIds", list: nStaff.map(s => ({ name: s.name, empId: s.empId || '' })) }) });
             } catch (e) { /* 離線：本機已更新，待下次連線時人工確認 */ }
         };
+        /* 職務修正不能用 sync()（它讀 curShift，合併「案場班表」檢視時 curShift==='all'
+           會直接跳過不寫），改成不依賴 curShift、依指定 shiftKey 寫回對應那份試算表。 */
+        const pushRoleCorrections_ = async (shiftKey, list, schedMap) => {
+            if (!asUrl || !list.length) return;
+            try {
+                const p = { action: "updateSchedule", shift: shiftKey, month: M, year: Y,
+                    data: list.map(s => ({ name: s.name, roleStr: ROLES[s.role] || '保全',
+                        shifts: Array.from({ length: DAYS }, (_, i) => { var _a; return ((_a = schedMap[s.id]) === null || _a === void 0 ? void 0 : _a[i + 1]) || '-'; }) })) };
+                await fetch(asUrl, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
+            } catch (e) { /* 離線：本機已更新，待下次連線時人工確認 */ }
+        };
         /* ── 2026-08-28新增：「員工工號對照」還是空的（第一次用）時，自動用姓名比對
-           帳號設定把工號抓進來，省得逐一手動輸入。只信任「狀態啟用」且「工號是純
-           數字」的帳號，同名撞到兩個以上符合條件的帳號時寧可跳過不猜，交給人工到
-           「員工工號對照」分頁補——目前現場帳號都已啟用、工號都是純數字，這個
-           限制不會漏掉真正該抓到的人，但保留給未來萬一資料變複雜時的安全網。 ── */
-        const autoFillStaffEmpIds_ = (staffList) => {
+           帳號設定把工號、職務都抓進來，省得逐一手動輸入/修正。只信任「狀態啟用」且
+           「工號是純數字」的帳號，同名撞到兩個以上符合條件的帳號時寧可跳過不猜，
+           交給人工到「員工工號對照」分頁補——目前現場帳號都已啟用、工號都是純數字，
+           這個限制不會漏掉真正該抓到的人，但保留給未來萬一資料變複雜時的安全網。
+           職務對應沿用 ROLE_MAP（fulltime/parttime 都算 staff／保全，跟目前登入者
+           自己的權限判斷共用同一套規則，不用另外設計）。 ── */
+        const autoFillStaffEmpIds_ = (staffList, schedMap) => {
             if (!userDb) return;
             const accounts = Object.entries(userDb).map(([empId, rec]) => ({ empId, ...rec }));
             const map = {};
-            let filled = 0;
+            const roleUpdates = {};
+            let filled = 0, roleFixed = 0;
             staffList.forEach(s => {
                 const matches = accounts.filter(a => a.name === s.name && a.status === 'active' && /^\d+$/.test(String(a.empId || '')));
-                if (matches.length === 1) {
-                    map[s.name] = matches[0].empId;
-                    filled++;
-                }
+                if (matches.length !== 1) return;
+                map[s.name] = matches[0].empId;
+                filled++;
+                const mappedRole = ROLE_MAP[matches[0].role];
+                if (mappedRole && mappedRole !== s.role) { roleUpdates[s.name] = mappedRole; roleFixed++; }
             });
             if (!filled) return;
             staffEmpIdMapRef.current = map;
-            setStaff(prev => prev.map(s => ({ ...s, empId: map[s.name] || s.empId || '' })));
-            syncStaffEmpIds(staffList.map(s => ({ name: s.name, empId: map[s.name] || '' })));
-            T(`🔧 已自動比對 ${filled} 位員工的工號`);
+            const corrected = staffList.map(s => ({ ...s, empId: map[s.name] || s.empId || '', role: roleUpdates[s.name] || s.role }));
+            setStaff(corrected);
+            syncStaffEmpIds(corrected.map(s => ({ name: s.name, empId: s.empId || '' })));
+            if (roleFixed) {
+                pushRoleCorrections_('night', corrected.filter(s => s.shift === '晚班' && roleUpdates[s.name]), schedMap);
+                pushRoleCorrections_('morning', corrected.filter(s => s.shift === '早班' && roleUpdates[s.name]), schedMap);
+                T(`🔧 已自動比對 ${filled} 位員工工號，校正 ${roleFixed} 位員工職務`);
+            } else {
+                T(`🔧 已自動比對 ${filled} 位員工的工號`);
+            }
         };
         /* ── 共用：從線上班表（試算表）載入最新資料並套用 ──
            GAS v2.2 起會辨識紅字「休」並回傳「排休」，APP 內以獨立班別顯示；
@@ -1160,7 +1182,7 @@ function ok(obj) {
                     // 2026-08-28新增：「員工工號對照」還是空的（第一次用這功能）時，
                     // 自動用姓名比對帳號設定把工號抓進來，省得逐一手動輸入。
                     if (Object.keys(staffEmpIdMapRef.current).length === 0) {
-                        autoFillStaffEmpIds_(合.staff);
+                        autoFillStaffEmpIds_(合.staff, 合.sched);
                     }
                 }
                 if (asUrl) {
@@ -1845,7 +1867,23 @@ function ok(obj) {
                     React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: C.goldBri, marginBottom: 14 } }, isA ? "新增員工" : "修改員工資料"),
                     React.createElement("div", { style: { marginBottom: 12 } },
                         React.createElement("label", { style: { display: "block", fontSize: 11, color: C.textDim, marginBottom: 5 } }, "\u59D3\u540D"),
-                        React.createElement("input", { style: S.input, value: stFrm.name, onChange: e => setStFrm(p => ({ ...p, name: e.target.value })), placeholder: "\u8F38\u5165\u59D3\u540D" })),
+                        React.createElement("input", { style: S.input, value: stFrm.name, onChange: e => {
+                            const nm = e.target.value;
+                            setStFrm(p => {
+                                const next = { ...p, name: nm };
+                                // 2026-08-28\u65B0\u589E\uFF1A\u65B0\u589E\u54E1\u5DE5\u6642\uFF0C\u59D3\u540D\u525B\u597D\u5C0D\u5230\u552F\u4E00\u4E00\u500B\u555F\u7528\u5E33\u865F\u5C31\u9806\u4FBF\u5E36\u5165\u5DE5\u865F/\u8077\u52D9
+                                if (stMod === "add" && userDb) {
+                                    const accounts = Object.entries(userDb).map(([empId, rec]) => ({ empId, ...rec }));
+                                    const matches = accounts.filter(a => a.name === nm.trim() && a.status === "active" && /^\d+$/.test(String(a.empId || "")));
+                                    if (matches.length === 1) {
+                                        next.empId = matches[0].empId;
+                                        const mapped = ROLE_MAP[matches[0].role];
+                                        if (mapped) next.role = mapped;
+                                    }
+                                }
+                                return next;
+                            });
+                        }, placeholder: "\u8F38\u5165\u59D3\u540D" })),
                     React.createElement("div", { style: { marginBottom: 12 } },
                         React.createElement("label", { style: { display: "block", fontSize: 11, color: C.textDim, marginBottom: 5 } }, "\u5DE5\u865F\uFF08\u9078\u586B\uFF0C2026-08-28\u65B0\u589E\uFF1A\u4E4B\u5F8C\u8981\u8DDF\u5E33\u865F\u7CFB\u7D71\u5C0D\u61C9\u6703\u7528\u5230\uFF09"),
                         React.createElement("input", { style: S.input, value: stFrm.empId || "", onChange: e => setStFrm(p => ({ ...p, empId: e.target.value })), placeholder: "\u8F38\u5165\u5DE5\u865F" })),
