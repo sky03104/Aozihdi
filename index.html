@@ -71,7 +71,7 @@ const REPORT_GAS_URL      = 'https://script.google.com/macros/s/AKfycbwHXlwTMmJy
 // 任何工具（index.html或任一tool_*.html）的前端有改動 → 整數+1；
 // 任何工具的後端（內嵌GAS_CODE或獨立.gs檔）有改動 → 小數+1。
 // 純視覺標示，方便比對現場看到的是不是最新版本，改完任何工具記得同步更新這裡。
-const APP_VERSION = '15.3';
+const APP_VERSION = '16.3';
 
 // PWA版本自動偵測（2026-08-27新增）：定期重新抓index.html比對APP_VERSION，
 // 版本不同就跳提示讓使用者自己按更新，不強制自動重整（避免打字打到一半被reload）
@@ -980,6 +980,13 @@ function ok(obj) {
             if (acc && acc.status === 'active') return ROLE_MAP[acc.role] || fallbackRole;
             return fallbackRole;
         };
+        /* 2026-08-28新增：只給「顯示用」，不能拿來覆蓋s.shift（s.shift是靠人實際排在
+           哪份試算表判斷分組/篩選，改了會讓人在單一班別檢視下消失，見咖哩與AI的討論）。
+           純粹讓管理員一眼看到帳號設定跟班表現況班別對不對得起來。 */
+        const getAccountShift_ = (empId) => {
+            const acc = empId && userDb ? userDb[empId] : null;
+            return (acc && acc.status === 'active') ? (acc.shift || '') : '';
+        };
         const syncStaffEmpIds = async (nStaff) => {
             const map = {};
             nStaff.forEach(s => { map[s.name] = s.empId || ''; });
@@ -1717,7 +1724,14 @@ function ok(obj) {
                             React.createElement("div", { style: { width: 34, height: 34, borderRadius: 8, background: `linear-gradient(135deg,${rBg(s.role)},${rBg(s.role)}88)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, color: "#fff", flexShrink: 0 } }, ROLES[s.role][0]),
                             React.createElement("div", null,
                                 React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.text } }, s.name),
-                                React.createElement("div", { style: { fontSize: 11, color: C.textMute } }, ROLES[s.role]))),
+                                React.createElement("div", { style: { fontSize: 11, color: C.textMute } }, ROLES[s.role]),
+                                (() => {
+                                    const acctShift = getAccountShift_(s.empId);
+                                    if (!acctShift) return null;
+                                    const mismatch = acctShift !== s.shift;
+                                    return React.createElement("div", { style: { fontSize: 10, color: mismatch ? C.warn : C.textMute, marginTop: 2 } },
+                                        (mismatch ? "⚠️ " : "") + "帳號設定：" + acctShift + (mismatch ? "（跟班表所在位置不同）" : ""));
+                                })())),
                         React.createElement("div", { style: { display: "flex", gap: 8 } },
                             React.createElement("button", { style: { ...gHost, padding: "6px 12px", fontSize: 12 }, onClick: () => { setStFrm({ name: s.name, role: s.role, shift: s.shift, empId: s.empId || "" }); setStMod(s); } }, "\u4FEE\u6539"),
                             React.createElement("button", { style: { ...dBtn, padding: "6px 12px", fontSize: 12 }, onClick: () => delSt(s) }, "\u522A\u9664"))))))))));
@@ -1905,7 +1919,14 @@ function ok(obj) {
                         React.createElement("input", { style: S.input, value: stFrm.empId || "", onChange: e => setStFrm(p => ({ ...p, empId: e.target.value })), placeholder: "\u8F38\u5165\u5DE5\u865F" })),
                     React.createElement("div", { style: { marginBottom: 12 } },
                         React.createElement("label", { style: { display: "block", fontSize: 11, color: C.textDim, marginBottom: 5 } }, "\u73ED\u5225"),
-                        React.createElement("div", { style: { display: "flex", gap: 8 } }, ["早班", "晚班"].map(sg => React.createElement("button", { key: sg, style: { ...stFrm.shift === sg ? gBtn : gHost, flex: 1, padding: "10px", fontSize: 13 }, onClick: () => setStFrm(p => ({ ...p, shift: sg })) }, sg)))),
+                        React.createElement("div", { style: { display: "flex", gap: 8 } }, ["早班", "晚班"].map(sg => React.createElement("button", { key: sg, style: { ...stFrm.shift === sg ? gBtn : gHost, flex: 1, padding: "10px", fontSize: 13 }, onClick: () => setStFrm(p => ({ ...p, shift: sg })) }, sg))),
+                        (() => {
+                            const acctShift = getAccountShift_(stFrm.empId);
+                            if (!acctShift) return null;
+                            const mismatch = acctShift !== stFrm.shift;
+                            return React.createElement("div", { style: { fontSize: 11, color: mismatch ? C.warn : C.textMute, marginTop: 6 } },
+                                (mismatch ? "⚠️ " : "") + "帳號設定班別：" + acctShift + (mismatch ? "（跟這裡不同，班表實際位置以此處為準，帳號設定僅供參考）" : ""));
+                        })()),
                     React.createElement("div", { style: { marginBottom: 14 } },
                         React.createElement("label", { style: { display: "block", fontSize: 11, color: C.textDim, marginBottom: 5 } }, "\u8077\u4F4D"),
                         roleLocked
