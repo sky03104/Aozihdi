@@ -5,8 +5,10 @@
 // 資料，轉存進 Supabase 的 vehicle_overnight_logs。
 //
 // ⚠️ 這支要貼在 車牌辨識_後端_GAS.gs 所在的 Apps Script 專案裡
-// （容器繫結腳本，getActiveSpreadsheet() 直接拿到過夜車輛登記試算表；
-// 也共用該檔案已定義的 toDate_ 函式，不要重複貼一次）。
+// （這是獨立腳本、不是容器繫結腳本，跟施工單/物流那幾支不一樣——
+// 主檔案全部用 SpreadsheetApp.openById(SPREADSHEET_ID) 開表，這裡也要
+// 比照辦理，不能用 getActiveSpreadsheet()。也共用該檔案已定義的
+// SPREADSHEET_ID / toDate_，不要重複貼一次）。
 //
 // 使用前置：
 //   1. 先在 Supabase SQL Editor 執行 過夜車輛SQL建表.sql
@@ -82,7 +84,7 @@ function 轉為ISO時間戳_過夜車輛_(v) {
 // 搬遷單一分頁
 // ============================
 function 遷移過夜車輛分頁_(typeLabel) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = ss.getSheetByName(typeLabel);
   if (!sheet) return { rows: [], skippedEmpty: 0, notFound: true };
   var lastRow = sheet.getLastRow();
@@ -108,11 +110,10 @@ function 遷移過夜車輛分頁_(typeLabel) {
 }
 
 // ============================
-// 診斷用：這個專案實際綁定的是哪份試算表、有哪些分頁
+// 診斷用：SPREADSHEET_ID 指到的是哪份試算表、有哪些分頁
 // ============================
 function 診斷目前試算表_過夜車輛() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) return '這個專案沒有綁定任何試算表（getActiveSpreadsheet()回傳null）';
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var names = ss.getSheets().map(function (s) { return s.getName() + '（gid=' + s.getSheetId() + '）'; });
   var msg = '試算表名稱：' + ss.getName() + '\n試算表ID：' + ss.getId() + '\n分頁清單：\n' + names.join('\n');
   Logger.log(msg);
