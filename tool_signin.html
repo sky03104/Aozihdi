@@ -139,6 +139,13 @@ function logWorkflow(tool,actionType,status){
     .wl-item-del{background:none;border:none;color:#F87171;font-size:16px;cursor:pointer;padding:6px;flex-shrink:0}
     .wl-save-btn{width:100%;background:linear-gradient(135deg,#16A34A,#22C55E);border:none;color:#fff;border-radius:12px;padding:14px;font-size:15px;font-weight:900;cursor:pointer;font-family:inherit}
     .wl-empty{font-size:13px;color:#4B5563;text-align:center;padding:20px 0}
+    /* ── 查詢歷史紀錄（2026-08-28 新增） ── */
+    .sq-mode-btn{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#8A95A8;border-radius:8px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
+    .sq-mode-btn.active{background:rgba(212,168,0,.15);border-color:rgba(212,168,0,.4);color:#FFD700}
+    .sq-summary{font-size:12px;color:#8A95A8;margin-bottom:10px}
+    .sq-item-time{font-size:11px;color:#6B7280;width:88px;flex-shrink:0}
+    .sq-item-plate{font-size:15px;font-weight:800;letter-spacing:1px;flex:1}
+    .sq-item-op{font-size:11px;color:#8A95A8;flex-shrink:0}
   </style>
 </head>
 <body>
@@ -155,7 +162,8 @@ function logWorkflow(tool,actionType,status){
 <header class="app-hdr">
   <img id="hdrLogo" class="hdr-logo" src="" alt=""/>
   <div><div class="hdr-cn"><span style="color:#FFD700">天鷹</span>保全</div><div class="hdr-en">OVERNIGHT VEHICLE REGISTRATION</div></div>
-  <button id="settingsBtn" class="back-btn" style="margin-left:auto;display:none" onclick="openSettings()" title="特殊車輛設定"><i class="ti ti-settings"></i></button>
+  <button id="searchBtn" class="back-btn" style="margin-left:auto;width:auto;padding:0 12px;font-size:13px;font-weight:700;white-space:nowrap" onclick="openSearch()" title="查詢歷史紀錄">🔍查詢歷史紀錄</button>
+  <button id="settingsBtn" class="back-btn" style="display:none" onclick="openSettings()" title="特殊車輛設定"><i class="ti ti-settings"></i></button>
 </header>
 
 <!-- S0: 類型選擇 -->
@@ -274,6 +282,33 @@ function logWorkflow(tool,actionType,status){
   <div class="wl-list" id="wlList"><div class="wl-empty">載入中…</div></div>
 
   <button class="wl-save-btn" onclick="saveWhitelist()"><i class="ti ti-device-floppy"></i> 儲存設定</button>
+</div>
+
+<!-- S3: 查詢歷史紀錄 -->
+<div id="s3" class="screen">
+  <div class="scr-ttl">
+    <button class="back-btn" onclick="showS(0)"><i class="ti ti-arrow-left"></i></button>
+    <span class="scr-ttl-txt">查詢歷史紀錄</span>
+  </div>
+
+  <div class="wl-form">
+    <div class="wl-row">
+      <button class="sq-mode-btn active" id="sqModeDate" onclick="setSearchMode('date')"><i class="ti ti-calendar"></i> 依日期</button>
+      <button class="sq-mode-btn" id="sqModePlate" onclick="setSearchMode('plate')"><i class="ti ti-license"></i> 依車牌</button>
+    </div>
+    <input type="date" class="wl-input" id="sqDateInp" style="display:block"/>
+    <input type="text" class="wl-input plate" id="sqKeywordInp" placeholder="車牌關鍵字，例如 5205" autocomplete="off" oninput="this.value=this.value.toUpperCase()" style="display:none"/>
+    <select class="wl-select" id="sqTypeInp">
+      <option value="">全部類型</option>
+      <option value="館內機車">館內機車</option>
+      <option value="館內汽車">館內汽車</option>
+      <option value="新莊停車場">新莊停車場</option>
+    </select>
+    <button class="wl-add-btn" onclick="runSearch()"><i class="ti ti-search"></i> 查詢</button>
+  </div>
+
+  <div class="sq-summary" id="sqSummary"></div>
+  <div class="wl-list" id="sqResultList"></div>
 </div>
 
 <input type="file" id="camInp" accept="image/*" capture="environment" style="display:none"/>
@@ -448,6 +483,57 @@ function saveWhitelist(){
       showToast(j.success?'✅ 已儲存':('⚠️ 儲存失敗：'+(j.error||'')));
     })
     .catch(function(){showToast('⚠️ 網路錯誤，儲存失敗');});
+}
+
+// ═══════ 查詢歷史紀錄（2026-08-28 新增） ═══════
+// 這支只呼叫 GAS 的 searchVehicleLogs action，之後後端換成查Supabase時前端完全不用改。
+var sqMode='date';
+function openSearch(){
+  showS(3);
+  var dateInp=document.getElementById('sqDateInp');
+  if(!dateInp.value){
+    var d=new Date();
+    dateInp.value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  document.getElementById('sqResultList').innerHTML='';
+  document.getElementById('sqSummary').textContent='';
+}
+function setSearchMode(mode){
+  sqMode=mode;
+  document.getElementById('sqModeDate').classList.toggle('active',mode==='date');
+  document.getElementById('sqModePlate').classList.toggle('active',mode==='plate');
+  document.getElementById('sqDateInp').style.display=mode==='date'?'block':'none';
+  document.getElementById('sqKeywordInp').style.display=mode==='plate'?'block':'none';
+}
+function runSearch(){
+  var body={action:'searchVehicleLogs',mode:sqMode,typeLabel:document.getElementById('sqTypeInp').value};
+  if(sqMode==='date'){
+    body.date=document.getElementById('sqDateInp').value;
+    if(!body.date){showToast('⚠️ 請選擇日期');return;}
+  }else{
+    body.keyword=document.getElementById('sqKeywordInp').value.trim();
+    if(!body.keyword){showToast('⚠️ 請輸入車牌關鍵字');return;}
+  }
+  document.getElementById('sqSummary').textContent='查詢中…';
+  document.getElementById('sqResultList').innerHTML='';
+  fetch(PLATE_GAS_URL,{method:'POST',body:JSON.stringify(body)})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if(!j.success){document.getElementById('sqSummary').textContent='';document.getElementById('sqResultList').innerHTML='<div class="wl-empty">'+escHtml(j.error||'查詢失敗')+'</div>';return;}
+      renderSearchResults(j.rows,j.truncated);
+    })
+    .catch(function(){document.getElementById('sqSummary').textContent='';document.getElementById('sqResultList').innerHTML='<div class="wl-empty">網路錯誤，查詢失敗</div>';});
+}
+function renderSearchResults(rows,truncated){
+  document.getElementById('sqSummary').textContent='共 '+rows.length+' 筆'+(truncated?'（結果太多，僅顯示最新300筆，請縮小查詢範圍）':'');
+  var list=document.getElementById('sqResultList');
+  if(!rows.length){list.innerHTML='<div class="wl-empty">查無紀錄</div>';return;}
+  list.innerHTML=rows.map(function(r){
+    return '<div class="wl-item"><span class="sq-item-time">'+escHtml(r.time.slice(5))+'</span>'+
+      '<span class="sq-item-plate">'+escHtml(r.plate)+'</span>'+
+      '<span class="wl-item-type">'+escHtml(r.type)+'</span>'+
+      '<span class="sq-item-op">'+escHtml(r.operator)+'</span></div>';
+  }).join('');
 }
 
 function openCam(type){

@@ -386,6 +386,13 @@ function doPost(e) {
       return jsonOut({ success: true });
     }
 
+    // --- 功能 E: 查詢歷史登記紀錄（依日期或依車牌關鍵字）---
+    // 這支之後SQL遷移只需要把裡面的Sheets讀取換成查Supabase，
+    // 回傳格式(rows陣列)先訂好，前端不用再改。
+    if (payload.action === 'searchVehicleLogs') {
+      return jsonOut(searchVehicleLogs_(payload));
+    }
+
     // --- 功能 C: 修正已登記的車牌（辨識錯誤但已送出時，前端「最近登記」列表可就地編輯）---
     if (payload.action === 'updatePlate') {
       var ss2 = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -438,6 +445,62 @@ function extractPlate_(text) {
     }
   }
   return '';
+}
+
+// ── 查詢歷史登記紀錄 ──────────────────────────
+// mode='date'：查指定日期(yyyy-MM-dd)一整天；mode='plate'：查車牌關鍵字，不限日期查全部歷史。
+// typeLabel 可選，不填就查三個分頁全部。結果依時間新到舊排序，最多回傳300筆避免資料量大時卡住。
+var VEHICLE_TYPE_LABELS_ = ['館內機車', '館內汽車', '新莊停車場'];
+var VEHICLE_SEARCH_MAX_ROWS_ = 300;
+
+function searchVehicleLogs_(payload) {
+  var mode = payload.mode;
+  var typeLabel = String(payload.typeLabel || '').trim();
+  var targetTypes = typeLabel ? [typeLabel] : VEHICLE_TYPE_LABELS_;
+
+  var dateStr = String(payload.date || '').trim();
+  var keyword = String(payload.keyword || '').trim().toUpperCase();
+  if (mode === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return { success: false, error: '請選擇有效日期' };
+  }
+  if (mode === 'plate' && !keyword) {
+    return { success: false, error: '請輸入車牌關鍵字' };
+  }
+
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var rows = [];
+  for (var t = 0; t < targetTypes.length; t++) {
+    var sheet = ss.getSheetByName(targetTypes[t]);
+    if (!sheet) continue;
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) continue;
+    var data = sheet.getRange(2, 1, lastRow - 1, 4).getValues(); // 時間/類型/車牌/登記人
+    for (var i = 0; i < data.length; i++) {
+      var ts = data[i][0];
+      var tsStr = (ts instanceof Date) ? Utilities.formatDate(ts, 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss') : String(ts || '');
+      if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(tsStr)) continue; // 跳過表頭/空列/爛值
+
+      if (mode === 'date') {
+        if (tsStr.slice(0, 10) !== dateStr) continue;
+      } else {
+        var plateVal = String(data[i][2] || '').trim().toUpperCase();
+        if (plateVal.indexOf(keyword) === -1) continue;
+      }
+
+      rows.push({
+        time: tsStr,
+        type: String(data[i][1] || targetTypes[t]),
+        plate: String(data[i][2] || ''),
+        operator: String(data[i][3] || '')
+      });
+    }
+  }
+
+  rows.sort(function (a, b) { return a.time < b.time ? 1 : (a.time > b.time ? -1 : 0); }); // 新到舊
+  var truncated = rows.length > VEHICLE_SEARCH_MAX_ROWS_;
+  if (truncated) rows = rows.slice(0, VEHICLE_SEARCH_MAX_ROWS_);
+
+  return { success: true, rows: rows, truncated: truncated };
 }
 
 // 輔助函式：回傳 JSON 格式
