@@ -715,6 +715,7 @@ function doSubmit(plate){
       if(j.success){
         if(st) st.innerHTML='<i class="ti ti-check"></i>';
         div.dataset.row=j.row; // 有row才能編輯，避免修改到還沒寫入成功的假資料
+        div.dataset.supabaseId=j.supabaseId||''; // 2026-08-28 SQL遷移：修正車牌時Supabase那份也要一併同步
         addEditBtn(itemId);
         logWorkflow('signin','vehicle-reg','已完成');
         if(j.specialVehicle)showToast('🅿️ '+plate+'（'+j.specialVehicle.type+'）已同步登記到特殊車輛');
@@ -773,7 +774,7 @@ function saveRecentEdit(itemId,oldPlate){
 
   var st=document.getElementById(itemId+'-st');
   if(st) st.innerHTML='<span class="spin" style="width:12px;height:12px;border-top-color:#818CF8"></span>';
-  fetch(PLATE_GAS_URL,{method:'POST',body:JSON.stringify({action:'updatePlate',typeLabel:div.dataset.type,row:div.dataset.row,plate:newPlate})})
+  fetch(PLATE_GAS_URL,{method:'POST',body:JSON.stringify({action:'updatePlate',typeLabel:div.dataset.type,row:div.dataset.row,supabaseId:div.dataset.supabaseId,plate:newPlate})})
     .then(function(r){return r.json();})
     .then(function(j){
       if(st) st.innerHTML=j.success?'<i class="ti ti-check"></i>':'<i class="ti ti-alert-triangle" style="color:#FB923C"></i>';

@@ -336,8 +336,15 @@ function doPost(e) {
       } finally {
         lock.releaseLock();
       }
-      // row 回傳給前端：辨識錯誤時前端可用這個列號呼叫 updatePlate 就地修正，不用手動開試算表改。
-      return jsonOut({ success: true, row: newRow, specialVehicle: specialVehicle });
+      // 2026-08-28 SQL遷移：雙寫Supabase（見docs/SQL遷移規劃_過夜車輛統計.md第三節，
+      // 這支工具的寄信是稽核用途，Sheets不停用，Supabase只是多一份供查詢/寄信優先讀）。
+      // 用typeof防呆：SQL遷移的腳本檔還沒貼進這個專案時，跳過同步，不影響原本Sheets登記功能。
+      var supabaseId = null;
+      if (typeof supabaseRequest_ === 'function') {
+        supabaseId = _syncVehicleRegToSupabase_(payload.typeLabel, plate, operator, now2);
+      }
+      // row/supabaseId 回傳給前端：辨識錯誤時前端可用這兩個值呼叫 updatePlate 就地修正，不用手動開試算表改。
+      return jsonOut({ success: true, row: newRow, supabaseId: supabaseId, specialVehicle: specialVehicle });
     }
 
     // --- 功能 D: 白名單設定（公司車/月租車）讀取／儲存 ---
@@ -387,10 +394,11 @@ function doPost(e) {
     }
 
     // --- 功能 E: 查詢歷史登記紀錄（依日期或依車牌關鍵字）---
-    // 這支之後SQL遷移只需要把裡面的Sheets讀取換成查Supabase，
-    // 回傳格式(rows陣列)先訂好，前端不用再改。
+    // 2026-08-28 SQL遷移：優先查Supabase，失敗自動退回讀Sheets（searchVehicleLogs_含備援
+    // 定義在 過夜車輛_SQL讀取層.gs，還沒貼進這個專案時用typeof防呆退回原本讀Sheets的版本）。
     if (payload.action === 'searchVehicleLogs') {
-      return jsonOut(searchVehicleLogs_(payload));
+      var searchHandler = (typeof searchVehicleLogs_含備援 === 'function') ? searchVehicleLogs_含備援 : searchVehicleLogs_;
+      return jsonOut(searchHandler(payload));
     }
 
     // --- 功能 C: 修正已登記的車牌（辨識錯誤但已送出時，前端「最近登記」列表可就地編輯）---
@@ -403,6 +411,10 @@ function doPost(e) {
       var newPlate = String(payload.plate || '').trim().toUpperCase();
       if (!newPlate) return jsonOut({ success: false, error: '車牌不可為空' });
       sheet2.getRange(row2, 3).setValue(newPlate); // C欄＝車牌（欄位順序見 vehicleReg：時間/類型/車牌/登記人）
+      // 2026-08-28 SQL遷移：Supabase那份也一併更新（雙寫維持一致），失敗不影響Sheets已成功的修正。
+      if (typeof supabaseRequest_ === 'function' && payload.supabaseId) {
+        _syncUpdatePlateToSupabase_(payload.supabaseId, newPlate);
+      }
       return jsonOut({ success: true });
     }
 
@@ -509,6 +521,33 @@ function jsonOut(data) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// 2026-08-28 SQL遷移：登記時同步寫一份到Supabase（雙寫，Sheets不停用）。
+// 失敗只記log、回傳null，不讓Supabase的問題影響到Sheets那邊已經成功的登記。
+function _syncVehicleRegToSupabase_(typeLabel, plate, operator, timestamp) {
+  try {
+    var iso = Utilities.formatDate(timestamp, 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ssXXX");
+    var result = supabaseRequest_('post', '/rest/v1/vehicle_overnight_logs',
+      [{ type_label: typeLabel, plate: plate, operator: operator, created_at: iso }],
+      { Prefer: 'return=representation' });
+    return (result && result[0] && result[0].id) || null;
+  } catch (err) {
+    console.error('過夜車輛登記同步Supabase失敗：' + err.toString());
+    return null;
+  }
+}
+
+// 2026-08-28 SQL遷移：修正車牌時，Supabase那份（若有id）也一併更新，維持兩邊一致。
+// 失敗只記log，不影響Sheets那邊已經成功的修正（Sheets才是這支功能目前的主要回應依據）。
+function _syncUpdatePlateToSupabase_(supabaseId, newPlate) {
+  if (!supabaseId) return;
+  try {
+    supabaseRequest_('patch', '/rest/v1/vehicle_overnight_logs?id=eq.' + encodeURIComponent(supabaseId),
+      { plate: newPlate });
+  } catch (err) {
+    console.error('過夜車輛修正車牌同步Supabase失敗：' + err.toString());
+  }
+}
+
 /* ═════════════════════════════════════════════
  * 每日登記摘要 Email（主管/公司看得到登記資料）
  * ─────────────────────────────────────────────
@@ -547,18 +586,11 @@ function testDailySummary() {
   Logger.log('✅ 測試信已寄出，請收信箱（含垃圾郵件夾）');
 }
 
-function sendDailySummary() {
-  var emails = getSummaryEmails_();
-  if (!emails) throw new Error('收件人未設定：請在「專案設定 → 指令碼屬性」新增 SUMMARY_EMAILS（多人用逗號分隔）');
-
-  var tz  = 'Asia/Taipei';
-  var now = new Date();
-  // 時間戳存的是 'yyyy-MM-dd HH:mm:ss' 台北時間字串 → 直接用字串比大小，避開時區換算陷阱
-  var todayStr     = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
-  var yesterdayStr = Utilities.formatDate(new Date(now.getTime() - 86400000), tz, 'yyyy-MM-dd');
-  var startKey = yesterdayStr + ' 08:00:00';
-  var endKey   = todayStr     + ' 08:00:00';
-
+// 原本 sendDailySummary 內建的Sheets統計邏輯，2026-08-28 SQL遷移時抽成獨立函式，
+// 供優先讀Supabase失敗時當備援使用（不刪，永久保留——這支工具的Sheets不停用，
+// 見docs/SQL遷移規劃_過夜車輛統計.md第三節）。
+function 取得過夜車輛統計資料_Sheets_(startKey, endKey) {
+  var tz = 'Asia/Taipei';
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   // 原本只讀 getSheets()[0]（最左邊分頁），三種類型分開存在不同分頁時
   // 只會統計到其中一頁，其他分頁的登記全部漏掉（2026-07-11發現連帶修正）。
@@ -586,6 +618,39 @@ function sendDailySummary() {
     byType[type] = (byType[type] || 0) + 1;
   }
   hits.sort(); // 依時間排序
+  return { hits: hits, byType: byType };
+}
+
+function sendDailySummary() {
+  var emails = getSummaryEmails_();
+  if (!emails) throw new Error('收件人未設定：請在「專案設定 → 指令碼屬性」新增 SUMMARY_EMAILS（多人用逗號分隔）');
+
+  var tz  = 'Asia/Taipei';
+  var now = new Date();
+  // 時間戳存的是 'yyyy-MM-dd HH:mm:ss' 台北時間字串 → 直接用字串比大小，避開時區換算陷阱
+  var todayStr     = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+  var yesterdayStr = Utilities.formatDate(new Date(now.getTime() - 86400000), tz, 'yyyy-MM-dd');
+  var startKey = yesterdayStr + ' 08:00:00';
+  var endKey   = todayStr     + ' 08:00:00';
+
+  // 2026-08-28 SQL遷移：優先查Supabase（區間查詢，不受歷史資料量影響），失敗
+  // 自動退回原本整表撈Sheets篩選當天窗口的舊邏輯（見docs/SQL遷移規劃_過夜車輛統計.md
+  // 第三節——這封信是稽核用途，兩邊都失敗才會真的寄不出去，機率極低）。
+  var stat;
+  if (typeof 取得過夜車輛統計資料_SQL_ === 'function') {
+    try {
+      var startISO = Utilities.formatDate(toDate_(startKey), tz, "yyyy-MM-dd'T'HH:mm:ssXXX");
+      var endISO = Utilities.formatDate(toDate_(endKey), tz, "yyyy-MM-dd'T'HH:mm:ssXXX");
+      stat = 取得過夜車輛統計資料_SQL_(startISO, endISO);
+    } catch (err) {
+      console.error('每日摘要查Supabase失敗，退回讀Sheets：' + err.toString());
+      stat = 取得過夜車輛統計資料_Sheets_(startKey, endKey);
+    }
+  } else {
+    stat = 取得過夜車輛統計資料_Sheets_(startKey, endKey);
+  }
+  var hits = stat.hits;      // [時間, 類型, 車牌, 登記人]
+  var byType = stat.byType;  // 類型 → 台數
 
   var dateLabel = yesterdayStr.slice(5).replace('-', '/') + ' 08:00 ～ ' + todayStr.slice(5).replace('-', '/') + ' 08:00';
   var subject = '【天鷹保全】過夜車輛登記摘要 ' + dateLabel + '（共 ' + hits.length + ' 台）';
