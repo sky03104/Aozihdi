@@ -908,7 +908,11 @@ function updateStaffEmpIds_(payload) {
     var it = list[i];
     var nm = String((it && it.name) || '').trim();
     if (!nm) continue;
-    sh.appendRow([nm, String((it && it.empId) || '').trim()]);
+    // 工號固定6位數字，開頭可能是0（例：015732）；Sheets看到純數字字串會自動轉成
+    // 數字格式吃掉開頭的0，加單引號前綴強制存成文字（跟tool_signin.html等處存
+    // 工號欄的做法一致）。
+    var eid = String((it && it.empId) || '').trim();
+    sh.appendRow([nm, eid ? "'" + eid : '']);
   }
   return respond({ success: true });
 }
