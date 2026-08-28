@@ -163,6 +163,9 @@ function doPost(e) {
     if (payload.action === 'recognizePlate') {
       var apiKeys = getApiKeys_();
       if (!apiKeys.length) return jsonOut({ success: false, error: 'API Key 未設定：請開 /exec 網址查看設定說明' });
+      // 2026-08-28新增：每次辨識隨機打亂金鑰嘗試順序，避免固定順序時排第一個的金鑰
+      // 永遠最先被打、額度最快用完，其他金鑰卻還很閒置（咖哩實測發現過這個狀況）。
+      apiKeys = shuffleArray_(apiKeys.slice());
 
       // 清洗 Base64 資料
       var cleanBase64 = payload.imageBase64.split(',')[1] || payload.imageBase64;
@@ -513,6 +516,16 @@ function searchVehicleLogs_(payload) {
   if (truncated) rows = rows.slice(0, VEHICLE_SEARCH_MAX_ROWS_);
 
   return { success: true, rows: rows, truncated: truncated };
+}
+
+// 2026-08-28新增：Fisher-Yates洗牌，回傳新陣列（不動原陣列），供每次辨識隨機打亂
+// 金鑰嘗試順序用，讓多把金鑰的額度消耗量比較平均，不會固定某一把先被打爆。
+function shuffleArray_(arr) {
+  for (var i = arr.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  }
+  return arr;
 }
 
 // 輔助函式：回傳 JSON 格式
