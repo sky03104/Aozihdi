@@ -897,22 +897,32 @@ function getStaffEmpIds_() {
   return respond({ success: true, list: list });
 }
 
+// 2026-08-28修正：原本沒上鎖，短時間內重新整理/重新開啟頁面觸發好幾次自動比對時，
+// 好幾個請求同時「清空→逐列appendRow」互相插隊，寫出一堆重複資料（咖哩實機截圖
+// 抓到）。改成上鎖＋整批setValues一次寫入（比一列列appendRow快很多，縮短鎖定時間）。
 function updateStaffEmpIds_(payload) {
-  var ss = SpreadsheetApp.openById(SHIFT_CONFIG.night.targetSsId);
-  var sh = ss.getSheetByName(員工工號分頁名稱_);
-  if (!sh) sh = ss.insertSheet(員工工號分頁名稱_);
-  sh.clearContents();
-  sh.appendRow(['姓名', '工號']);
-  var list = payload.list || [];
-  for (var i = 0; i < list.length; i++) {
-    var it = list[i];
-    var nm = String((it && it.name) || '').trim();
-    if (!nm) continue;
-    // 工號固定6位數字，開頭可能是0（例：015732）；Sheets看到純數字字串會自動轉成
-    // 數字格式吃掉開頭的0，加單引號前綴強制存成文字（跟tool_signin.html等處存
-    // 工號欄的做法一致）。
-    var eid = String((it && it.empId) || '').trim();
-    sh.appendRow([nm, eid ? "'" + eid : '']);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var ss = SpreadsheetApp.openById(SHIFT_CONFIG.night.targetSsId);
+    var sh = ss.getSheetByName(員工工號分頁名稱_);
+    if (!sh) sh = ss.insertSheet(員工工號分頁名稱_);
+    sh.clearContents();
+    var list = payload.list || [];
+    var rows = [['姓名', '工號']];
+    for (var i = 0; i < list.length; i++) {
+      var it = list[i];
+      var nm = String((it && it.name) || '').trim();
+      if (!nm) continue;
+      // 工號固定6位數字，開頭可能是0（例：015732）；Sheets看到純數字字串會自動轉成
+      // 數字格式吃掉開頭的0，加單引號前綴強制存成文字（跟tool_signin.html等處存
+      // 工號欄的做法一致）。
+      var eid = String((it && it.empId) || '').trim();
+      rows.push([nm, eid ? "'" + eid : '']);
+    }
+    sh.getRange(1, 1, rows.length, 2).setValues(rows);
+  } finally {
+    lock.releaseLock();
   }
   return respond({ success: true });
 }
