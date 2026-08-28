@@ -71,7 +71,7 @@ const REPORT_GAS_URL      = 'https://script.google.com/macros/s/AKfycbwHXlwTMmJy
 // 任何工具（index.html或任一tool_*.html）的前端有改動 → 整數+1；
 // 任何工具的後端（內嵌GAS_CODE或獨立.gs檔）有改動 → 小數+1。
 // 純視覺標示，方便比對現場看到的是不是最新版本，改完任何工具記得同步更新這裡。
-const APP_VERSION = '14.3';
+const APP_VERSION = '15.3';
 
 // PWA版本自動偵測（2026-08-27新增）：定期重新抓index.html比對APP_VERSION，
 // 版本不同就跳提示讓使用者自己按更新，不強制自動重整（避免打字打到一半被reload）
@@ -972,6 +972,14 @@ function ok(obj) {
             } catch (e) { /* 離線或讀取失敗：沿用目前記憶體裡的對照表 */ }
         };
         /* 新增/修改/刪除員工後呼叫：把目前staff的姓名→工號整批覆寫回雲端對照表 */
+        /* 2026-08-28新增：這個人有對到啟用帳號時，職務一律以帳號設定為準（換算過
+           ROLE_MAP），沒對到就用傳進來的原值——StMod()的唯讀顯示、saveSt()實際存檔
+           都要用這支，確保「畫面上鎖住顯示什麼」跟「存進去的是什麼」永遠一致。 */
+        const resolveEffectiveRole_ = (empId, fallbackRole) => {
+            const acc = empId && userDb ? userDb[empId] : null;
+            if (acc && acc.status === 'active') return ROLE_MAP[acc.role] || fallbackRole;
+            return fallbackRole;
+        };
         const syncStaffEmpIds = async (nStaff) => {
             const map = {};
             nStaff.forEach(s => { map[s.name] = s.empId || ''; });
@@ -1275,9 +1283,11 @@ function ok(obj) {
                 T("請輸入姓名", "err");
                 return;
             }
+            const empIdTrim = (stFrm.empId || '').trim();
+            const effRole = resolveEffectiveRole_(empIdTrim, stFrm.role); // 有對到啟用帳號就一律用帳號的職務，不管表單上按了什麼
             if (stMod === "add") {
                 const id = ++_nid;
-                const ns = { id, name: stFrm.name.trim(), role: stFrm.role, shift: stFrm.shift, empId: (stFrm.empId || '').trim() };
+                const ns = { id, name: stFrm.name.trim(), role: effRole, shift: stFrm.shift, empId: empIdTrim };
                 const nStaff = [...staff, ns];
                 const nSc = { ...sched };
                 nSc[id] = {};
@@ -1290,7 +1300,7 @@ function ok(obj) {
                 syncStaffEmpIds(nStaff);
             }
             else {
-                const nStaff = staff.map(s => s.id === stMod.id ? { ...s, ...stFrm, name: stFrm.name.trim() } : s);
+                const nStaff = staff.map(s => s.id === stMod.id ? { ...s, ...stFrm, role: effRole, name: stFrm.name.trim() } : s);
                 setStaff(nStaff);
                 T(`已修改：${stFrm.name.trim()}`);
                 if (asUrl) sync(sched, nStaff);
@@ -1861,6 +1871,12 @@ function ok(obj) {
             if (!stMod)
                 return null;
             const isA = stMod === "add";
+            // 2026-08-28新增：這個人有對到一個啟用的帳號時，職務改成唯讀顯示（不能在這裡改），
+            // 只能到「帳號設定」改，避免兩邊各自維護一份又對不起來。沒對到帳號的人
+            // （查無工號或工號對不到現存啟用帳號）維持原本可以手動選職務。
+            const roleAcc = stFrm.empId && userDb ? userDb[stFrm.empId] : null;
+            const roleLocked = !!(roleAcc && roleAcc.status === "active");
+            const roleAccMapped = resolveEffectiveRole_(stFrm.empId, stFrm.role);
             return (React.createElement("div", { style: S.ov, onClick: () => setStMod(null) },
                 React.createElement("div", { style: S.sh, onClick: e => e.stopPropagation() },
                     React.createElement("div", { style: S.hd }),
@@ -1892,7 +1908,11 @@ function ok(obj) {
                         React.createElement("div", { style: { display: "flex", gap: 8 } }, ["早班", "晚班"].map(sg => React.createElement("button", { key: sg, style: { ...stFrm.shift === sg ? gBtn : gHost, flex: 1, padding: "10px", fontSize: 13 }, onClick: () => setStFrm(p => ({ ...p, shift: sg })) }, sg)))),
                     React.createElement("div", { style: { marginBottom: 14 } },
                         React.createElement("label", { style: { display: "block", fontSize: 11, color: C.textDim, marginBottom: 5 } }, "\u8077\u4F4D"),
-                        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, Object.entries(ROLES).map(([k, v]) => React.createElement("button", { key: k, style: { padding: "6px 12px", borderRadius: 7, border: `1px solid ${stFrm.role === k ? rBg(k) : C.cardBd}`, background: stFrm.role === k ? `${rBg(k)}33` : C.card, color: stFrm.role === k ? C.text : C.textDim, fontSize: 12, cursor: "pointer", fontWeight: stFrm.role === k ? 700 : 400 }, onClick: () => setStFrm(p => ({ ...p, role: k })) }, v)))),
+                        roleLocked
+                            ? React.createElement("div", null,
+                                React.createElement("div", { style: { display: "inline-block", padding: "6px 12px", borderRadius: 7, border: `1px solid ${rBg(roleAccMapped)}`, background: `${rBg(roleAccMapped)}33`, color: C.text, fontSize: 12, fontWeight: 700 } }, ROLES[roleAccMapped] || roleAccMapped),
+                                React.createElement("div", { style: { fontSize: 11, color: C.textMute, marginTop: 6 } }, "\u6B64\u4EBA\u5DF2\u6709\u5E33\u865F\uFF0C\u8077\u52D9\u7531\u300C\u5E33\u865F\u8A2D\u5B9A\u300D\u540C\u6B65\u986F\u793A\uFF0C\u5982\u9700\u4FEE\u6539\u8ACB\u81F3\u5E33\u865F\u8A2D\u5B9A\u8ABF\u6574"))
+                            : React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, Object.entries(ROLES).map(([k, v]) => React.createElement("button", { key: k, style: { padding: "6px 12px", borderRadius: 7, border: `1px solid ${stFrm.role === k ? rBg(k) : C.cardBd}`, background: stFrm.role === k ? `${rBg(k)}33` : C.card, color: stFrm.role === k ? C.text : C.textDim, fontSize: 12, cursor: "pointer", fontWeight: stFrm.role === k ? 700 : 400 }, onClick: () => setStFrm(p => ({ ...p, role: k })) }, v)))),
                     React.createElement("div", { style: { display: "flex", gap: 8 } },
                         React.createElement("button", { style: { ...gBtn, flex: 1, padding: "13px", fontSize: 14 }, onClick: saveSt }, isA ? "確認新增" : "儲存修改"),
                         !isA && React.createElement("button", { style: { ...dBtn, padding: "13px 16px", fontSize: 13 }, onClick: () => delSt(stMod) }, "\u522A\u9664")))));
