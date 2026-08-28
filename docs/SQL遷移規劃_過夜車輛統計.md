@@ -77,8 +77,9 @@ alter table vehicle_overnight_logs enable row level security;
 ## 八、進度追蹤
 
 - [x] 程式碼撰寫（2026-08-28）：`過夜車輛SQL建表.sql`（階段1 DDL）、`過夜車輛_SQL遷移腳本.gs`（階段2）、`過夜車輛_SQL讀取層.gs`（階段3查詢＋階段5寄信，各附比對/效能測試工具）、`車牌辨識_後端_GAS.gs` 加上雙寫與備援呼叫（階段4，用 `typeof` 防呆，沒貼進讀取層/遷移腳本前完全不影響原本行為）、`過夜車輛_SQL每日備份.gs`（階段6）、`tool_signin.html` 補 `supabaseId` 傳遞供修正車牌時雙邊同步。node --check 與 HTML 標籤閉合皆已驗證通過。
-- [ ] 階段1：建置（**待咖哩執行**：Supabase SQL Editor 跑建表 SQL；GAS 專案設定 SUPABASE_URL/SUPABASE_SECRET_KEY）
-- [ ] 階段2：歷史資料搬遷（**待咖哩執行**：跑 `遷移過夜車輛資料到Supabase()`，`核對過夜車輛遷移結果()` 確認筆數）
+- [x] 階段1：建置（2026-08-28）
+- [x] 階段2：歷史資料搬遷（2026-08-28）。館內機車1667筆、館內汽車576筆、新莊停車場241筆，實際寫入Supabase共2484筆，`核對過夜車輛遷移結果()`確認一致。
+  - ⚠️ 踩坑記錄：遷移腳本一開始誤用 `SpreadsheetApp.getActiveSpreadsheet()`，但這支GAS專案是獨立腳本不是容器繫結腳本（跟施工單/物流不同），咖哩實測噴出 `Cannot read properties of null (reading 'getSheetByName')`。改用主檔案原本就在用的 `SpreadsheetApp.openById(SPREADSHEET_ID)` 後重跑成功。
 - [ ] 階段3：換讀＋失敗備援（查詢功能）（**待咖哩驗證**：貼上新版四支.gs檔＋新版本部署後，跑 `比對searchVehicleLogs()`／`測試searchVehicleLogs效能()`）
 - [ ] 階段4：換寫（雙寫）（**待咖哩驗證**：實際登記一筆＋修正一筆車牌，確認 Supabase 與 Sheets 兩邊一致）
 - [ ] 階段5：寄信換讀＋失敗備援（**待咖哩驗證**：跑 `比對每日寄信統計資料()`，再跑 `testDailySummary()` 收信確認內容正常）
