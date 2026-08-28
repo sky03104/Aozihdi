@@ -332,7 +332,7 @@ const NODES = [
   { id: 35, title: 'SessionStart Hook', topic: 'infra', pos: [0.4025, -2.1468, 1.1435], note: '.claude/settings.json：OBSIDIAN_VAULT_PATH + load_vault_context.py；只在 cwd 進入 vault 目錄才注入 _CLAUDE.md，不影響其他 session' },
 
   // ── 東海／後端 GAS ──
-  { id: 36, title: '車牌辨識 GAS', topic: 'backend', pos: [1.4062, 1.7406, 0.9428], note: '車牌辨識_後端_GAS.gs（獨立部署）；recognizePlate Gemini Vision 辨識＋台灣車牌格式正規化、vehicleReg 寫車輛登記試算表 1K46ZEq…（含2分鐘去重＋empId驗證）；Key 存指令碼屬性；每日 08:00 自動寄晚班登記摘要 email（SUMMARY_EMAILS）。2026-07-30 新增：白名單設定/特殊車輛/長期停放紀錄 3個分頁＋getPlateWhitelist/savePlateWhitelist action，vehicleReg命中白名單額外寫特殊車輛，同地點連續2天以上即時偵測寫長期停放紀錄' },
+  { id: 36, title: '車牌辨識 GAS', topic: 'backend', pos: [1.4062, 1.7406, 0.9428], note: '車牌辨識_後端_GAS.gs（獨立腳本，非容器繫結，全部用openById開表）；recognizePlate Gemini Vision 辨識＋台灣車牌格式正規化、vehicleReg 寫車輛登記試算表 1K46ZEq…（含2分鐘去重＋empId驗證）；Key 存指令碼屬性；每日 08:00 自動寄晚班登記摘要 email（SUMMARY_EMAILS）。2026-07-30 新增：白名單設定/特殊車輛/長期停放紀錄 3個分頁＋getPlateWhitelist/savePlateWhitelist action，vehicleReg命中白名單額外寫特殊車輛，同地點連續2天以上即時偵測寫長期停放紀錄。2026-08-28 SQL遷移：新增searchVehicleLogs（tool_signin.html右上角查詢按鈕）；vehicleReg/updatePlate雙寫Supabase(id85)+Sheets，searchVehicleLogs/sendDailySummary優先讀Supabase失敗自動退回讀Sheets——跟施工單/打烊開店/物流不同，這支工具的Sheets是永久保留的備援，不是過渡期設計，因為寄信是稽核用途不能寄不出去' },
 
   // ── 前端工具（直立雙圈環繞核心） ──
   { id: 37, title: '物流車輛統計', topic: 'tools', pos: [2.5895, -0.52, -1.495], note: 'tool_logistics.html 獨立檔（iframe src）；三分類(1.9噸/3.5噸/8噸以上)登記＋快捷一鍵送出＋單日查詢＋整月統計；可修改/刪除；全員開放(id18)，快捷管理限 admin（2026-07-15 咖哩要求外圈工具節點整體拉開1.3倍間距）' },
@@ -533,7 +533,7 @@ const EDGES = [
   // 無線電管理：主控台→工具（獨立GAS與試算表）；每個 action 打回主 App 登入系統驗 token+角色
   [0, 142], [142, 1],
   // Supabase SQL遷移：施工單/班表歷史/打烊開店/物流四個工具陸續接上同一個Supabase專案(id85)
-  [11, 47], [47, 68], [85, 68], [85, 46], [85, 20], [85, 15], [85, 18], [85, 19], [85, 38], [85, 39],
+  [11, 47], [47, 68], [85, 68], [85, 46], [85, 20], [85, 15], [85, 18], [85, 19], [85, 38], [85, 39], [85, 36],
 ];
 
 // === BRAIN_MAP_DATA_END ===
