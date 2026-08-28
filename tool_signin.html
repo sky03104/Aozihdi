@@ -143,6 +143,12 @@ function logWorkflow(tool,actionType,status){
     .sq-mode-btn{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#8A95A8;border-radius:8px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
     .sq-mode-btn.active{background:rgba(212,168,0,.15);border-color:rgba(212,168,0,.4);color:#FFD700}
     .sq-summary{font-size:12px;color:#8A95A8;margin-bottom:10px}
+    /* ── 查詢欄位加強可視性（2026-08-28，第一次使用的人反應原本欄位太不明顯）── */
+    .sq-field-label{font-size:12px;color:#FFD700;font-weight:700;margin:2px 0 4px;letter-spacing:.5px}
+    .sq-field{background:rgba(255,215,0,.06)!important;border:1.5px solid rgba(212,168,0,.45)!important;color:#F5F5F5!important;box-shadow:0 0 0 1px rgba(212,168,0,.08) inset}
+    .sq-field:focus{border-color:#FFD700!important;background:rgba(255,215,0,.1)!important}
+    /* iOS/Android 原生 date/select 外觀太淡，強制拉高對比 */
+    .sq-field::-webkit-calendar-picker-indicator{filter:invert(80%) sepia(60%) saturate(400%) hue-rotate(1deg)}
     .sq-item-time{font-size:11px;color:#6B7280;width:88px;flex-shrink:0}
     .sq-item-plate{font-size:15px;font-weight:800;letter-spacing:1px;flex:1}
     .sq-item-op{font-size:11px;color:#8A95A8;flex-shrink:0}
@@ -296,9 +302,12 @@ function logWorkflow(tool,actionType,status){
       <button class="sq-mode-btn active" id="sqModeDate" onclick="setSearchMode('date')"><i class="ti ti-calendar"></i> 依日期</button>
       <button class="sq-mode-btn" id="sqModePlate" onclick="setSearchMode('plate')"><i class="ti ti-license"></i> 依車牌</button>
     </div>
-    <input type="date" class="wl-input" id="sqDateInp" style="display:block"/>
-    <input type="text" class="wl-input plate" id="sqKeywordInp" placeholder="車牌關鍵字，例如 5205" autocomplete="off" oninput="this.value=this.value.toUpperCase()" style="display:none"/>
-    <select class="wl-select" id="sqTypeInp">
+    <div class="sq-field-label" id="sqDateLbl">📅 查詢日期</div>
+    <input type="date" class="wl-input sq-field" id="sqDateInp" style="display:block"/>
+    <div class="sq-field-label" id="sqKeywordLbl" style="display:none">🚗 車牌關鍵字</div>
+    <input type="text" class="wl-input plate sq-field" id="sqKeywordInp" placeholder="輸入車牌數字或英文，例如 5205" autocomplete="off" oninput="this.value=this.value.toUpperCase()" style="display:none"/>
+    <div class="sq-field-label">篩選類型（可不選，預設查全部）</div>
+    <select class="wl-select sq-field" id="sqTypeInp">
       <option value="">全部類型</option>
       <option value="館內機車">館內機車</option>
       <option value="館內汽車">館內汽車</option>
@@ -503,7 +512,9 @@ function setSearchMode(mode){
   document.getElementById('sqModeDate').classList.toggle('active',mode==='date');
   document.getElementById('sqModePlate').classList.toggle('active',mode==='plate');
   document.getElementById('sqDateInp').style.display=mode==='date'?'block':'none';
+  document.getElementById('sqDateLbl').style.display=mode==='date'?'block':'none';
   document.getElementById('sqKeywordInp').style.display=mode==='plate'?'block':'none';
+  document.getElementById('sqKeywordLbl').style.display=mode==='plate'?'block':'none';
 }
 function runSearch(){
   var body={action:'searchVehicleLogs',mode:sqMode,typeLabel:document.getElementById('sqTypeInp').value};
