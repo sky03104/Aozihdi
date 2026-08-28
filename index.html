@@ -71,7 +71,7 @@ const REPORT_GAS_URL      = 'https://script.google.com/macros/s/AKfycbwHXlwTMmJy
 // 任何工具（index.html或任一tool_*.html）的前端有改動 → 整數+1；
 // 任何工具的後端（內嵌GAS_CODE或獨立.gs檔）有改動 → 小數+1。
 // 純視覺標示，方便比對現場看到的是不是最新版本，改完任何工具記得同步更新這裡。
-const APP_VERSION = '10.1';
+const APP_VERSION = '11.2';
 
 // PWA版本自動偵測（2026-08-27新增）：定期重新抓index.html比對APP_VERSION，
 // 版本不同就跳提示讓使用者自己按更新，不強制自動重整（避免打字打到一半被reload）
@@ -909,7 +909,7 @@ function ok(obj) {
         const [selSt, setSelSt] = useState(null);
         const [editC, setEditC] = useState(null);
         const [stMod, setStMod] = useState(null);
-        const [stFrm, setStFrm] = useState({ name: "", role: "staff", shift: "晚班" });
+        const [stFrm, setStFrm] = useState({ name: "", role: "staff", shift: "晚班", empId: "" });
         const [cfm, setCfm] = useState(null);
         const [asUrl, setAsUrl] = useState("https://script.google.com/macros/s/AKfycbzs56InZLeaHiRJhy1alNfQwDyH0mXEV9t_WJxzfjTjIhf68DHgMiWVQvVG6vKrRZ2x1w/exec");
         const [syncS, setSyncS] = useState("idle");
@@ -931,7 +931,7 @@ function ok(obj) {
             setSyncS("syncing");
             try {
                 const p = { action: "updateSchedule", shift: curShift, month: M, year: Y,
-                    data: sf.map(s => ({ name: s.name, roleStr: ROLES[s.role] || '保全', shifts: Array.from({ length: DAYS }, (_, i) => { var _a; return ((_a = sc[s.id]) === null || _a === void 0 ? void 0 : _a[i + 1]) || '-'; }) })) };
+                    data: sf.map(s => ({ name: s.name, roleStr: ROLES[s.role] || '保全', empId: s.empId || '', shifts: Array.from({ length: DAYS }, (_, i) => { var _a; return ((_a = sc[s.id]) === null || _a === void 0 ? void 0 : _a[i + 1]) || '-'; }) })) };
                 await fetch(asUrl, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
                 setSyncS("ok");
                 setTimeout(() => setSyncS("idle"), 3000);
@@ -992,15 +992,16 @@ function ok(obj) {
                     // 該筆資料是從 shKey 那份線上班表讀到的，所在班表分頁才是「班別」唯一依據，
                     // 每次同步都以此校正 shift，避免舊快取殘留的錯誤班別一直不會自動修正
                     const shiftHere = shKey === 'morning' ? '早班' : '晚班';
+                    const empId = String(row.empId || '').trim();
                     if (!m) {
                         const id = ++_nid;
-                        m = { id: id, name: name, role: role, shift: shiftHere };
+                        m = { id: id, name: name, role: role, shift: shiftHere, empId: empId };
                         nStaff.push(m);
                         nSc[m.id] = {};
                     }
                     else {
                         const i2 = nStaff.findIndex(s => s.id === m.id);
-                        nStaff[i2] = { ...nStaff[i2], role: role, shift: shiftHere };
+                        nStaff[i2] = { ...nStaff[i2], role: role, shift: shiftHere, empId: empId };
                     }
                     nSc[m.id] = { ...nSc[m.id], ...shifts };
                     cnt++;
@@ -1198,7 +1199,7 @@ function ok(obj) {
             }
             if (stMod === "add") {
                 const id = ++_nid;
-                const ns = { id, name: stFrm.name.trim(), role: stFrm.role, shift: stFrm.shift };
+                const ns = { id, name: stFrm.name.trim(), role: stFrm.role, shift: stFrm.shift, empId: (stFrm.empId || '').trim() };
                 const nStaff = [...staff, ns];
                 const nSc = { ...sched };
                 nSc[id] = {};
@@ -1612,7 +1613,7 @@ function ok(obj) {
             return (React.createElement("div", { style: { padding: "13px 13px" } },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } },
                     React.createElement("span", { style: { fontSize: 15, fontWeight: 900, color: C.text } }, "\u54E1\u5DE5\u7BA1\u7406"),
-                    React.createElement("button", { style: { ...gBtn, padding: "8px 14px", fontSize: 13 }, onClick: () => { setStFrm({ name: "", role: "staff", shift: "晚班" }); setStMod("add"); } }, "\uFF0B \u65B0\u589E\u54E1\u5DE5")),
+                    React.createElement("button", { style: { ...gBtn, padding: "8px 14px", fontSize: 13 }, onClick: () => { setStFrm({ name: "", role: "staff", shift: "晚班", empId: "" }); setStMod("add"); } }, "\uFF0B \u65B0\u589E\u54E1\u5DE5")),
                 ["早班", "晚班"].filter(sg => curShift === 'all' || sg === (curShift === 'morning' ? '早班' : '晚班')).map(sg => (React.createElement("div", { key: sg, style: { marginBottom: 18 } },
                     React.createElement("div", { style: { fontSize: 11, color: C.gold, letterSpacing: 2, marginBottom: 8, padding: "6px 12px", background: "rgba(212,168,0,0.07)", borderRadius: 7, border: "1px solid rgba(212,168,0,0.2)", fontWeight: 700 } },
                         sg,
@@ -1626,7 +1627,7 @@ function ok(obj) {
                                 React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.text } }, s.name),
                                 React.createElement("div", { style: { fontSize: 11, color: C.textMute } }, ROLES[s.role]))),
                         React.createElement("div", { style: { display: "flex", gap: 8 } },
-                            React.createElement("button", { style: { ...gHost, padding: "6px 12px", fontSize: 12 }, onClick: () => { setStFrm({ name: s.name, role: s.role, shift: s.shift }); setStMod(s); } }, "\u4FEE\u6539"),
+                            React.createElement("button", { style: { ...gHost, padding: "6px 12px", fontSize: 12 }, onClick: () => { setStFrm({ name: s.name, role: s.role, shift: s.shift, empId: s.empId || "" }); setStMod(s); } }, "\u4FEE\u6539"),
                             React.createElement("button", { style: { ...dBtn, padding: "6px 12px", fontSize: 12 }, onClick: () => delSt(s) }, "\u522A\u9664"))))))))));
         }
         /* ── UploadView ── */
@@ -1785,6 +1786,9 @@ function ok(obj) {
                     React.createElement("div", { style: { marginBottom: 12 } },
                         React.createElement("label", { style: { display: "block", fontSize: 11, color: C.textDim, marginBottom: 5 } }, "\u59D3\u540D"),
                         React.createElement("input", { style: S.input, value: stFrm.name, onChange: e => setStFrm(p => ({ ...p, name: e.target.value })), placeholder: "\u8F38\u5165\u59D3\u540D" })),
+                    React.createElement("div", { style: { marginBottom: 12 } },
+                        React.createElement("label", { style: { display: "block", fontSize: 11, color: C.textDim, marginBottom: 5 } }, "\u5DE5\u865F\uFF08\u9078\u586B\uFF0C2026-08-28\u65B0\u589E\uFF1A\u4E4B\u5F8C\u8981\u8DDF\u5E33\u865F\u7CFB\u7D71\u5C0D\u61C9\u6703\u7528\u5230\uFF09"),
+                        React.createElement("input", { style: S.input, value: stFrm.empId || "", onChange: e => setStFrm(p => ({ ...p, empId: e.target.value })), placeholder: "\u8F38\u5165\u5DE5\u865F" })),
                     React.createElement("div", { style: { marginBottom: 12 } },
                         React.createElement("label", { style: { display: "block", fontSize: 11, color: C.textDim, marginBottom: 5 } }, "\u73ED\u5225"),
                         React.createElement("div", { style: { display: "flex", gap: 8 } }, ["早班", "晚班"].map(sg => React.createElement("button", { key: sg, style: { ...stFrm.shift === sg ? gBtn : gHost, flex: 1, padding: "10px", fontSize: 13 }, onClick: () => setStFrm(p => ({ ...p, shift: sg })) }, sg)))),

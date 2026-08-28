@@ -445,6 +445,10 @@ function 讀班表分頁_(sh) {
   var rng = sh.getRange('A4:AG30');
   var data = rng.getValues();
   var colors = rng.getFontColors();
+  // 2026-08-28新增：AH欄存工號，供之後跟帳號系統比對用（第一步只加欄位，
+  // 還沒接自動查帳號的邏輯）。獨立讀取不動A4:AG30既有範圍，避免影響
+  // 其他依賴這個固定範圍的備份/複製邏輯。
+  var empIds = sh.getRange('AH4:AH30').getValues();
   var rows = [];
   for (var r = 0; r < data.length; r++) {
     var name = String(data[r][1] || '').trim();
@@ -458,7 +462,7 @@ function 讀班表分頁_(sh) {
       }
       shifts.push(v);
     }
-    rows.push({ roleStr: String(data[r][0] || '').trim(), name: name, shifts: shifts });
+    rows.push({ roleStr: String(data[r][0] || '').trim(), name: name, shifts: shifts, empId: String(empIds[r][0] || '').trim() });
   }
   return rows;
 }
@@ -741,6 +745,12 @@ function handleUpdateSchedule(payload) {
         grid[targetRow][0] = roleStr || '保全';
         grid[targetRow][1] = nm;
       }
+      // 2026-08-28新增：工號寫入AH欄。只在有帶值時才寫，沒帶（例如舊版前端還沒
+      // 更新）就不動既有儲存格，避免把手動填過的工號覆蓋成空白。
+      var empId = String(list[i].empId || '').trim();
+      if (empId) {
+        sh.getRange(4 + targetRow, 34).setValue(empId);
+      }
 
       var shifts = list[i].shifts || [];
       var n = Math.min(shifts.length, 31);
@@ -813,7 +823,7 @@ function handleDeleteStaff(payload) {
     }
     if (targetRow === -1) return respond({ success: true, deleted: false });
 
-    var rng = sh.getRange(4 + targetRow, 1, 1, 33); // A~AG 整列清空
+    var rng = sh.getRange(4 + targetRow, 1, 1, 34); // A~AH 整列清空（2026-08-28：多納入AH工號欄，避免刪除後留下孤兒工號）
     rng.setValue('');
     rng.setFontColor('#000000');
     SpreadsheetApp.flush();
