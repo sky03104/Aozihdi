@@ -558,16 +558,9 @@ function renderSearchResults(rows,truncated){
   }).join('');
 }
 
-// 把目前查詢結果截成一張圖，優先用系統分享面板（PWA可直接選LINE分享），
-// 不支援分享檔案時退回開新分頁讓使用者自己長按儲存（同tool_logistics.html的做法）
-async function exportSearchScreenshot(){
-  if(!sqLastRows.length){showToast('⚠️ 沒有可匯出的查詢結果');return;}
-  var btn=document.getElementById('sqShareBtn');
-  var oldText=btn.innerHTML;
-  btn.innerHTML='⏳ 產生截圖中…';
-  btn.disabled=true;
-
-  var rowsHtml=sqLastRows.map(function(r){
+// 把一組（單一類型）的查詢結果渲染成圖片Blob，供exportSearchScreenshot分類型呼叫
+function renderVehicleRowsToBlob(rows,titleSuffix){
+  var rowsHtml=rows.map(function(r){
     return '<tr><td>'+escHtml(r.time)+'</td><td>'+escHtml(r.type)+'</td>'+
       '<td style="font-weight:800;letter-spacing:1px;">'+escHtml(r.plate)+'</td><td>'+escHtml(r.operator)+'</td></tr>';
   }).join('');
@@ -575,9 +568,9 @@ async function exportSearchScreenshot(){
   var capture=document.createElement('div');
   capture.style.cssText='position:fixed;left:-9999px;top:0;width:420px;background:#fff;color:#1a1a1a;padding:20px;font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;';
   capture.innerHTML=
-    '<div style="text-align:center;font-size:20px;font-weight:900;margin-bottom:4px;">天鷹保全・過夜車輛查詢紀錄</div>'+
+    '<div style="text-align:center;font-size:20px;font-weight:900;margin-bottom:4px;">天鷹保全・過夜車輛查詢紀錄'+(titleSuffix?'・'+escHtml(titleSuffix):'')+'</div>'+
     '<div style="text-align:center;font-size:13px;color:#555;margin-bottom:4px;">'+escHtml(sqLastQueryLabel)+'</div>'+
-    '<div style="text-align:center;font-size:13px;color:#555;margin-bottom:14px;">共 '+sqLastRows.length+' 筆</div>'+
+    '<div style="text-align:center;font-size:13px;color:#555;margin-bottom:14px;">共 '+rows.length+' 筆</div>'+
     '<table class="sqtable"><tr><th>時間</th><th>類型</th><th>車牌</th><th>登記人</th></tr>'+rowsHtml+'</table>';
   var style=document.createElement('style');
   style.textContent='table.sqtable{width:100%;border-collapse:collapse;font-size:12px;}'
@@ -586,32 +579,66 @@ async function exportSearchScreenshot(){
   capture.appendChild(style);
   document.body.appendChild(capture);
 
-  try{
-    var canvas=await html2canvas(capture,{backgroundColor:'#ffffff',scale:2});
+  return html2canvas(capture,{backgroundColor:'#ffffff',scale:2}).then(function(canvas){
     document.body.removeChild(capture);
-
-    canvas.toBlob(async function(blob){
-      btn.innerHTML=oldText;
-      btn.disabled=false;
-      if(!blob){showToast('截圖產生失敗');return;}
-      var fileName='過夜車輛查詢紀錄.png';
-      var file=new File([blob],fileName,{type:'image/png'});
-
-      if(navigator.canShare && navigator.canShare({files:[file]})){
-        try{
-          await navigator.share({files:[file],title:'過夜車輛查詢紀錄',text:sqLastQueryLabel});
-          return;
-        }catch(shareErr){
-          if(shareErr && shareErr.name==='AbortError')return; // 使用者自己取消分享，不用提示錯誤
-        }
-      }
-      // 不支援分享或分享失敗：開新分頁顯示圖片，手機可長按「儲存圖片」再自行傳LINE
-      var url=URL.createObjectURL(blob);
-      window.open(url,'_blank');
-      showToast('已開啟截圖，長按圖片可儲存後傳送');
-    },'image/png');
-  }catch(err){
+    return new Promise(function(resolve){canvas.toBlob(resolve,'image/png');});
+  }).catch(function(err){
     if(capture.parentNode)document.body.removeChild(capture);
+    throw err;
+  });
+}
+
+// 把目前查詢結果截成圖片，優先用系統分享面板（PWA可直接選LINE分享）。
+// 2026-08-28咖哩要求：查「全部類型」時橫跨多種類型的話，拆成一個類型一張圖
+// （比全部塞同一張表格清楚，主管收到LINE時容易分開看）；只有單一類型時維持一張圖。
+async function exportSearchScreenshot(){
+  if(!sqLastRows.length){showToast('⚠️ 沒有可匯出的查詢結果');return;}
+  var btn=document.getElementById('sqShareBtn');
+  var oldText=btn.innerHTML;
+  btn.innerHTML='⏳ 產生截圖中…';
+  btn.disabled=true;
+
+  var groups={};
+  var order=[];
+  sqLastRows.forEach(function(r){
+    if(!groups[r.type]){groups[r.type]=[];order.push(r.type);}
+    groups[r.type].push(r);
+  });
+  var multi=order.length>1;
+
+  try{
+    var files=[];
+    for(var i=0;i<order.length;i++){
+      var t=order[i];
+      var blob=await renderVehicleRowsToBlob(groups[t],multi?t:'');
+      if(!blob)continue;
+      var fileName=multi?('過夜車輛查詢紀錄_'+t+'.png'):'過夜車輛查詢紀錄.png';
+      files.push(new File([blob],fileName,{type:'image/png'}));
+    }
+    btn.innerHTML=oldText;
+    btn.disabled=false;
+    if(!files.length){showToast('截圖產生失敗');return;}
+
+    if(navigator.canShare && navigator.canShare({files:files})){
+      try{
+        await navigator.share({files:files,title:'過夜車輛查詢紀錄',text:sqLastQueryLabel});
+        return;
+      }catch(shareErr){
+        if(shareErr && shareErr.name==='AbortError')return; // 使用者自己取消分享，不用提示錯誤
+      }
+    }
+    // 不支援分享或分享失敗：開一個分頁把所有圖片依序列出，手機可逐張長按「儲存圖片」再自行傳LINE
+    var urls=files.map(function(f){return URL.createObjectURL(f);});
+    var w=window.open('','_blank');
+    if(w){
+      w.document.write('<title>過夜車輛查詢紀錄截圖</title><body style="background:#111;margin:0;padding:16px;">'+
+        urls.map(function(u){return '<img src="'+u+'" style="width:100%;max-width:420px;display:block;margin:0 auto 16px;border-radius:8px;">';}).join('')+
+        '</body>');
+      showToast(files.length>1?('已開啟'+files.length+'張截圖，長按各張圖片可分別儲存'):'已開啟截圖，長按圖片可儲存後傳送');
+    }else{
+      showToast('瀏覽器擋住彈出視窗，請允許彈出視窗後再試一次');
+    }
+  }catch(err){
     btn.innerHTML=oldText;
     btn.disabled=false;
     showToast('⚠️ 截圖失敗：'+(err&&err.message?err.message:err));
