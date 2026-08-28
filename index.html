@@ -71,7 +71,7 @@ const REPORT_GAS_URL      = 'https://script.google.com/macros/s/AKfycbwHXlwTMmJy
 // 任何工具（index.html或任一tool_*.html）的前端有改動 → 整數+1；
 // 任何工具的後端（內嵌GAS_CODE或獨立.gs檔）有改動 → 小數+1。
 // 純視覺標示，方便比對現場看到的是不是最新版本，改完任何工具記得同步更新這裡。
-const APP_VERSION = '16.4';
+const APP_VERSION = '17.5';
 
 // PWA版本自動偵測（2026-08-27新增）：定期重新抓index.html比對APP_VERSION，
 // 版本不同就跳提示讓使用者自己按更新，不強制自動重整（避免打字打到一半被reload）
@@ -999,6 +999,28 @@ function ok(obj) {
                     body: JSON.stringify({ action: "updateStaffEmpIds", list: Object.entries(map).map(([name, empId]) => ({ name, empId })) }) });
             } catch (e) { /* 離線：本機已更新，待下次連線時人工確認 */ }
         };
+        /* 2026-08-28新增：新增/修改單一員工時改用這兩支，不要再呼叫syncStaffEmpIds
+           整批覆寫——早班/晚班畫面各自只載入自己那班的staff（既有設計），如果拿
+           「目前畫面上的staff」整批覆寫這份早晚班共用的對照表，會把另一班的資料
+           洗掉（咖哩實機測試發現：早班畫面存檔，晚班的工號資料整批消失）。 */
+        const upsertStaffEmpId = async (name, empId) => {
+            staffEmpIdMapRef.current = { ...staffEmpIdMapRef.current, [name]: empId || '' };
+            if (!asUrl) return;
+            try {
+                await fetch(asUrl, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "upsertStaffEmpId", name, empId: empId || '' }) });
+            } catch (e) { /* 離線：本機已更新，待下次連線時人工確認 */ }
+        };
+        const deleteStaffEmpIdRemote = async (name) => {
+            const next = { ...staffEmpIdMapRef.current };
+            delete next[name];
+            staffEmpIdMapRef.current = next;
+            if (!asUrl) return;
+            try {
+                await fetch(asUrl, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "deleteStaffEmpId", name }) });
+            } catch (e) { /* 離線：本機已更新，待下次連線時人工確認 */ }
+        };
         /* 職務修正不能用 sync()（它讀 curShift，合併「案場班表」檢視時 curShift==='all'
            會直接跳過不寫），改成不依賴 curShift、依指定 shiftKey 寫回對應那份試算表。 */
         const pushRoleCorrections_ = async (shiftKey, list, schedMap) => {
@@ -1306,14 +1328,14 @@ function ok(obj) {
                 setSched(nSc);
                 T(`新增：${ns.name}`);
                 if (asUrl) sync(nSc, nStaff);
-                syncStaffEmpIds(nStaff);
+                upsertStaffEmpId(ns.name, ns.empId);
             }
             else {
                 const nStaff = staff.map(s => s.id === stMod.id ? { ...s, ...stFrm, role: effRole, name: stFrm.name.trim() } : s);
                 setStaff(nStaff);
                 T(`已修改：${stFrm.name.trim()}`);
                 if (asUrl) sync(sched, nStaff);
-                syncStaffEmpIds(nStaff);
+                upsertStaffEmpId(stFrm.name.trim(), empIdTrim);
             }
             setStMod(null);
         }
@@ -1333,7 +1355,7 @@ function ok(obj) {
                 T(`已刪除：${s.name}`, "err");
                 setStMod(null);
                 syncDeleteStaff(s.name);
-                syncStaffEmpIds(nStaff);
+                deleteStaffEmpIdRemote(s.name);
             });
         }
         // 從 ZIP 取出指定檔案內容（瀏覽器原生 DecompressionStream）

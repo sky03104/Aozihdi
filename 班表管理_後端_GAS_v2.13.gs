@@ -104,6 +104,10 @@ function doPost(e) {
       return handleDeleteStaff(payload);
     } else if (action === 'updateStaffEmpIds') {
       return updateStaffEmpIds_(payload);
+    } else if (action === 'upsertStaffEmpId') {
+      return upsertStaffEmpId_(payload);
+    } else if (action === 'deleteStaffEmpId') {
+      return deleteStaffEmpId_(payload);
     }
 
     throw new Error('未知的 action');
@@ -921,6 +925,61 @@ function updateStaffEmpIds_(payload) {
       rows.push([nm, eid ? "'" + eid : '']);
     }
     sh.getRange(1, 1, rows.length, 2).setValues(rows);
+  } finally {
+    lock.releaseLock();
+  }
+  return respond({ success: true });
+}
+
+// 2026-08-28新增：只新增/更新單一員工的工號，不動其他人的資料。
+// 背景：早班/晚班畫面各自只載入自己那班的員工清單（既有設計），如果修改單一
+// 員工時沿用 updateStaffEmpIds_ 的「整批覆寫」寫法，在早班畫面存檔會把晚班
+// 員工的工號資料整批洗掉（反之亦然，咖哩實機測試發現）。這份對照表早晚班
+// 共用同一份，一定要用「只改這一筆」的寫法，不能整批覆寫。
+function upsertStaffEmpId_(payload) {
+  var nm = String((payload && payload.name) || '').trim();
+  if (!nm) return respond({ success: false, error: '缺少姓名' });
+  var eid = String((payload && payload.empId) || '').trim();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var ss = SpreadsheetApp.openById(SHIFT_CONFIG.night.targetSsId);
+    var sh = ss.getSheetByName(員工工號分頁名稱_);
+    if (!sh) { sh = ss.insertSheet(員工工號分頁名稱_); sh.appendRow(['姓名', '工號']); }
+    var lastRow = sh.getLastRow();
+    var targetRow = -1;
+    if (lastRow >= 2) {
+      var names = sh.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (var i = 0; i < names.length; i++) {
+        if (String(names[i][0] || '').trim() === nm) { targetRow = i + 2; break; }
+      }
+    }
+    var val = eid ? "'" + eid : '';
+    if (targetRow === -1) sh.appendRow([nm, val]);
+    else sh.getRange(targetRow, 2).setValue(val);
+  } finally {
+    lock.releaseLock();
+  }
+  return respond({ success: true });
+}
+
+// 2026-08-28新增：刪除單一員工的工號那一列，同理不動其他人。
+function deleteStaffEmpId_(payload) {
+  var nm = String((payload && payload.name) || '').trim();
+  if (!nm) return respond({ success: false, error: '缺少姓名' });
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var ss = SpreadsheetApp.openById(SHIFT_CONFIG.night.targetSsId);
+    var sh = ss.getSheetByName(員工工號分頁名稱_);
+    if (!sh) return respond({ success: true, deleted: false });
+    var lastRow = sh.getLastRow();
+    for (var i = lastRow; i >= 2; i--) {
+      if (String(sh.getRange(i, 1).getValue() || '').trim() === nm) {
+        sh.deleteRow(i);
+        break;
+      }
+    }
   } finally {
     lock.releaseLock();
   }
