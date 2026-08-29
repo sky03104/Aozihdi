@@ -148,6 +148,16 @@ create table staff_emp_ids (
       現在保留不動並在程式碼加註記。`node --check` 語法驗證通過。**待咖哩手動操作**：這支
       獨立 GAS 部署要另外設 Script Properties（`SUPABASE_URL`=凹子底專案、
       `SUPABASE_SECRET_KEY`），部署後先跑幾天觀察互動查詢有沒有問題）
-- [ ] 階段5：自動排哨工具改讀凹子底專案
+- [x] 階段5：自動排哨工具改讀凹子底專案（2026-08-29 完成——`哨表產生_GAS.gs` 的
+      `getEmployeeNames()`／`getMonthlyRoster()` 改成 Supabase 優先（獨立的
+      `guardSupabaseRequest_` 連線，跟 LINE小助手/班表管理各自獨立 Script Properties），
+      任一步驟失敗自動退回原本讀 Sheets 的邏輯（`getEmployeeNamesFromSheets_`／
+      `getMonthlyRosterFromSheets_`，程式碼原封不動搬過去，行為完全不變）。
+      刻意**不驗證**請求的 year/month 是否跟目前 live 版本相符（沿用原本 Sheets 版就沒做
+      這個檢查的既有行為，不在這次修改範圍內）。`node --check` 通過。**這個 repo 裡沒找到
+      CLAUDE.md 提到的 ~60 項 node 測試檔**（大概率在自動分配演算法那層，屬於
+      `tool_guard_gen.html` 前端邏輯或另一個沒同步進來的檔案），**待咖哩部署後手動確認
+      這些測試還過、且實際排一次哨表結果跟改版前一致**。**待咖哩手動操作**：獨立部署，
+      Script Properties 設 `SUPABASE_URL`（凹子底專案）＋`SUPABASE_SECRET_KEY`）
 - [ ] 階段6：會計月彙整表鏡像推播（待與咖哩確認新版面）
 - [ ] 階段7：切斷 Sheets 寫入
