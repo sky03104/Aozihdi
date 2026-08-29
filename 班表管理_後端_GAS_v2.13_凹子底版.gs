@@ -5,7 +5,7 @@
 //
 // 版本：2.16 新增（2026-08-27，效能優化+補同步缺口）：
 //   - getSchedule 加一層1小時短時間快取（CacheService，定義於
-//     班表管理_SQL讀取層.gs的getScheduleData_含快取），緩解Apps Script平台
+//     班表管理_SQL讀取層_凹子底版.gs的getScheduleData_含快取），緩解Apps Script平台
 //     本身每次冷啟動+重新打開試算表的開銷（跟讀哪個資料庫無關，無法完全消除，
 //     只能降低被觸發的頻率）。
 //   - handleUpdate/checkAndSwitchMonth_ 寫入成功後主動清除對應快取，不用等
@@ -23,7 +23,7 @@
 //     查歷史月份，Sheets備份分頁機制已停用，未來月份只有Supabase有資料。
 // 版本：2.14 新增（2026-08-27，SQL遷移階段3+5）：
 //   - handleUpdate、checkAndSwitchMonth_ 在 Sheets 寫入成功後，多呼叫一次
-//     同步目前線上班表到Supabase_()（定義於 班表管理_SQL讀取層.gs），把最新
+//     同步目前線上班表到Supabase_()（定義於 班表管理_SQL讀取層_凹子底版.gs），把最新
 //     線上班表同步一份到 Supabase，避免 SQL 那邊變成過時的死資料。
 //     ⚠️ Sheets 目前仍是唯一權威來源，同步失敗只記 log，不會擋住 Sheets 這邊
 //     原本的正常運作。
@@ -126,12 +126,12 @@ function doGet(e) {
     // v2.15：實測發現這支範圍固定很小（27列x33欄），Sheets本來就快（熱機後
     // 18~25ms），改讀Supabase反而每次都要多一段跨公司網路來回（實測750~800ms，
     // 不會變快）。改回優先讀Sheets，Supabase只當備援（讀取含備援_ 定義於
-    // 班表管理_SQL讀取層.gs）。getScheduleByMonth/listScheduleMonths維持
+    // 班表管理_SQL讀取層_凹子底版.gs）。getScheduleByMonth/listScheduleMonths維持
     // Supabase優先不變——那兩支查的是歷史月份，Sheets備份分頁機制已停用，
     // 未來月份只有Supabase有資料，沒有退路也不需要退路。
     // v2.16：真正拖慢的是Apps Script平台每次冷啟動＋重新打開試算表的開銷，
     // 跟讀哪個資料庫無關，加一層1小時短時間快取緩解（getScheduleData_含快取
-    // 定義於 班表管理_SQL讀取層.gs）。
+    // 定義於 班表管理_SQL讀取層_凹子底版.gs）。
     return getScheduleData_含快取(e);
   } else if (action === 'getScheduleByMonth') {
     return 讀取含備援_(e, getScheduleByMonth_SQL, getScheduleByMonth_, 'getScheduleByMonth');   // v2.13：指定月份（含歷史備份），請款工具用

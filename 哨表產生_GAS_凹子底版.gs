@@ -14,7 +14,7 @@
 var GUARD_SS_ID = '1sIcdAhw0mz5iM3F5fulDNPOda2pv-t7xUhT6XXf9X7Q';
 var POST_CONFIG_SHEET_NAME = '哨點設定';
 
-// 早/晚班月班表：與 天鷹保全APP_後端_GAS.gs 的 SCHEDULE_SHEETS_ 相同（獨立部署，各自維護一份常數）
+// 早/晚班月班表：與 天鷹保全APP_後端_GAS_凹子底版.gs 的 SCHEDULE_SHEETS_ 相同（獨立部署，各自維護一份常數）
 var SCHEDULE_SHEETS_ = {
   early: { id: '1l8SoOVDQ4nO6qBkXcNEaBzct6AN82-H_0njbKNQauUQ', sheetName: '早班班表' },
   late:  { id: '1hIbgESfLitqC3W9DuSFGMWEuFZKJFKzK8srorQMuia8', sheetName: '晚班班表' }

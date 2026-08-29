@@ -2135,7 +2135,7 @@ function readEmployeeShiftsFromSheet_(sh, name, dayCount) {
 // 保留不動，見上方）。跑穩幾天、確認沒問題後再考慮拿掉備援路徑。
 //
 // SCHEDULE_SHEETS_ 用 early/late，凹子底沙盒的 schedule_entries.shift_type
-// 用 morning/night，這裡做對應轉換（跟 班表管理_SQL遷移腳本.gs 的
+// 用 morning/night，這裡做對應轉換（跟 班表管理_SQL遷移腳本_凹子底版.gs 的
 // SHIFT_TYPE_MAP_ 是同一個資料庫，但 key 名稱不同，兩邊各自轉各自的）。
 // ════════════════════════════════════════════════════════════
 var LINE_SHIFT_TYPE_MAP_ = { early: 'morning', late: 'night' };

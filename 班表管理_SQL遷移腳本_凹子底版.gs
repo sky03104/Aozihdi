@@ -5,7 +5,7 @@
 //       _待生效 分頁，全部搬進 Supabase 的 schedule_versions / schedule_entries。
 //
 // ⚠️ 使用前置（缺一不可）：
-//   1. 這個檔案要跟 班表管理_後端_GAS_v2.13.gs 貼在「同一個」Apps Script 專案裡，
+//   1. 這個檔案要跟 班表管理_後端_GAS_v2.13_凹子底版.gs 貼在「同一個」Apps Script 專案裡，
 //      才能直接呼叫裡面已經寫好的 SHIFT_CONFIG / 讀班表分頁_ / resolveTargetSheet /
 //      備份分頁前綴_ 等函式，不重複寫一份解析邏輯（重複寫容易兩邊改到不一致）。
 //   2. 專案設定（左側齒輪圖示）→ Script Properties → 新增兩個屬性：

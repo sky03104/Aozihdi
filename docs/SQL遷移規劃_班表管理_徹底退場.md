@@ -26,7 +26,7 @@
 
 **凹子底是新案場，巨蛋是現在正在上線服務現場同事的案場，兩者絕不能互相影響：**
 
-- 這次改的 `天鷹保全APP_後端_GAS.gs`（LINE小助手）、`哨表產生_GAS.gs`（自動排哨）
+- 這次改的 `天鷹保全APP_後端_GAS_凹子底版.gs`（LINE小助手）、`哨表產生_GAS_凹子底版.gs`（自動排哨）
   雖然放在 Aozihdi repo，**程式碼裡的常數（`SCHEDULE_SHEETS_`／`POST_SHEET_ID` 等）
   其實還是指向巨蛋真正的試算表**——因為凹子底目前還沒有自己的資料來源，這次是
   **拿巨蛋的真實資料當試驗品**，驗證「SQL 化這條路走不走得通」，不是真的在幫
@@ -51,8 +51,8 @@
   **共用同一個 GAS 部署**（`SCH_WEBAPP_URL`），前端拖曳 Excel 上傳的 UX **不需要改**，
   只改後端這支 GAS 存資料的方式
 - 三個外部系統目前直接讀這兩份 Sheets，完全繞過 GAS：
-  1. LINE小助手（`天鷹保全APP_後端_GAS.gs`，獨立部署）
-  2. 自動排哨工具（`哨表產生_GAS.gs`，獨立部署，`tool_guard_gen.html` 呼叫）
+  1. LINE小助手（`天鷹保全APP_後端_GAS_凹子底版.gs`，獨立部署）
+  2. 自動排哨工具（`哨表產生_GAS_凹子底版.gs`，獨立部署，`tool_guard_gen.html` 呼叫）
   3. 會計月彙整表（外部人工維護試算表，純公式 IMPORTRANGE/XLOOKUP/CHOOSECOLS 讀班表）
 
 ## 這次的決定（咖哩已拍板）
@@ -150,7 +150,7 @@ create table staff_emp_ids (
 
 - [x] 階段1：凹子底專案建表 ＋ `docs/班表管理SQL建表.sql`（2026-08-29 完成——`schedule_versions`／`schedule_entries`／`shift_codes`／`staff_emp_ids` 四表已建，RLS 已開、不建 policy，只留 service_role 存取，比照現有工具的存取模式）
 - [x] 階段2：歷史資料從 Sheets 遷移進凹子底專案（2026-08-29 完成——直接從兩份 Google Sheets 讀取六份分頁：晚班班表/待生效/備份、早班班表/待生效/備份，寫入 `schedule_versions`(6筆)+`schedule_entries`(3730筆，逐版本核對筆數與 Sheets 來源完全一致：558/527/527/744/630/744)；`班別設定`分頁寫入`shift_codes`(4筆)；`員工工號對照`分頁寫入`staff_emp_ids`(42筆)）
-- [x] 階段3：`getSchedule`／`getScheduleByMonth` 改接凹子底專案＋快取重設計（2026-08-29 發現：這支程式碼因為 Aozihdi 是 tianying-security 的完整 clone，正式站早在 2026-08-27 v2.16 就已經做好一模一樣的設計——`doGet` 的 `getSchedule` 走 `getScheduleData_含快取`（1小時 CacheService，寫入時主動清快取）、`getScheduleByMonth`/`listScheduleMonths` 走 `讀取含備援_`（Supabase優先、Sheets備援），程式邏輯不用重寫。**唯一真的要修的 bug**：`班表管理_SQL遷移腳本.gs` 的 `SHIFT_TYPE_MAP_` 沿用正式站把 `morning` 對應成資料庫 `'day'`，但凹子底沙盒的 `schedule_entries.shift_type` check 限制是 `'night'/'morning'`（跟正式站不同的庫，不能照搬對應表），已改成 identity mapping 並修正註解。**待咖哩手動操作**：這幾支 `.gs` 檔要貼進一個獨立的 Apps Script 部署（不能跟正式站共用），Script Properties 設 `SUPABASE_URL=https://tjrlpthprtrlmugrofpj.supabase.co`＋對應的 legacy service_role key，部署後執行 `測試讀取效能()`/`比對讀取結果()` 驗證）
+- [x] 階段3：`getSchedule`／`getScheduleByMonth` 改接凹子底專案＋快取重設計（2026-08-29 發現：這支程式碼因為 Aozihdi 是 tianying-security 的完整 clone，正式站早在 2026-08-27 v2.16 就已經做好一模一樣的設計——`doGet` 的 `getSchedule` 走 `getScheduleData_含快取`（1小時 CacheService，寫入時主動清快取）、`getScheduleByMonth`/`listScheduleMonths` 走 `讀取含備援_`（Supabase優先、Sheets備援），程式邏輯不用重寫。**唯一真的要修的 bug**：`班表管理_SQL遷移腳本_凹子底版.gs` 的 `SHIFT_TYPE_MAP_` 沿用正式站把 `morning` 對應成資料庫 `'day'`，但凹子底沙盒的 `schedule_entries.shift_type` check 限制是 `'night'/'morning'`（跟正式站不同的庫，不能照搬對應表），已改成 identity mapping 並修正註解。**待咖哩手動操作**：這幾支 `.gs` 檔要貼進一個獨立的 Apps Script 部署（不能跟正式站共用），Script Properties 設 `SUPABASE_URL=https://tjrlpthprtrlmugrofpj.supabase.co`＋對應的 legacy service_role key，部署後執行 `測試讀取效能()`/`比對讀取結果()` 驗證）
 - [x] 階段4：LINE小助手改讀凹子底專案（2026-08-29 完成——原本以為範圍很大，實際查code發現
       LINE小助手真正碰班表資料的只有 `readEmployeeShiftsFromSheet_`／`getEmployeeShifts_`／
       `findEmployeeShiftsAuto_` 三支，只給互動查詢（今日/明日/本週/本月班表問答）用，都只讀
@@ -165,7 +165,7 @@ create table staff_emp_ids (
       現在保留不動並在程式碼加註記。`node --check` 語法驗證通過。**待咖哩手動操作**：這支
       獨立 GAS 部署要另外設 Script Properties（`SUPABASE_URL`=凹子底專案、
       `SUPABASE_SECRET_KEY`），部署後先跑幾天觀察互動查詢有沒有問題）
-- [x] 階段5：自動排哨工具改讀凹子底專案（2026-08-29 完成——`哨表產生_GAS.gs` 的
+- [x] 階段5：自動排哨工具改讀凹子底專案（2026-08-29 完成——`哨表產生_GAS_凹子底版.gs` 的
       `getEmployeeNames()`／`getMonthlyRoster()` 改成 Supabase 優先（獨立的
       `guardSupabaseRequest_` 連線，跟 LINE小助手/班表管理各自獨立 Script Properties），
       任一步驟失敗自動退回原本讀 Sheets 的邏輯（`getEmployeeNamesFromSheets_`／
@@ -178,7 +178,7 @@ create table staff_emp_ids (
       Script Properties 設 `SUPABASE_URL`（凹子底專案）＋`SUPABASE_SECRET_KEY`）
 - [x] 階段6：會計月彙整表鏡像推播（2026-08-29 咖哩已確認版面：沿用原本 A4:AG30
       「人×日矩陣」概念的簡化版，拿掉職務欄/星期列/月份表頭合併格/工時統計欄/代號
-      說明/檢核列。新增 `班表管理_SQL會計鏡像推播.gs`：`推播會計鏡像()` 從凹子底沙盒
+      說明/檢核列。新增 `班表管理_SQL會計鏡像推播_凹子底版.gs`：`推播會計鏡像()` 從凹子底沙盒
       抓兩班的 live 版本資料，整批重寫進會計試算表的「早班班表鏡像」/「晚班班表鏡像」
       分頁（A1=年月、B1:AF1=日期1~31、A欄起=姓名、之後每欄=當天代號），每日定時觸發
       （04:00，跟每日備份錯開時段）。`node --check` 通過。**⚠️ 待咖哩確認的事**：
