@@ -87,9 +87,25 @@ repo `sky03104/wei` 的 `feature/supabase-migration` 分支（已完整跑過
       申請帳號的密碼欄位前端還留著（UI 未同步拿掉），但已改成不會送
       進資料庫，屬於待补的 UI 一致性小問題，不影響功能。
       `node --check` 驗證 inline script 語法通過，HTML 標籤閉合正常。
-- [ ] **實測**：登入／改密碼／申請審核／toolPerms 權限矩陣／LINE 綁定，
-      跟正式站行為比對。**還沒在瀏覽器實測過**，admin-users Edge
-      Function 已部署，可以開始測「核准申請」／「重設密碼」流程了。
+- [x] **實測踩坑：遷移寫入 `auth.users` 漏了兩個欄位，全數 65 帳號都登不進去**
+      （2026-08-29）——第一次瀏覽器實測登入（`sky03104`）回「帳號或密碼錯誤」，
+      但直接用 SQL `extensions.crypt()` 比對密碼 hash 是對的，`resolve_empid_email()`
+      也正確回傳 email，追下去才發現是 GoTrue（Supabase Auth 底層）忽略掉的兩個
+      欄位：①`instance_id` 全部是 `null`，補成標準值全零 UUID
+      `00000000-0000-0000-0000-000000000000` 才會被 GoTrue 的使用者查詢比對到
+      （改完密碼錯誤變成 500，代表這關過了）；②`confirmation_token`／
+      `recovery_token`／`email_change_token_new`／`email_change`／
+      `email_change_token_current`／`phone_change`／`phone_change_token`／
+      `reauthentication_token` 這幾個 token 欄位是 `null`，但 GoTrue 的 Go
+      程式碼期待空字串 `''` 不是 `null`，掃到 `null` 直接 500（內部錯誤）。
+      兩處都用 `coalesce(欄位, 對應標準值)` 批次補到全部 65 個
+      `%@tianying.internal` 帳號，補完 `sky03104` 立刻登入成功。**用
+      `auth.admin.createUser()`（Edge Function 走這個 API）新建的帳號不會有
+      這個問題**——這是只有當初用 SQL `insert` 直接寫 `auth.users` 的舊資料
+      （Phase 4 遷移的 64 筆 + 手動建的測試筆）才會踩到的坑，記錄下來避免
+      以後又用同樣方式手動 insert 使用者資料到 `auth.users`。
+- [ ] **實測**：改密碼／申請審核／toolPerms 權限矩陣／LINE 綁定，
+      跟正式站行為比對。登入已確認可用，其餘流程還沒測。
 
 ## 密碼處理
 
