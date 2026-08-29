@@ -153,13 +153,18 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
       if (!profile) return json({ status: 'err', msg: '找不到此工號' }, 404);
 
-      const tempPassword = randomTempPassword();
+      // 前端「重設密碼」彈窗讓管理員自己打新密碼（或按「還原123」），
+      // 對照原本 GAS 版本可以指定任意新密碼的行為；沒帶 newPassword 才
+      // 隨機配一組（給批次遷移之類的情境用）。
+      const newPassword = (typeof body.newPassword === 'string' && body.newPassword.length >= 2)
+        ? body.newPassword
+        : randomTempPassword();
       const { error: updErr } = await admin.auth.admin.updateUserById(profile.id, {
-        password: tempPassword,
+        password: newPassword,
       });
       if (updErr) return json({ status: 'err', msg: '重設密碼失敗：' + updErr.message }, 500);
 
-      return json({ status: 'ok', empId, tempPassword });
+      return json({ status: 'ok', empId, tempPassword: newPassword });
     }
 
     return json({ status: 'err', msg: '未知的 action' }, 400);

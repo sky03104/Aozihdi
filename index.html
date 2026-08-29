@@ -28,6 +28,7 @@
   <div id="root"></div>
   <script src="react-bundle.js"></script>
   <script defer src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js" onerror="window.XLSX={read:function(){return{Sheets:{},SheetNames:[]};},utils:{sheet_to_json:function(){return[];},decode_range:function(){return{s:{r:0,c:0},e:{r:0,c:0}};},encode_cell:function(){return'A1';}}}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script>
 const WORKFLOW_GAS_URL='https://script.google.com/macros/s/AKfycbzxjedGAbxj3G85zkybqoFoB-P7uQ9ycqdJZ7mzQ2Ax-vaxKgOTG60120PlGPbcNJpR/exec';
 function logWorkflow(tool,actionType,status){
@@ -71,7 +72,7 @@ const REPORT_GAS_URL      = 'https://script.google.com/macros/s/AKfycbwHXlwTMmJy
 // 任何工具（index.html或任一tool_*.html）的前端有改動 → 整數+1；
 // 任何工具的後端（內嵌GAS_CODE或獨立.gs檔）有改動 → 小數+1。
 // 純視覺標示，方便比對現場看到的是不是最新版本，改完任何工具記得同步更新這裡。
-const APP_VERSION = '20.7';
+const APP_VERSION = '21.7';
 
 // PWA版本自動偵測（2026-08-27新增）：定期重新抓index.html比對APP_VERSION，
 // 版本不同就跳提示讓使用者自己按更新，不強制自動重整（避免打字打到一半被reload）
@@ -155,36 +156,127 @@ const DEMO_USERS = [
     { id: "011369", name: "陳惠景", role: "fulltime", dept: "漢神巨蛋", status: "active" },
 ];
 const DEMO_PENDING = [];
-// 帳號申請／請假申請雲端服務：寫入「天鷹保全APP」試算表（獨立GAS專案）
+// 請假申請／公告／交辦事項雲端服務（沒搬 SQL，繼續打 GAS）：寫入「天鷹保全APP」試算表（獨立GAS專案）
 const ACCOUNT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxEVBHseDpLWiWe4d8kLcCHbVFiKAK9wyoLwqNkt59PS4vPCY9QfG0_wiDJf2coO3zMcg/exec';
-/* ── 密碼變更雲端同步：寫回 GAS「帳號管理」分頁。
-   密碼原本只存本機 localStorage，換裝置或重新加到桌面就變回預設 123，
-   改為每次重設/修改密碼都同步上雲端，任何裝置重開都拉得到最新密碼 ── */
+/* ── 帳號密碼權限系統 SQL 試作（2026-08-29）──────────────────
+   帳號／申請／設定／LINE 綁定改走 Supabase：前端直連 + Row Level
+   Security 把關，登入交給 Supabase Auth（內建 bcrypt 密碼雜湊 + JWT
+   session），不再靠 GAS 中介、不再自己刻 HMAC token。
+   請假／公告／交辦事項這些沒搬 SQL，還是打上面的 ACCOUNT_GAS_URL。
+   詳見 supabase/MIGRATION_PLAN.md。 */
+const SUPABASE_URL = 'https://tjrlpthprtrlmugrofpj.supabase.co';
+// anon key 可以安全寫進前端/公開 repo，權限靠 RLS 擋，不是靠隱藏 key
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqcmxwdGhwcnRybG11Z3JvZnBqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5NTgzOTIsImV4cCI6MjEwMzUzNDM5Mn0.CHgyr9bna-eoaLaUGWPzUzx_ofz9vTPNOAnSdqugiOQ';
+/* 「記住我」跟 Supabase session 存放位置綁在一起：勾了記住我才存
+   localStorage（關瀏覽器仍有效），沒勾存 sessionStorage（分頁關閉即
+   失效）。跟舊版 hsh_remember_flag 的行為意圖一致，只是換一套機制。 */
+const _sbStorageAdapter = {
+    getItem: (key) => {
+        try { return localStorage.getItem(key) || sessionStorage.getItem(key); } catch (e) { return null; }
+    },
+    setItem: (key, value) => {
+        try {
+            if (localStorage.getItem('hsh_remember_flag') === '1') localStorage.setItem(key, value);
+            else sessionStorage.setItem(key, value);
+        } catch (e) {}
+    },
+    removeItem: (key) => {
+        try { localStorage.removeItem(key); sessionStorage.removeItem(key); } catch (e) {}
+    }
+};
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { storage: _sbStorageAdapter, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false }
+});
+/* 系統設定（toolPerms/workAllowedIds/toolsConfig/leaveCapMorning/
+   leaveCapNight）在 Supabase 存的是 jsonb，這裡統一轉回原本 GAS
+   getSettings()/setSettings() 的回應形狀，applyCloudSettings() 才不用改 */
+function formatSettingsResult(data) {
+    const out = { status: 'ok' };
+    if (typeof data.leaveCapMorning === 'number') out.leaveCapMorning = data.leaveCapMorning;
+    if (typeof data.leaveCapNight === 'number') out.leaveCapNight = data.leaveCapNight;
+    if (data.toolPerms) out.toolPerms = typeof data.toolPerms === 'string' ? data.toolPerms : JSON.stringify(data.toolPerms);
+    if (data.workAllowedIds) out.workAllowedIds = data.workAllowedIds;
+    if (data.toolsConfig) out.toolsConfig = typeof data.toolsConfig === 'string' ? data.toolsConfig : JSON.stringify(data.toolsConfig);
+    return out;
+}
+async function sbGetSettings() {
+    try {
+        const { data, error } = await sb.rpc('get_settings');
+        if (error) throw error;
+        return formatSettingsResult(data || {});
+    } catch (e) { return { status: 'err', msg: e.message, leaveCapMorning: 5, leaveCapNight: 3 }; }
+}
+async function sbSetSettings(patch) {
+    try {
+        const { data, error } = await sb.rpc('set_settings', { p_patch: patch });
+        if (error) throw error;
+        return formatSettingsResult(data || {});
+    } catch (e) { return { status: 'err', msg: e.message }; }
+}
+/* 呼叫唯一持有 service role key 的 admin-users Edge Function
+   （新增帳號／核准申請建帳號／重設密碼——這幾件事需要 auth.admin
+   權限，純前端 RLS 做不到） */
+async function callAdminUsersFn(action, payload) {
+    const { data: sess } = await sb.auth.getSession();
+    const res = await fetch(SUPABASE_URL + '/functions/v1/admin-users', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + ((sess && sess.session && sess.session.access_token) || ''),
+            'apikey': SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify(Object.assign({ action: action }, payload || {}))
+    });
+    return await res.json();
+}
+/* ── 密碼變更雲端同步（管理員在「使用者管理」重設某人密碼用）：
+   改走 admin-users Edge Function 的 resetPassword，讓管理員直接指定
+   新密碼（對照原本可以自訂密碼的行為），不再寫明文密碼進資料表 ── */
 async function syncUserPwToCloud(empId, pw) {
     try {
-        const body = new FormData();
-        body.append('action', 'updateUser');
-        body.append('data', JSON.stringify({ empId: empId, pw: pw }));
-        const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
-        const d = await res.json();
+        const d = await callAdminUsersFn('resetPassword', { empId: empId, newPassword: pw });
         return !!(d && d.status === 'ok');
     } catch (e) { return false; }
 }
-/* ── 後端登入驗證（2026-07-26）───────────────────────────────
-   原本密碼比對是在前端做的，代表全公司的密碼必須跟著這個檔案一起
-   下載到每個人的手機上 ── 等於公開。現在改成把帳號密碼送去後端比對，
-   後端只回「這個人是誰」和一張通行證，前端從此不持有任何密碼。
-
-   通行證（token）＝ 證明「我已經登入過」的憑據，取代原本把密碼
-   明文存在瀏覽器裡的「記住我」做法。 */
-const AUTH_TOKEN_KEY = 'hsh_auth_token';
-async function callAuthApi(action, payload) {
-    const body = new FormData();
-    body.append('action', action);
-    body.append('data', JSON.stringify(payload || {}));
-    const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
-    return await res.json();
+/* ── 登入／通行證（2026-08-29 改版）───────────────────────────
+   密碼雜湊、session 全部交給 Supabase Auth（bcrypt + JWT），前端從此
+   不持有、也不驗證任何密碼。工號先換成合成 email 再交給
+   signInWithPassword()。 */
+async function sbLogin(empId, pw) {
+    try {
+        const { data: email, error: rErr } = await sb.rpc('resolve_empid_email', { p_emp_id: empId });
+        if (rErr || !email) return { status: 'err', msg: '帳號或密碼錯誤' };
+        const { data, error } = await sb.auth.signInWithPassword({ email: email, password: pw });
+        if (error || !data.session) return { status: 'err', msg: '帳號或密碼錯誤' };
+        const { data: prof } = await sb.from('profiles').select('emp_id,display_name,role,dept,shift').eq('id', data.user.id).maybeSingle();
+        if (!prof) { try { await sb.auth.signOut(); } catch (e) {} return { status: 'err', msg: '帳號資料異常，請聯絡管理員' }; }
+        return { status: 'ok', user: { empId: prof.emp_id, name: prof.display_name, role: prof.role, dept: prof.dept, shift: prof.shift } };
+    } catch (e) { return { status: 'err', msg: e.message || '連線失敗' }; }
 }
+async function sbVerifySession() {
+    try {
+        const { data: sess } = await sb.auth.getSession();
+        if (!sess || !sess.session) return { status: 'err' };
+        const { data: prof } = await sb.from('profiles').select('emp_id,display_name,role,dept,shift,status').eq('id', sess.session.user.id).maybeSingle();
+        if (!prof || prof.status !== 'active') return { status: 'err' };
+        return { status: 'ok', user: { empId: prof.emp_id, name: prof.display_name, role: prof.role, dept: prof.dept, shift: prof.shift } };
+    } catch (e) { return { status: 'err' }; }
+}
+async function sbChangePassword(newPw) {
+    try {
+        const { error } = await sb.auth.updateUser({ password: newPw });
+        if (error) return { status: 'err', msg: error.message };
+        return { status: 'ok' };
+    } catch (e) { return { status: 'err', msg: e.message }; }
+}
+/* getAuthToken()/setAuthToken()：舊版 HMAC 通行證機制的殘留。
+   REPORT_GAS_URL（事故與表揚，獨立 GAS 專案）目前還是靠這把 token
+   驗證身分，那支這次沒有一起搬 SQL（已知後續工作，見
+   supabase/MIGRATION_PLAN.md），所以先留著這兩個函式不刪，只是從此
+   沒有人再 setAuthToken() 寫入新值——getAuthToken() 會回空字串，
+   loadReviewCounts() 打 REPORT_GAS_URL 會驗證失敗，安全地拿不到主管
+   待審卡片清單（不是白屏也不是掛掉，只是這張卡片暫時是空的）。 */
+const AUTH_TOKEN_KEY = 'hsh_auth_token';
 function getAuthToken() {
     try { return localStorage.getItem(AUTH_TOKEN_KEY) || ''; } catch (e) { return ''; }
 }
@@ -2792,26 +2884,25 @@ function App() {
                 if (localStorage.getItem('hsh_remember_flag') !== '1') return;
                 let sessionUser = null;
 
-                // 1) 優先用「記住我」的通行證，向後端換回目前身分
-                //    （順便確認帳號還在、還沒被停用 —— 後端會一起檢查）
-                const token = getAuthToken();
-                if (token) {
-                    try {
-                        const d = await callAuthApi('verifySession', { token: token });
+                // 1) 優先用 Supabase session 換回目前身分
+                //    （順便確認帳號還在、還沒被停用 —— profiles.status 會擋掉）
+                try {
+                    const { data: sess0 } = await sb.auth.getSession();
+                    if (sess0 && sess0.session) {
+                        const d = await sbVerifySession();
                         if (d && d.status === 'ok' && d.user) {
-                            const u = d.user;
-                            sessionUser = { name: u.name, role: u.role, dept: u.dept, empId: u.empId, shift: u.shift };
+                            sessionUser = d.user;
                         } else {
-                            // 通行證過期或帳號已停用 → 清掉，讓使用者重新登入
-                            setAuthToken('');
+                            // session 存在但帳號查不到/已停用 → 清掉，讓使用者重新登入
+                            try { await sb.auth.signOut(); } catch (e) {}
                             try { localStorage.removeItem('hsh_session_user'); } catch (e) {}
                             /* 順手清掉緊急聯絡清單的本機快取，避免登入失效後這份工具還留著上次同步的電話資料 */
                             try { localStorage.removeItem('hsh_ec_contacts'); } catch (e) {}
                             return;
                         }
-                    } catch (e) {
-                        // 純粹連不上網路：不要把人踢出去，改走下面既有的登入態
                     }
+                } catch (e) {
+                    // 純粹連不上網路：不要把人踢出去，改走下面既有的登入態
                 }
 
                 // 2) 沒有通行證時，沿用現有登入態（從工具頁返回主選單不需重登）
@@ -2867,7 +2958,7 @@ function App() {
         setLoggingIn(true);
         let d;
         try {
-            d = await callAuthApi('login', { empId: loginForm.id.trim(), pw: loginForm.pw });
+            d = await sbLogin(loginForm.id.trim(), loginForm.pw);
         } catch (e) {
             setLoggingIn(false);
             showToast("⚠️ 連不上伺服器，請檢查網路後再試一次", "err");
@@ -2884,13 +2975,10 @@ function App() {
         /* 寫入 localStorage 讓 iframe 工具（緊急聯絡清單等）能讀到目前登入者角色 */
         localStorage.setItem('hsh_session_user', JSON.stringify(sessionUser));
                 try { if (typeof logWorkflow === 'function') logWorkflow('app', 'login', '上線'); } catch (e) {}
-        /* 通行證（不存密碼）一律發放並存起來，跟「記住我」拆開——
-           無線電管理/生理假紀錄/缺班調班紀錄這幾個獨立分頁工具是靠這張
-           通行證跟 GAS 對話，不應該因為使用者沒勾記住我就連不上，
-           使用者也完全猜不到兩者有關聯（2026-08-19 咖哩實機回報
-           「無線電管理一直跳登入已失效」查出）。token 本身在後端就有
-           7 天效期（issueToken_），一律存起來不會比較不安全。 */
-        setAuthToken(d.token);
+        /* 2026-08-29：登入態改用 Supabase Auth 的 JWT session（sb client
+           自己存取，見 _sbStorageAdapter），不再需要自己發/存 HMAC token。
+           無線電管理等獨立分頁工具目前仍靠舊版 token 跟 GAS 對話，這批
+           工具沒有一起搬 SQL，是已知後續工作（見 supabase/MIGRATION_PLAN.md）。 */
         /* 記住我：只決定主控台下次重新整理要不要免密碼自動登入
            （hsh_session_user/hsh_auth_token 已經一律存了，這裡只是額外
            一個開關）。沒勾就清掉，下次開主控台會停在登入頁要求重打密碼。 */
@@ -2928,24 +3016,20 @@ function App() {
         }
         setChangingPw(true);
         try {
-            // 1) 用舊密碼登入 → 通過代表舊密碼正確，並取得通行證
-            const auth = await callAuthApi('login', { empId: currentUser.empId, pw: pwForm.old });
-            if (!auth || auth.status !== 'ok' || !auth.token) {
+            // 1) 用舊密碼重新登入 → 通過代表舊密碼正確（順便刷新 session）
+            const auth = await sbLogin(currentUser.empId, pwForm.old);
+            if (!auth || auth.status !== 'ok') {
                 setChangingPw(false);
                 showToast("❌ 舊密碼錯誤", "err");
                 return;
             }
-            // 2) 用通行證請後端改密碼
-            const d = await callAuthApi('changePassword', {
-                token: auth.token, oldPw: pwForm.old, newPw: pwForm.new1
-            });
+            // 2) 改密碼（Supabase Auth 內建，不用自己比對舊密碼）
+            const d = await sbChangePassword(pwForm.new1);
             setChangingPw(false);
             if (!d || d.status !== 'ok') {
                 showToast("❌ " + ((d && d.msg) || '密碼更新失敗，請再試一次'), "err");
                 return;
             }
-            // 3) 舊通行證仍指向同一個人，換成這次拿到的新的即可
-            if (getAuthToken()) setAuthToken(auth.token);
             setChangePwModal(false);
             setPwForm({ old: '', new1: '', new2: '' });
             showToast("✅ 密碼已成功更新！");
@@ -3036,16 +3120,12 @@ function App() {
     /* ── 管理員編輯工具名稱/圖示/分類後同步到雲端（系統設定分頁，跟 toolPerms 共用同一支 setSettings）── */
     const saveToolsOverridesCloud = async (overrides) => {
         try {
-            const body = new FormData();
-            body.append('action', 'setSettings');
-            body.append('data', JSON.stringify({ toolsConfig: JSON.stringify(overrides) }));
-            await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
+            await sbSetSettings({ toolsConfig: JSON.stringify(overrides) });
         } catch (e) { /* 離線：本機已存，其他裝置下次讀 getSettings 時會跟著同步 */ }
     };
     const loadLeaveSettings = async () => {
         try {
-            const res = await fetch(ACCOUNT_GAS_URL + '?action=getSettings');
-            const d = await res.json();
+            const d = await sbGetSettings();
             applyCloudSettings(d);
         } catch (e) { /* 失敗用預設 早5晚3 */ }
     };
@@ -3054,12 +3134,17 @@ function App() {
        待審清單/請假清單/早晚班設定各自的「重新整理」按鈕仍用回原本的獨立函式，這裡只省登入當下那一輪。 */
     const loadLoginBootstrap = async () => {
         try {
-            const res = await fetch(ACCOUNT_GAS_URL + '?action=bootstrap');
-            const d = await res.json();
-            if (d.status !== 'ok') throw new Error(d.msg || 'bootstrap 未就緒');
-            if (Array.isArray(d.applications)) setPending(d.applications);
-            if (Array.isArray(d.leaveRequests)) setLeaveRequests(d.leaveRequests);
-            applyCloudSettings(d.settings);
+            // applications／settings 搬了 SQL，leaveRequests 沒搬——兩條平行請求各自打
+            // Supabase／GAS，前端合併結果，維持畫面拿到的資料形狀不變
+            const [leaveRes, acctResult] = await Promise.all([
+                fetch(ACCOUNT_GAS_URL + '?action=getLeaveRequests').then(r => r.json()).catch(() => null),
+                sb.rpc('account_bootstrap')
+            ]);
+            if (leaveRes && leaveRes.status === 'ok' && Array.isArray(leaveRes.list)) setLeaveRequests(leaveRes.list);
+            if (acctResult.error) throw acctResult.error;
+            const acct = acctResult.data || {};
+            if (Array.isArray(acct.applications)) setPending(acct.applications);
+            applyCloudSettings(formatSettingsResult(acct.settings || {}));
         } catch (e) {
             /* GAS 尚未部署 bootstrap（或連線失敗）→ 退回原本三支個別呼叫，
                確保前端先上線、後端還沒重新部署的空窗期不會整個登入資料開天窗 */
@@ -3071,11 +3156,7 @@ function App() {
     /* ── 管理員儲存早晚班上限到雲端 ── */
     const saveLeaveSettings = async (m, n) => {
         try {
-            const body = new FormData();
-            body.append('action', 'setSettings');
-            body.append('data', JSON.stringify({ leaveCapMorning: m, leaveCapNight: n }));
-            const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
-            const d = await res.json();
+            const d = await sbSetSettings({ leaveCapMorning: m, leaveCapNight: n });
             if (d.status === 'ok') {
                 showToast(`✅ 已儲存上限（早${d.leaveCapMorning}／晚${d.leaveCapNight}）`);
             } else {
@@ -3090,13 +3171,12 @@ function App() {
         if (!(currentUser === null || currentUser === void 0 ? void 0 : currentUser.empId)) return;
         setLineBindLoading(true);
         try {
-            const res = await fetch(ACCOUNT_GAS_URL + '?action=getLineBinding&empId=' + encodeURIComponent(currentUser.empId));
-            const d = await res.json();
-            if (d.status === 'ok') {
-                setLineBindStatus({ bound: !!d.bound, lineUserId: d.lineUserId || '', boundAt: d.boundAt || '' });
+            const { data, error } = await sb.from('line_bindings').select('line_user_id,bound_at,status').eq('emp_id', currentUser.empId).maybeSingle();
+            if (error) throw error;
+            if (data) {
+                setLineBindStatus({ bound: data.status === 'bound', lineUserId: data.line_user_id || '', boundAt: data.bound_at || '' });
             } else {
                 setLineBindStatus({ bound: false });
-                showToast('⚠️ 綁定狀態查詢失敗：' + (d.msg || '請重試'));
             }
         } catch (e) {
             setLineBindStatus({ bound: false });
@@ -3110,21 +3190,12 @@ function App() {
         if (!(currentUser === null || currentUser === void 0 ? void 0 : currentUser.empId)) return;
         setLineCodeLoading(true);
         try {
-            const data = JSON.stringify({ empId: currentUser.empId, name: currentUser.name });
-            const res = await fetch(ACCOUNT_GAS_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'action=generateLineCode&data=' + encodeURIComponent(data)
-            });
-            const d = await res.json();
-            if (d.status === 'ok' && d.code) {
-                setLineCode(d.code);
-                showToast('✅ 驗證碼已產生，請於 5 分鐘內至 LINE Bot 輸入');
-            } else {
-                showToast('❌ 驗證碼產生失敗：' + (d.msg || '請重試'));
-            }
+            const { data, error } = await sb.rpc('generate_line_code', { p_emp_id: currentUser.empId, p_name: currentUser.name });
+            if (error) throw error;
+            setLineCode(data.code);
+            showToast('✅ 驗證碼已產生，請於 5 分鐘內至 LINE Bot 輸入');
         } catch (e) {
-            showToast('⚠️ 網路錯誤，無法產生驗證碼');
+            showToast('❌ 驗證碼產生失敗：' + (e.message || '請重試'));
         } finally {
             setLineCodeLoading(false);
         }
@@ -3134,19 +3205,10 @@ function App() {
         if (!(currentUser === null || currentUser === void 0 ? void 0 : currentUser.empId)) return;
         setLineBindLoading(true);
         try {
-            const data = JSON.stringify({ empId: currentUser.empId });
-            const res = await fetch(ACCOUNT_GAS_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'action=unbindLine&data=' + encodeURIComponent(data)
-            });
-            const d = await res.json();
-            if (d.status === 'ok') {
-                showToast('✅ 已解除 LINE 綁定');
-                setLineBindStatus({ bound: false });
-            } else {
-                showToast('❌ 解除綁定失敗：' + (d.msg || '請重試'));
-            }
+            const { error } = await sb.rpc('unbind_line', { p_emp_id: currentUser.empId });
+            if (error) throw error;
+            showToast('✅ 已解除 LINE 綁定');
+            setLineBindStatus({ bound: false });
         } catch (e) {
             showToast('⚠️ 網路錯誤，無法解除綁定');
         } finally {
@@ -3156,13 +3218,11 @@ function App() {
     /* ── 從雲端載入待審核申請（管理員登入後自動載入；審核頁可手動重新整理） ── */
     const loadPendingFromCloud = async (silent) => {
         try {
-            const res = await fetch(ACCOUNT_GAS_URL + '?action=getApplications');
-            const d = await res.json();
-            if (d.status === 'ok' && Array.isArray(d.list)) {
-                setPending(d.list);
-                if (!silent) showToast(`🔄 已更新待審清單（${d.list.length} 筆）`);
-            }
-            else if (!silent) showToast('❌ 載入待審清單失敗');
+            const { data, error } = await sb.from('applications').select('id,emp_id,name,dept,role,applied_at').eq('status', 'pending').order('applied_at');
+            if (error) throw error;
+            const list = (data || []).map(r => ({ id: r.id, empId: r.emp_id, name: r.name, dept: r.dept, role: r.role, appliedAt: r.applied_at }));
+            setPending(list);
+            if (!silent) showToast(`🔄 已更新待審清單（${list.length} 筆）`);
         }
         catch (e) { if (!silent) showToast('❌ 網路錯誤，無法載入待審清單'); }
     };
@@ -3176,8 +3236,11 @@ function App() {
     useEffect(() => {
         (async () => {
             try {
-                const res = await fetch(ACCOUNT_GAS_URL + '?action=getUserDB');
-                const d = await res.json();
+                const { data, error } = await sb.from('profiles').select('emp_id,display_name,role,dept,status,shift');
+                if (error) throw error;
+                const users = {};
+                (data || []).forEach(r => { users[r.emp_id] = { name: r.display_name, role: r.role, dept: r.dept, status: r.status, shift: r.shift || '' }; });
+                const d = { status: 'ok', users: users };
                 if (d.status === 'ok' && d.users && typeof d.users === 'object') {
                     // 保險：不論後端版本回什麼，前端一律剝掉密碼欄位再使用與儲存。
                     // （新版後端已不回傳 pw；這道防線是為了「後端還沒更新完」的過渡期，
@@ -3255,16 +3318,17 @@ function App() {
             pw: regForm.pw,
             appliedAt: new Date().toLocaleDateString('zh-TW').replace(/\//g, '-'),
         };
-        // 申請單寫入雲端試算表，管理員在任何裝置都能看到並審核（寫入成功才視為送出）
+        // 申請單寫進 Supabase，管理員在任何裝置都能看到並審核（寫入成功才視為送出）。
+        // 2026-08-29 起申請不再收明文密碼——newPending.pw 只留給前端表單驗證用，
+        // 不會送進資料庫；核准後密碼由 admin-users Edge Function 配一組隨機臨時密碼。
         (async () => {
             showToast("⏳ 申請送出中…");
             try {
-                const body = new URLSearchParams();
-                body.append('action', 'submitApplication');
-                body.append('data', JSON.stringify(newPending));
-                const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
-                const d = await res.json();
-                if (d.status === 'ok') {
+                const { error } = await sb.from('applications').insert({
+                    emp_id: newPending.empId, name: newPending.name, dept: newPending.dept,
+                    role: newPending.role, status: 'pending', applied_at: new Date().toISOString()
+                });
+                if (!error) {
                     setPending(prev => [...prev, newPending]);
                     setPage("login");
                     setRegStep(1);
@@ -3272,7 +3336,7 @@ function App() {
                     showToast("✅ 申請已送出，請等待管理員審核");
                 }
                 else {
-                    showToast("❌ 送出失敗：" + (d.msg || '請稍後再試'));
+                    showToast("❌ 送出失敗：" + (error.message || '請稍後再試'));
                 }
             }
             catch (e) {
@@ -3712,11 +3776,7 @@ function App() {
                             setPermsSaved(true);
                             setTimeout(() => setPermsSaved(false), 2500);
                             try {
-                                const body = new FormData();
-                                body.append('action', 'setSettings');
-                                body.append('data', JSON.stringify({ toolPerms: JSON.stringify(perms), workAllowedIds: workAllowedIds }));
-                                const r = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
-                                const d = await r.json();
+                                const d = await sbSetSettings({ toolPerms: JSON.stringify(perms), workAllowedIds: workAllowedIds });
                                 showToast(d.status === 'ok' ? "✅ 權限已同步到雲端，所有裝置將自動更新！" : "✅ 本機已儲存（雲端同步失敗）");
                             } catch (e) {
                                 showToast("✅ 本機已儲存（無網路，雲端未同步）");
@@ -3739,10 +3799,7 @@ function App() {
                         catch (e) { }
                         /* 雲端也要一起還原，否則下次開啟 loadLeaveSettings 又把雲端舊權限拉回來 */
                         try {
-                            const body = new FormData();
-                            body.append('action', 'setSettings');
-                            body.append('data', JSON.stringify({ toolPerms: JSON.stringify(DEFAULT_PERMS), workAllowedIds: null }));
-                            await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
+                            await sbSetSettings({ toolPerms: JSON.stringify(DEFAULT_PERMS), workAllowedIds: null });
                         } catch (e) { }
                         showToast("🔄 已還原為原廠預設權限");
                     }, style: { width: '100%', background: 'transparent', border: '1px solid rgba(255,255,255,.1)',
@@ -3798,34 +3855,26 @@ function App() {
                             React.createElement("div", { style: { fontSize: 13, fontWeight: 600 } }, row.v))))),
                         React.createElement("div", { style: { display: 'flex', gap: 8 } },
                             React.createElement("button", { onClick: async () => {
-                                    // 先更新雲端試算表狀態，成功後才更新本地（避免雲端與本地不一致）
+                                    // 核准要建立 Auth 帳號（auth.admin.createUser），純前端 RLS 做不到，
+                                    // 走 admin-users Edge Function（唯一持有 service role key 的地方）
+                                    let d;
                                     try {
-                                        const body = new URLSearchParams();
-                                        body.append('action', 'reviewApplication');
-                                        body.append('id', String(p.id));
-                                        body.append('decision', 'approved');
-                                        const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
-                                        const d = await res.json();
-                                        if (d.status !== 'ok') { showToast('❌ 雲端更新失敗：' + (d.msg || '請重試')); return; }
+                                        d = await callAdminUsersFn('approveApplication', { applicationId: p.id });
+                                        if (!d || d.status !== 'ok') { showToast('❌ 雲端更新失敗：' + ((d && d.msg) || '請重試')); return; }
                                     }
                                     catch (e) { showToast('❌ 網路錯誤，請重試'); return; }
-                                    /* 前端不再保存密碼；密碼由後端 reviewApplication 從申請表寫進帳號表 */
-                                    setUserDb(prev => ({ ...prev, [p.empId]: { name: p.name, role: p.role, dept: p.dept, isDefaultPw: (p.isDefaultPw === true), status: 'active' } }));
+                                    setUserDb(prev => ({ ...prev, [p.empId]: { name: p.name, role: p.role, dept: p.dept, status: 'active' } }));
                                     setPending(prev => prev.filter(x => x.id !== p.id));
                                     showToast(`✅ 已核准 ${p.name} 的帳號申請`);
+                                    alert(`${p.name}（${p.empId}）的臨時密碼：${d.tempPassword}\n\n請轉告本人登入後盡快至「個人資料」改密碼。`);
                                 }, style: { flex: 1, padding: '9px', borderRadius: 8, cursor: 'pointer',
                                     background: 'rgba(16,185,129,.15)', color: 'var(--success)',
                                     border: '1px solid rgba(16,185,129,.35)', fontFamily: "'Noto Sans TC',sans-serif",
                                     fontSize: 13, fontWeight: 700, transition: 'background .2s' } }, "\u2705 \u6838\u51C6"),
                             React.createElement("button", { onClick: async () => {
                                     try {
-                                        const body = new URLSearchParams();
-                                        body.append('action', 'reviewApplication');
-                                        body.append('id', String(p.id));
-                                        body.append('decision', 'rejected');
-                                        const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
-                                        const d = await res.json();
-                                        if (d.status !== 'ok') { showToast('❌ 雲端更新失敗：' + (d.msg || '請重試')); return; }
+                                        const { error } = await sb.rpc('reject_application', { p_id: p.id });
+                                        if (error) { showToast('❌ 雲端更新失敗：' + error.message); return; }
                                     }
                                     catch (e) { showToast('❌ 網路錯誤，請重試'); return; }
                                     setPending(prev => prev.filter(x => x.id !== p.id));
@@ -4940,19 +4989,14 @@ function App() {
                                 // 同步寫入雲端「帳號管理」分頁（含班別）
                                 (async () => {
                                     try {
-                                        const body = new FormData();
-                                        body.append('action', 'updateUser');
-                                        body.append('data', JSON.stringify({
-                                            empId: tgtId,
-                                            name: selectedUser.name,
+                                        const { error } = await sb.from('profiles').update({
+                                            display_name: selectedUser.name,
                                             role: selectedUser.role,
                                             dept: selectedUser.dept,
                                             status: selectedUser.status,
                                             shift: newShift,
-                                        }));
-                                        const res = await fetch(ACCOUNT_GAS_URL, { method: 'POST', body });
-                                        const dd = await res.json();
-                                        if (dd.status !== 'ok') showToast('⚠️ 雲端同步失敗：' + (dd.msg || '未知錯誤'), 'err');
+                                        }).eq('emp_id', tgtId);
+                                        if (error) showToast('⚠️ 雲端同步失敗：' + error.message, 'err');
                                     } catch (err) {
                                         showToast('⚠️ 雲端同步連線失敗：' + err.message, 'err');
                                     }

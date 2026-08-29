@@ -67,10 +67,24 @@ repo `sky03104/wei` 的 `feature/supabase-migration` 分支（已完整跑過
       政策只放行 HTTPS 白名單網域，Postgres 直連（5432/6543）跟
       Supabase Management API（`api.supabase.com`）都連不到，沒辦法
       由 Claude 這邊直接執行，所以是咖哩手動貼的。
-- [ ] **Phase 5：前端接上**——Aozihdi 的 `index.html` 目前 `ACCOUNT_GAS_URL`
-      相關的 35 個呼叫點還沒改，這是接下來最大的一塊，還沒開始。
+- [x] **Phase 5：前端接上完成**（2026-08-29）——`index.html` 新增
+      Supabase client 初始化（`supabase-js` UMD CDN + anon key）、
+      `sbLogin()`/`sbVerifySession()`/`sbChangePassword()`/
+      `sbGetSettings()`/`sbSetSettings()`/`callAdminUsersFn()` 這批
+      helper。範圍內 action（登入/帳號/申請/設定/LINE，約 20 個呼叫點）
+      全部改成 `.rpc()`/`.from()` 直連或呼叫 admin-users Edge Function；
+      範圍外（請假/公告/交辦事項/明日哨表）維持打 `ACCOUNT_GAS_URL`，
+      逐一核對過沒有誤改。`bootstrap` 拆成 GAS `getLeaveRequests` +
+      Supabase `account_bootstrap()` 兩條平行請求再合併。舊版自製 HMAC
+      token（`hsh_auth_token`）機制保留但不再寫入，只剩
+      `REPORT_GAS_URL`（事故與表揚，未搬 SQL）還在讀，會安全地拿不到
+      主管待審卡片清單（已知限制，見下方「已知留到後面的事」）。
+      申請帳號的密碼欄位前端還留著（UI 未同步拿掉），但已改成不會送
+      進資料庫，屬於待补的 UI 一致性小問題，不影響功能。
+      `node --check` 驗證 inline script 語法通過，HTML 標籤閉合正常。
 - [ ] **實測**：登入／改密碼／申請審核／toolPerms 權限矩陣／LINE 綁定，
-      跟正式站行為比對。
+      跟正式站行為比對。**還沒在瀏覽器實測過**，需要先部署
+      admin-users Edge Function 才能測「核准申請」流程。
 
 ## 密碼處理
 
