@@ -1,0 +1,5 @@
+# 帳密系統 SQL 遷移 — 這些檔案含真實員工資料/密碼，絕對不能進 git
+supabase/data-export.json
+supabase/migration-credentials.txt
+supabase/node_modules/
+supabase/.env

@@ -1,0 +1,11 @@
+{
+  "name": "aozihdi-account-migration",
+  "private": true,
+  "description": "帳號密碼權限系統搬遷 SQL 用的遷移腳本，只有這個資料夾用得到",
+  "scripts": {
+    "migrate": "node migrate-from-sheets.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}
