@@ -39,11 +39,24 @@ repo `sky03104/wei` 的 `feature/supabase-migration` 分支（已完整跑過
       `reject_application()`／`bind_line()`／`unbind_line()`／
       `generate_line_code()`。單純 CRUD（讀自己的 profile／line binding）
       前端直接 `.from().select()`，不特別包 function。
-- [x] **Phase 4a：匯出／遷移腳本寫好**（`匯出帳密資料_GAS.gs`／
-      `migrate-from-sheets.js`／`verify-migration.sql`）——**還沒真的
-      跑過**，需要咖哩：①複製試算表 ②部署臨時 GAS ③在有網路的環境
-      跑 `npm install && npm run migrate` ④跑 `verify-migration.sql`
-      核對筆數。
+- [x] **Phase 4：資料遷移已完成並驗證**（2026-08-29）——**改用 Supabase
+      MCP 直接執行，沒有真的跑 `migrate-from-sheets.js` 這支 Node 腳本**
+      （原計畫路徑；連上 MCP 之後改成用 `execute_sql` 直接下 SQL insert，
+      更省一手）。來源是咖哩複製出來的副本試算表
+      `1bEUyj_9injDIROf3ycagtVwXTspKPhVsCUEZeXs7rWQ`（用 Google Drive
+      連接器讀取 `read_file_content`），**沒有讀取或動到正式試算表**。
+      密碼一律配隨機臨時密碼（`extensions.crypt()` bcrypt 雜湊，寫進
+      `auth.users`／`auth.identities`，`auth.identities.email` 是
+      generated column，不能顯式 insert，改用 `select ... from
+      auth.users` 帶出），舊明文密碼完全沒有遷移。**筆數核對**：
+      profiles 64、applications 18、settings 6、line_bindings 40、
+      line_verification_codes 40，`auth.users`／`auth.identities`
+      各 64 筆對齊，孤兒資料 0 筆。**已驗證**：`extensions.crypt()`
+      密碼雜湊比對正確（測試帳號 011341）；`resolve_empid_email()`
+      對 active 帳號回傳 email、對 inactive 帳號（如 011340）與不存在
+      工號都正確回傳 null（登入會被擋）。臨時密碼清單存在本機
+      `supabase/migration-credentials.txt`（已在 `.gitignore`，不會
+      進 git），已交給咖哩，發完給對應員工後應刪除。
 - [x] **Phase 6：Edge Function 寫好**（`functions/admin-users/index.ts`）——
       處理「核准申請→建帳號」／「管理員新增帳號」／「管理員重設密碼」，
       這是唯一需要 service role key 的地方。**還沒部署、還沒實測**。
