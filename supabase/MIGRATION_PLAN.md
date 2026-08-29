@@ -57,9 +57,12 @@ repo `sky03104/wei` 的 `feature/supabase-migration` 分支（已完整跑過
       工號都正確回傳 null（登入會被擋）。臨時密碼清單存在本機
       `supabase/migration-credentials.txt`（已在 `.gitignore`，不會
       進 git），已交給咖哩，發完給對應員工後應刪除。
-- [x] **Phase 6：Edge Function 寫好**（`functions/admin-users/index.ts`）——
+- [x] **Phase 6：Edge Function 已部署**（`functions/admin-users/index.ts`）——
       處理「核准申請→建帳號」／「管理員新增帳號」／「管理員重設密碼」，
-      這是唯一需要 service role key 的地方。**還沒部署、還沒實測**。
+      這是唯一需要 service role key 的地方。2026-08-29 用 Supabase MCP
+      `deploy_edge_function` 部署完成，`verify_jwt: true`，狀態 ACTIVE，
+      URL `https://tjrlpthprtrlmugrofpj.supabase.co/functions/v1/admin-users`，
+      跟前端 `callAdminUsersFn()` 呼叫路徑核對一致。**還沒實測**。
 - [x] **套用 schema/policies/functions 到 Supabase 專案**——2026-08-29
       咖哩親自在 Supabase Dashboard 的 SQL Editor 依序貼上執行
       `schema.sql` → `policies.sql` → `functions.sql`，三份都成功
