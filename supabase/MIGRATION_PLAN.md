@@ -47,10 +47,13 @@ repo `sky03104/wei` 的 `feature/supabase-migration` 分支（已完整跑過
 - [x] **Phase 6：Edge Function 寫好**（`functions/admin-users/index.ts`）——
       處理「核准申請→建帳號」／「管理員新增帳號」／「管理員重設密碼」，
       這是唯一需要 service role key 的地方。**還沒部署、還沒實測**。
-- [ ] **套用 schema/policies/functions 到 Supabase 專案**——SQL 檔案
-      都寫好了，需要在 Supabase Dashboard 的 SQL Editor 依序執行
-      `schema.sql` → `policies.sql` → `functions.sql`（三個檔案都是
-      `create or replace`／`drop policy if exists`，可重複執行）。
+- [x] **套用 schema/policies/functions 到 Supabase 專案**——2026-08-29
+      咖哩親自在 Supabase Dashboard 的 SQL Editor 依序貼上執行
+      `schema.sql` → `policies.sql` → `functions.sql`，三份都成功
+      （Success. No rows returned）。備註：這個 sandbox 環境的網路
+      政策只放行 HTTPS 白名單網域，Postgres 直連（5432/6543）跟
+      Supabase Management API（`api.supabase.com`）都連不到，沒辦法
+      由 Claude 這邊直接執行，所以是咖哩手動貼的。
 - [ ] **Phase 5：前端接上**——Aozihdi 的 `index.html` 目前 `ACCOUNT_GAS_URL`
       相關的 35 個呼叫點還沒改，這是接下來最大的一塊，還沒開始。
 - [ ] **實測**：登入／改密碼／申請審核／toolPerms 權限矩陣／LINE 綁定，
