@@ -131,7 +131,7 @@ create table staff_emp_ids (
 
 ## 進度追蹤
 
-- [ ] 階段1：凹子底專案建表 ＋ `docs/班表管理SQL建表.sql`
+- [x] 階段1：凹子底專案建表 ＋ `docs/班表管理SQL建表.sql`（2026-08-29 完成——`schedule_versions`／`schedule_entries`／`shift_codes`／`staff_emp_ids` 四表已建，RLS 已開、不建 policy，只留 service_role 存取，比照現有工具的存取模式）
 - [ ] 階段2：歷史資料從 Sheets 遷移進凹子底專案
 - [ ] 階段3：`getSchedule`／`getScheduleByMonth` 改接凹子底專案＋快取重設計
 - [ ] 階段4：LINE小助手改讀凹子底專案
