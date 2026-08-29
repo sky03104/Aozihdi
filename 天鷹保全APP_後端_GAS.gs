@@ -25,6 +25,16 @@
 //   ・班表異動推播：notifyScheduleChange / notifyScheduleChangeBatch / monthScheduleReleased
 //                  + onEdit偵測 + 5分鐘彙整推播
 //
+// ⚠️ 2026-08-29（班表徹底退場SQL規劃 階段7 待辦，現在還不能刪）：
+//   onScheduleEdit_ / getScheduleQueueSheet_ / processScheduleChangeQueue_ /
+//   notifyScheduleChangeAction_ / notifyScheduleChangeBatchAction_ /
+//   notifyScheduleChangeBulkAction_ / monthScheduleReleasedAction_ /
+//   setupScheduleNotifyTriggers_ 這整組「偵測 Sheets 手動編輯→推播異動」的
+//   機制，前提是還有人會直接在 Google Sheets 上手改班表。咖哩已確認之後
+//   班表全部走程式上傳/編輯（tool_upload.html／index.html 班表管理），不會
+//   再直接手改 Sheets——等 階段7 真的切斷 Sheets 寫入那天，這整組連同
+//   onEdit 安裝式觸發器一起刪掉即可，現在（Sheets 還沒退場）先留著。
+//
 // ★ v2 修正（本月班表漏7/31）：
 //   ・原本 SCHEDULE_DAYS 寫死 30 天，31號永遠不會被讀取/顯示（2月則會多印出不存在的29~30號）
 //   ・改用 getDaysInMonth_(year, month) 依當月實際天數動態計算，涉及：
@@ -2112,9 +2122,77 @@ function readEmployeeShiftsFromSheet_(sh, name, dayCount) {
   return null;
 }
 
+// ════════════════════════════════════════════════════════════
+// 2026-08-29：班表徹底退場SQL規劃 階段4 —— 改讀凹子底沙盒 Supabase
+// ────────────────────────────────────────────────────────────
+// 這支 LINE 小助手是獨立部署的 GAS 專案，要自己在「專案設定→Script
+// Properties」設 SUPABASE_URL=https://tjrlpthprtrlmugrofpj.supabase.co
+// ＋ SUPABASE_SECRET_KEY（legacy service_role key，eyJ開頭），跟班表管理
+// 那支 GAS 部署完全獨立、不共用設定。
+//
+// 雙讀＋Sheets備援：這支是互動查詢，Supabase 連線失敗時不該讓使用者看到
+// 查詢失敗，直接退回原本讀 Sheets 的路徑（readEmployeeShiftsFromSheet_
+// 保留不動，見上方）。跑穩幾天、確認沒問題後再考慮拿掉備援路徑。
+//
+// SCHEDULE_SHEETS_ 用 early/late，凹子底沙盒的 schedule_entries.shift_type
+// 用 morning/night，這裡做對應轉換（跟 班表管理_SQL遷移腳本.gs 的
+// SHIFT_TYPE_MAP_ 是同一個資料庫，但 key 名稱不同，兩邊各自轉各自的）。
+// ════════════════════════════════════════════════════════════
+var LINE_SHIFT_TYPE_MAP_ = { early: 'morning', late: 'night' };
+
+function lineSupabaseConfig_() {
+  var props = PropertiesService.getScriptProperties();
+  var url = props.getProperty('SUPABASE_URL');
+  var key = props.getProperty('SUPABASE_SECRET_KEY');
+  if (!url || !key) throw new Error('請先設定 Script Properties：SUPABASE_URL / SUPABASE_SECRET_KEY');
+  return { url: url.replace(/\/+$/, ''), key: key };
+}
+
+function lineSupabaseRequest_(method, path) {
+  var cfg = lineSupabaseConfig_();
+  var options = {
+    method: method,
+    headers: { apikey: cfg.key, Authorization: 'Bearer ' + cfg.key, 'Content-Type': 'application/json' },
+    muteHttpExceptions: true
+  };
+  var resp = UrlFetchApp.fetch(cfg.url + path, options);
+  var code = resp.getResponseCode();
+  var text = resp.getContentText();
+  if (code >= 400) throw new Error('Supabase 請求失敗（' + code + '）：' + text + '｜path=' + path);
+  return text ? JSON.parse(text) : null;
+}
+
+// 從凹子底沙盒讀某人當月班別代號陣列，讀不到／連線失敗回傳 null（呼叫端會自動退回讀 Sheets）
+function readEmployeeShiftsFromSupabase_(shiftType, name, dayCount) {
+  try {
+    var shiftTypeForDb = LINE_SHIFT_TYPE_MAP_[shiftType];
+    if (!shiftTypeForDb) return null;
+
+    var versions = lineSupabaseRequest_('GET',
+      '/rest/v1/schedule_versions?shift_type=eq.' + shiftTypeForDb + '&status=eq.live');
+    if (!versions || versions.length === 0) return null;
+
+    var entries = lineSupabaseRequest_('GET',
+      '/rest/v1/schedule_entries?version_id=eq.' + versions[0].id +
+      '&emp_name=eq.' + encodeURIComponent(name) + '&order=day_of_month.asc');
+    if (!entries || entries.length === 0) return null;
+
+    var byDay = {};
+    for (var i = 0; i < entries.length; i++) byDay[entries[i].day_of_month] = entries[i].shift_code || '-';
+    var shifts = [];
+    for (var d = 1; d <= dayCount; d++) shifts.push(byDay[d] !== undefined ? byDay[d] : '-');
+    return shifts;
+  } catch (err) {
+    console.error('readEmployeeShiftsFromSupabase_ 失敗（' + shiftType + '/' + name + '）：' + err.toString());
+    return null;
+  }
+}
+
 function getEmployeeShifts_(shiftType, name) {
   var today = getTaipeiToday_();
   var dayCount = getDaysInMonth_(today.year, today.month);
+  var sqlShifts = readEmployeeShiftsFromSupabase_(shiftType, name, dayCount);
+  if (sqlShifts) return sqlShifts;
   return readEmployeeShiftsFromSheet_(getScheduleSheet_(shiftType), name, dayCount);
 }
 
@@ -2122,6 +2200,8 @@ function findEmployeeShiftsAuto_(name) {
   var today = getTaipeiToday_();
   var dayCount = getDaysInMonth_(today.year, today.month);
   for (var key in SCHEDULE_SHEETS_) {
+    var sqlShifts = readEmployeeShiftsFromSupabase_(key, name, dayCount);
+    if (sqlShifts) return { shiftType: key, shifts: sqlShifts };
     var shifts = readEmployeeShiftsFromSheet_(getScheduleSheet_(key), name, dayCount);
     if (shifts) return { shiftType: key, shifts: shifts };
   }

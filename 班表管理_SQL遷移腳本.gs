@@ -9,8 +9,12 @@
 //      才能直接呼叫裡面已經寫好的 SHIFT_CONFIG / 讀班表分頁_ / resolveTargetSheet /
 //      備份分頁前綴_ 等函式，不重複寫一份解析邏輯（重複寫容易兩邊改到不一致）。
 //   2. 專案設定（左側齒輪圖示）→ Script Properties → 新增兩個屬性：
-//        SUPABASE_URL          = https://narilpgjmjncladkquly.supabase.co
-//        SUPABASE_SECRET_KEY   = （sb_secret_ 開頭那把金鑰）
+//        SUPABASE_URL          = https://tjrlpthprtrlmugrofpj.supabase.co （凹子底專案，沙盒版）
+//        SUPABASE_SECRET_KEY   = （legacy service_role key，eyJ 開頭的 JWT，
+//                                  不是 sb_secret_ 開頭那種——GAS UrlFetchApp
+//                                  不能自訂 User-Agent，新格式金鑰的瀏覽器偵測會拒絕）
+//   ⚠️ 這是獨立的沙盒 Apps Script 部署，不要跟正式站 tianying-security 那個
+//      共用同一個部署／Script Properties，兩邊指向不同 Supabase 專案。
 //   3. 在 Apps Script 編輯器的函式下拉選單選 遷移班表資料到Supabase，按執行，
 //      看「執行紀錄」（Logger）確認結果。
 //
@@ -18,9 +22,10 @@
 // 重複執行前會先檢查 Supabase 該版本明細是否已存在，不會重複灌資料。
 // ════════════════════════════════════════════════════════════
 
-// SHIFT_CONFIG 的 key 是 night/morning，但 Supabase schema_entries.shift_type
-// 的 check 限制是 'day'/'night'，這裡做對應轉換。
-var SHIFT_TYPE_MAP_ = { night: 'night', morning: 'day' };
+// SHIFT_CONFIG 的 key 是 night/morning，凹子底沙盒版 schedule_entries.shift_type
+// 的 check 限制是 'night'/'morning'（跟正式站 narilpgjmjncladkquly 用 'day' 不同，
+// 這裡刻意用 identity mapping，兩者互不相通，改動前務必確認資料庫是哪一個）。
+var SHIFT_TYPE_MAP_ = { night: 'night', morning: 'morning' };
 
 // ============================
 // Supabase 連線基礎函式

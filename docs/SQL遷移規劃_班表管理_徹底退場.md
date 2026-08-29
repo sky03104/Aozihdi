@@ -132,9 +132,22 @@ create table staff_emp_ids (
 ## 進度追蹤
 
 - [x] 階段1：凹子底專案建表 ＋ `docs/班表管理SQL建表.sql`（2026-08-29 完成——`schedule_versions`／`schedule_entries`／`shift_codes`／`staff_emp_ids` 四表已建，RLS 已開、不建 policy，只留 service_role 存取，比照現有工具的存取模式）
-- [ ] 階段2：歷史資料從 Sheets 遷移進凹子底專案
-- [ ] 階段3：`getSchedule`／`getScheduleByMonth` 改接凹子底專案＋快取重設計
-- [ ] 階段4：LINE小助手改讀凹子底專案
+- [x] 階段2：歷史資料從 Sheets 遷移進凹子底專案（2026-08-29 完成——直接從兩份 Google Sheets 讀取六份分頁：晚班班表/待生效/備份、早班班表/待生效/備份，寫入 `schedule_versions`(6筆)+`schedule_entries`(3730筆，逐版本核對筆數與 Sheets 來源完全一致：558/527/527/744/630/744)；`班別設定`分頁寫入`shift_codes`(4筆)；`員工工號對照`分頁寫入`staff_emp_ids`(42筆)）
+- [x] 階段3：`getSchedule`／`getScheduleByMonth` 改接凹子底專案＋快取重設計（2026-08-29 發現：這支程式碼因為 Aozihdi 是 tianying-security 的完整 clone，正式站早在 2026-08-27 v2.16 就已經做好一模一樣的設計——`doGet` 的 `getSchedule` 走 `getScheduleData_含快取`（1小時 CacheService，寫入時主動清快取）、`getScheduleByMonth`/`listScheduleMonths` 走 `讀取含備援_`（Supabase優先、Sheets備援），程式邏輯不用重寫。**唯一真的要修的 bug**：`班表管理_SQL遷移腳本.gs` 的 `SHIFT_TYPE_MAP_` 沿用正式站把 `morning` 對應成資料庫 `'day'`，但凹子底沙盒的 `schedule_entries.shift_type` check 限制是 `'night'/'morning'`（跟正式站不同的庫，不能照搬對應表），已改成 identity mapping 並修正註解。**待咖哩手動操作**：這幾支 `.gs` 檔要貼進一個獨立的 Apps Script 部署（不能跟正式站共用），Script Properties 設 `SUPABASE_URL=https://tjrlpthprtrlmugrofpj.supabase.co`＋對應的 legacy service_role key，部署後執行 `測試讀取效能()`/`比對讀取結果()` 驗證）
+- [x] 階段4：LINE小助手改讀凹子底專案（2026-08-29 完成——原本以為範圍很大，實際查code發現
+      LINE小助手真正碰班表資料的只有 `readEmployeeShiftsFromSheet_`／`getEmployeeShifts_`／
+      `findEmployeeShiftsAuto_` 三支，只給互動查詢（今日/明日/本週/本月班表問答）用，都只讀
+      **當月 live 版本**。之前研究誤以為每日「明日哨點」推播（`pushTomorrowPostScheduled_`）
+      也用到這份資料，查過才發現那支走的是完全不同的 `POST_SHEET_ID`（哨表/崗位系統，屬於
+      TODO-38 範圍，不是這次的月班表）。已新增 `readEmployeeShiftsFromSupabase_()`
+      （凹子底沙盒獨立連線，跟班表管理 GAS 用不同的 Script Properties）＋改
+      `getEmployeeShifts_`／`findEmployeeShiftsAuto_` 為 Supabase 優先、失敗自動退回讀
+      Sheets。**跟咖哩確認過**：之後班表全部走程式上傳/編輯，不會再有人直接手改 Sheets——
+      所以原本監聽 Sheets 手動編輯並推播異動的一整組機制（`onScheduleEdit_` 等 8 支函式＋
+      onEdit 觸發器）**判定為之後可刪除的死碼**，但要等階段7真的切斷 Sheets 寫入那天再刪，
+      現在保留不動並在程式碼加註記。`node --check` 語法驗證通過。**待咖哩手動操作**：這支
+      獨立 GAS 部署要另外設 Script Properties（`SUPABASE_URL`=凹子底專案、
+      `SUPABASE_SECRET_KEY`），部署後先跑幾天觀察互動查詢有沒有問題）
 - [ ] 階段5：自動排哨工具改讀凹子底專案
 - [ ] 階段6：會計月彙整表鏡像推播（待與咖哩確認新版面）
 - [ ] 階段7：切斷 Sheets 寫入
