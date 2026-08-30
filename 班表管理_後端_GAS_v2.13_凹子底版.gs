@@ -76,7 +76,7 @@ function 手動授權_請跑一次() {
 // 轉換 mimeType），跑完把「執行記錄」完整錯誤訊息貼給我。跑完可以刪除這支函式。
 function 診斷_模擬Drive複製() {
   try {
-    var testFileId = '1FRagQv2RpjqSr9hxwP-YNQAnFBw1bYgL-msNS826K-E'; // 晚班班表_凹子底沙盒，本身就是Sheets，測試複製轉換流程
+    var testFileId = SHIFT_CONFIG.night.targetSsId; // 改為動態讀取，避免跟實際設定脫鉤
     var tempSs = Drive.Files.copy(
       { title: '_診斷測試_' + Date.now(), mimeType: MimeType.GOOGLE_SHEETS },
       testFileId
