@@ -187,4 +187,20 @@ create table staff_emp_ids (
       咖哩要對照重寫會計試算表裡原本讀舊版面的公式；③這支要跟班表管理其他 GAS 檔案
       貼進同一個獨立部署（共用 `SHIFT_CONFIG`/`supabaseRequest_`），部署後先手動執行
       `推播會計鏡像()` 確認正常再排 `設定會計鏡像每日觸發器()`）
+## 凹子底沙盒獨立部署網址（2026-08-30 咖哩已部署）
+
+三個獨立 Apps Script 部署都跟巨蛋正式站完全分開，網址如下：
+
+| 部署 | 網址 | 前端接線狀態 |
+|---|---|---|
+| 班表管理_後端_GAS_v2.13_凹子底版 | `https://script.google.com/macros/s/AKfycbykW2fycBU5FFOrQ_5ZbKkBIT0d2z_3rUeA88vA3mrnMgCeZWUmu9fAI_rjNUnrapv5/exec` | ✅ 已接：`tool_upload.html` 的 `SCH_WEBAPP_URL` 改指向這裡（2026-08-30） |
+| 哨表產生_GAS_凹子底版 | `https://script.google.com/macros/s/AKfycbysR6FRDALHSAuE3u9-OWTwVoEzpzwOfD6tFIASzCKmQp40KUsDxoTCLy4fdacBtne-/exec` | ✅ 已接：`tool_guard_gen.html` 的 `GUARD_GEN_GAS_URL` 改指向這裡（2026-08-30） |
+| 天鷹保全APP_後端_GAS_凹子底版（LINE小助手） | `https://script.google.com/macros/s/AKfycbyMYMi2cY02A8soyOai2ZVJ3H-5ObXXAwxQFoLkZEzg2dRJw5zBTTKDFYBG19kiFSm_/exec` | ⏳ 未接：這支是 LINE webhook 端點，不是前端 HTML 呼叫的網址，要接的話是去 LINE Developers 後台把 Webhook URL 換成這個（**尚未確認咖哩是否已切換**，切了之後這個沙盒部署才會真的收到 LINE 訊息） |
+
+**待辦**：三個部署都已建立，Script Properties 是否都正確設定（`SUPABASE_URL`/`SUPABASE_SECRET_KEY`
+指向凹子底專案）還沒實測確認；`班表管理_後端_GAS_v2.13_凹子底版` 這個部署還沒確認有沒有把另外
+4 支 `班表管理_SQL*_凹子底版.gs` 檔案一起貼進同一個專案（`SQL讀取層`/`SQL遷移腳本`/`SQL每日備份`/
+`SQL會計鏡像推播`，`doGet` 會呼叫到裡面的函式，沒一起貼會 ReferenceError，這是這系列踩過的坑，
+見 `docs/SQL遷移規劃_班表管理.md` 的重大踩坑記錄）。
+
 - [ ] 階段7：切斷 Sheets 寫入
