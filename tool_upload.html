@@ -917,10 +917,11 @@ let schFile=null,schFileB64=null,schFileId=null,schUrlShowing=false;
 let schMainRows=null,schMonthNum=null; // 前端解析的班表資料（供同步給班表管理工具）
 /* ── 雙班別設定：晚班維持原行為；早班寫入早班線上試算表 ── */
 const SCH_SHIFTS={
+  // 2026-08-30：改指向凹子底沙盒試算表（避免確認連結誤導成巨蛋正式站）
   night:{label:'晚班',sheetName:'晚班班表',
-    url:'https://docs.google.com/spreadsheets/d/1hIbgESfLitqC3W9DuSFGMWEuFZKJFKzK8srorQMuia8/edit?gid=1144284018#gid=1144284018'},
+    url:'https://docs.google.com/spreadsheets/d/133R-RCM1iO74Ty01osbW873YFzBFJJV14ITMdBesyQs/edit?gid=1144284018#gid=1144284018'},
   morning:{label:'早班',sheetName:'早班班表',
-    url:'https://docs.google.com/spreadsheets/d/1l8SoOVDQ4nO6qBkXcNEaBzct6AN82-H_0njbKNQauUQ/edit?gid=38985608#gid=38985608'}
+    url:'https://docs.google.com/spreadsheets/d/1SKEe-VoNBZnZj2wTI8BmKq5HMtKagV6GKdiTPZig3ks/edit?gid=38985608#gid=38985608'}
 };
 let schShift='night';        // 目前選擇的班別
 let schSrcSheetName='晚班班表'; // 實際讀取到的 Excel 分頁名稱（隨檔案解析更新）
