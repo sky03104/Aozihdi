@@ -14,7 +14,7 @@
 var GUARD_SS_ID = '1sIcdAhw0mz5iM3F5fulDNPOda2pv-t7xUhT6XXf9X7Q';
 var POST_CONFIG_SHEET_NAME = '哨點設定';
 
-// 早/晚班月班表：與 天鷹保全APP_後端_GAS.gs 的 SCHEDULE_SHEETS_ 相同（獨立部署，各自維護一份常數）
+// 早/晚班月班表：與 天鷹保全APP_後端_GAS_凹子底版.gs 的 SCHEDULE_SHEETS_ 相同（獨立部署，各自維護一份常數）
 var SCHEDULE_SHEETS_ = {
   early: { id: '1l8SoOVDQ4nO6qBkXcNEaBzct6AN82-H_0njbKNQauUQ', sheetName: '早班班表' },
   late:  { id: '1hIbgESfLitqC3W9DuSFGMWEuFZKJFKzK8srorQMuia8', sheetName: '晚班班表' }
@@ -102,10 +102,48 @@ function saveGuardPostConfig(configs, empId) {
   }
 }
 
+// ════════════════════════════════════════════════════════════
+// 2026-08-29：班表徹底退場SQL規劃 階段5 —— 改讀凹子底沙盒 Supabase
+// ────────────────────────────────────────────────────────────
+// 獨立部署，自己的 Script Properties：SUPABASE_URL=
+// https://tjrlpthprtrlmugrofpj.supabase.co ＋ SUPABASE_SECRET_KEY
+// （legacy service_role key），跟 LINE小助手／班表管理 GAS 各自獨立設定。
+//
+// SCHEDULE_SHEETS_ 用 early/late，凹子底沙盒 schedule_entries.shift_type
+// 用 morning/night，這裡做對應轉換。
+//
+// 雙讀＋Sheets備援：這是互動工具（有人在畫面前等結果），Supabase 失敗時
+// 退回原本讀 Sheets 的路徑，不讓使用者看到空白/錯誤。跑穩幾天、且既有
+// ~60 項 node 測試（TODO-12）都過了才考慮拿掉備援路徑。
+// ════════════════════════════════════════════════════════════
+var GUARD_SHIFT_TYPE_MAP_ = { early: 'morning', late: 'night' };
+
+function guardSupabaseConfig_() {
+  var props = PropertiesService.getScriptProperties();
+  var url = props.getProperty('SUPABASE_URL');
+  var key = props.getProperty('SUPABASE_SECRET_KEY');
+  if (!url || !key) throw new Error('請先設定 Script Properties：SUPABASE_URL / SUPABASE_SECRET_KEY');
+  return { url: url.replace(/\/+$/, ''), key: key };
+}
+
+function guardSupabaseRequest_(method, path) {
+  var cfg = guardSupabaseConfig_();
+  var options = {
+    method: method,
+    headers: { apikey: cfg.key, Authorization: 'Bearer ' + cfg.key, 'Content-Type': 'application/json' },
+    muteHttpExceptions: true
+  };
+  var resp = UrlFetchApp.fetch(cfg.url + path, options);
+  var code = resp.getResponseCode();
+  var text = resp.getContentText();
+  if (code >= 400) throw new Error('Supabase 請求失敗（' + code + '）：' + text + '｜path=' + path);
+  return text ? JSON.parse(text) : null;
+}
+
 // ============================
 // 員工名單（早/晚班月班表姓名欄，B欄，去重合併）
 // ============================
-function getEmployeeNames() {
+function getEmployeeNamesFromSheets_() {
   var names = {};
   ['early', 'late'].forEach(function (key) {
     var cfg = SCHEDULE_SHEETS_[key];
@@ -117,6 +155,32 @@ function getEmployeeNames() {
       if (name && name !== '姓名' && name !== '日期') names[name] = true; // 跳過表頭列
     }
   });
+  return names;
+}
+
+function getEmployeeNamesFromSupabase_() {
+  var names = {};
+  for (var key in GUARD_SHIFT_TYPE_MAP_) {
+    var shiftTypeForDb = GUARD_SHIFT_TYPE_MAP_[key];
+    var versions = guardSupabaseRequest_('GET',
+      '/rest/v1/schedule_versions?shift_type=eq.' + shiftTypeForDb + '&status=eq.live');
+    if (!versions || versions.length === 0) return null; // 任一班別查不到就整組放棄，退回 Sheets
+    var entries = guardSupabaseRequest_('GET',
+      '/rest/v1/schedule_entries?version_id=eq.' + versions[0].id + '&select=emp_name');
+    for (var i = 0; i < entries.length; i++) {
+      var name = String(entries[i].emp_name || '').trim();
+      if (name) names[name] = true;
+    }
+  }
+  return names;
+}
+
+function getEmployeeNames() {
+  var names = null;
+  try { names = getEmployeeNamesFromSupabase_(); } catch (err) {
+    console.error('getEmployeeNamesFromSupabase_ 失敗，改用 Sheets：' + err.toString());
+  }
+  if (!names) names = getEmployeeNamesFromSheets_();
   var list = Object.keys(names).sort(function (a, b) { return a.localeCompare(b, 'zh-Hant'); });
   return { status: 'ok', msg: '', data: list };
 }
@@ -127,15 +191,10 @@ function getDaysInMonth_(year, month) {
 
 // ============================
 // 當日在職名單（排除休假代號），供哨表自動分配使用
-// 讀取邏輯照抄 天鷹保全APP_後端_GAS.gs 的 readEmployeeShiftsFromSheet_：
-//   姓名在 data[r][1]，班別代號在 data[r][2+day-1]
+// 沿用既有行為：不驗證 year/month 是否跟目前 live 版本的月份相符，
+// 只依 day 取當天代號（跟原本 Sheets 版邏輯完全一致，不是這次要修的範圍）
 // ============================
-function getMonthlyRoster(year, month, day) {
-  year = parseInt(year); month = parseInt(month); day = parseInt(day);
-  if (!year || !month || !day) throw new Error('year/month/day 參數缺失');
-  var maxDay = getDaysInMonth_(year, month);
-  if (day < 1 || day > maxDay) throw new Error('日期超出範圍：' + year + '年' + month + '月只有' + maxDay + '天');
-
+function getMonthlyRosterFromSheets_(year, month, day) {
   var result = { early: [], late: [] };
   ['early', 'late'].forEach(function (key) {
     var cfg = SCHEDULE_SHEETS_[key];
@@ -151,6 +210,40 @@ function getMonthlyRoster(year, month, day) {
       result[key].push({ name: name, code: code });
     }
   });
+  return result;
+}
+
+function getMonthlyRosterFromSupabase_(day) {
+  var result = { early: [], late: [] };
+  for (var key in GUARD_SHIFT_TYPE_MAP_) {
+    var shiftTypeForDb = GUARD_SHIFT_TYPE_MAP_[key];
+    var versions = guardSupabaseRequest_('GET',
+      '/rest/v1/schedule_versions?shift_type=eq.' + shiftTypeForDb + '&status=eq.live');
+    if (!versions || versions.length === 0) return null; // 任一班別查不到就整組放棄，退回 Sheets
+    var entries = guardSupabaseRequest_('GET',
+      '/rest/v1/schedule_entries?version_id=eq.' + versions[0].id +
+      '&day_of_month=eq.' + day + '&select=emp_name,shift_code');
+    for (var i = 0; i < entries.length; i++) {
+      var name = String(entries[i].emp_name || '').trim();
+      var code = String(entries[i].shift_code || '').trim();
+      if (!name || !code || OFF_CODES_.indexOf(code) !== -1) continue;
+      result[key].push({ name: name, code: code });
+    }
+  }
+  return result;
+}
+
+function getMonthlyRoster(year, month, day) {
+  year = parseInt(year); month = parseInt(month); day = parseInt(day);
+  if (!year || !month || !day) throw new Error('year/month/day 參數缺失');
+  var maxDay = getDaysInMonth_(year, month);
+  if (day < 1 || day > maxDay) throw new Error('日期超出範圍：' + year + '年' + month + '月只有' + maxDay + '天');
+
+  var result = null;
+  try { result = getMonthlyRosterFromSupabase_(day); } catch (err) {
+    console.error('getMonthlyRosterFromSupabase_ 失敗，改用 Sheets：' + err.toString());
+  }
+  if (!result) result = getMonthlyRosterFromSheets_(year, month, day);
 
   var weekdayIdx = new Date(year, month - 1, day).getDay();
   return {
