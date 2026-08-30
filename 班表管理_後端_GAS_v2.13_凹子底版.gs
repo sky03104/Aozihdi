@@ -62,19 +62,19 @@
 var NOTIFY_GAS_URL = "https://script.google.com/macros/s/AKfycbxEVBHseDpLWiWe4d8kLcCHbVFiKAK9wyoLwqNkt59PS4vPCY9QfG0_wiDJf2coO3zMcg/exec";
 
 // ── 雙班別設定 ──
+// 2026-08-30：凹子底沙盒改用獨立試算表（複製自巨蛋正式站，保留表頭格式），
+// 避免這支沙盒部署的 Excel 上傳寫壞巨蛋正式線上班表。gid 沿用來源（整份試算表複製，內部 sheetId 不變）。
 var SHIFT_CONFIG = {
-  // 晚班：維持原本目標（不變）
   night: {
     label: '晚班',
-    targetSsId: '1hIbgESfLitqC3W9DuSFGMWEuFZKJFKzK8srorQMuia8',
+    targetSsId: '1FRagQv2RpjqSr9hxwP-YNQAnFBw1bYgL-msNS826K-E',
     targetSheetName: '晚班班表',
     targetGid: 1144284018,
     sourceSheetName: '晚班班表'
   },
-  // 早班：新增目標（早班線上班表）
   morning: {
     label: '早班',
-    targetSsId: '1l8SoOVDQ4nO6qBkXcNEaBzct6AN82-H_0njbKNQauUQ',
+    targetSsId: '1SKEe-VoNBZnZj2wTI8BmKq5HMtKagV6GKdiTPZig3ks',
     targetSheetName: '早班班表',
     targetGid: 38985608,
     sourceSheetName: '早班班表'
