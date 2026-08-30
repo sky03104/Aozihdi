@@ -195,11 +195,12 @@ create table staff_emp_ids (
 |---|---|---|
 | 班表管理_後端_GAS_v2.13_凹子底版 | `https://script.google.com/macros/s/AKfycbykW2fycBU5FFOrQ_5ZbKkBIT0d2z_3rUeA88vA3mrnMgCeZWUmu9fAI_rjNUnrapv5/exec` | ✅ 已接：`tool_upload.html` 的 `SCH_WEBAPP_URL` 改指向這裡（2026-08-30） |
 | 哨表產生_GAS_凹子底版 | `https://script.google.com/macros/s/AKfycbysR6FRDALHSAuE3u9-OWTwVoEzpzwOfD6tFIASzCKmQp40KUsDxoTCLy4fdacBtne-/exec` | ✅ 已接：`tool_guard_gen.html` 的 `GUARD_GEN_GAS_URL` 改指向這裡（2026-08-30） |
-| 天鷹保全APP_後端_GAS_凹子底版（LINE小助手） | `https://script.google.com/macros/s/AKfycbyMYMi2cY02A8soyOai2ZVJ3H-5ObXXAwxQFoLkZEzg2dRJw5zBTTKDFYBG19kiFSm_/exec` | ⏳ 未接：這支是 LINE webhook 端點，不是前端 HTML 呼叫的網址，要接的話是去 LINE Developers 後台把 Webhook URL 換成這個（**尚未確認咖哩是否已切換**，切了之後這個沙盒部署才會真的收到 LINE 訊息） |
+| 天鷹保全APP_後端_GAS_凹子底版（LINE小助手） | `https://script.google.com/macros/s/AKfycbyMYMi2cY02A8soyOai2ZVJ3H-5ObXXAwxQFoLkZEzg2dRJw5zBTTKDFYBG19kiFSm_/exec` | ✅ 已接（2026-08-30）：新開 Provider「凹子底小助手」→ 新 Messaging API Channel「天鷹凹子底小助手」（Channel ID `2011328962`），Webhook URL 已設成這支網址並開啟 Use webhook。**待辦**：Channel access token 需另外在 Messaging API 分頁下拉 Issue，貼進本部署 Script Properties 的 `LINE_CHANNEL_ACCESS_TOKEN`，貼完才算真正接通（尚待咖哩確認完成＋實機加好友測試） |
 
 **2026-08-30 咖哩確認**：
-- LINE小助手這個沙盒部署暫不接 LINE Webhook，之後會另外開一個全新的 LINE 官方帳號/小助手
-  給凹子底專用（跟巨蛋徹底分開），這次先不測 LINE 互動查詢那條路徑。
+- LINE小助手這個沙盒部署原規劃暫不接 LINE Webhook，之後另開全新官方帳號——**已提前完成**：
+  新建 Provider＋Messaging API Channel 專供凹子底，跟巨蛋「天鷹班表小助手」完全分離，
+  Webhook URL 已指向本部署。
 - `班表管理_後端_GAS_v2.13_凹子底版` 部署已確認把另外 4 支 `班表管理_SQL*_凹子底版.gs`
   都一起貼進同一個 Apps Script 專案了，不會有 ReferenceError 的風險。
 
