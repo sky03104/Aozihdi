@@ -197,10 +197,19 @@ create table staff_emp_ids (
 | 哨表產生_GAS_凹子底版 | `https://script.google.com/macros/s/AKfycbysR6FRDALHSAuE3u9-OWTwVoEzpzwOfD6tFIASzCKmQp40KUsDxoTCLy4fdacBtne-/exec` | ✅ 已接：`tool_guard_gen.html` 的 `GUARD_GEN_GAS_URL` 改指向這裡（2026-08-30） |
 | 天鷹保全APP_後端_GAS_凹子底版（LINE小助手） | `https://script.google.com/macros/s/AKfycbyMYMi2cY02A8soyOai2ZVJ3H-5ObXXAwxQFoLkZEzg2dRJw5zBTTKDFYBG19kiFSm_/exec` | ⏳ 未接：這支是 LINE webhook 端點，不是前端 HTML 呼叫的網址，要接的話是去 LINE Developers 後台把 Webhook URL 換成這個（**尚未確認咖哩是否已切換**，切了之後這個沙盒部署才會真的收到 LINE 訊息） |
 
-**待辦**：三個部署都已建立，Script Properties 是否都正確設定（`SUPABASE_URL`/`SUPABASE_SECRET_KEY`
-指向凹子底專案）還沒實測確認；`班表管理_後端_GAS_v2.13_凹子底版` 這個部署還沒確認有沒有把另外
-4 支 `班表管理_SQL*_凹子底版.gs` 檔案一起貼進同一個專案（`SQL讀取層`/`SQL遷移腳本`/`SQL每日備份`/
-`SQL會計鏡像推播`，`doGet` 會呼叫到裡面的函式，沒一起貼會 ReferenceError，這是這系列踩過的坑，
-見 `docs/SQL遷移規劃_班表管理.md` 的重大踩坑記錄）。
+**2026-08-30 咖哩確認**：
+- LINE小助手這個沙盒部署暫不接 LINE Webhook，之後會另外開一個全新的 LINE 官方帳號/小助手
+  給凹子底專用（跟巨蛋徹底分開），這次先不測 LINE 互動查詢那條路徑。
+- `班表管理_後端_GAS_v2.13_凹子底版` 部署已確認把另外 4 支 `班表管理_SQL*_凹子底版.gs`
+  都一起貼進同一個 Apps Script 專案了，不會有 ReferenceError 的風險。
+
+**待辦（我這邊沒有瀏覽器/GAS執行環境，這幾項只能咖哩手動測）**：
+1. 確認三個部署的 Script Properties（`SUPABASE_URL`=凹子底專案、`SUPABASE_SECRET_KEY`）都設對
+2. 實際用 `tool_upload.html` 拖曳一份 Excel 上傳班表，確認走的是新的凹子底版後端、資料有沒有正確
+   寫進 Supabase（可以在 Supabase 後台的 `schedule_entries`/`schedule_versions` 直接看新資料）
+3. 開 `tool_guard_gen.html` 排一次哨表，確認自動分配結果正常
+4. 在 Apps Script 編輯器手動執行 `推播會計鏡像()`，確認 `ACCOUNTING_SS_ID` 對不對、鏡像分頁有沒有
+   正確寫入
+5. 這三項都確認沒問題後，才進入階段7（砍 Sheets 寫入）
 
 - [ ] 階段7：切斷 Sheets 寫入
