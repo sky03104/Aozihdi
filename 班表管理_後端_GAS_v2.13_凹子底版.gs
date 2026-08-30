@@ -94,7 +94,7 @@ function 診斷_模擬Drive複製() {
 var SHIFT_CONFIG = {
   night: {
     label: '晚班',
-    targetSsId: '1FRagQv2RpjqSr9hxwP-YNQAnFBw1bYgL-msNS826K-E',
+    targetSsId: '133R-RCM1iO74Ty01osbW873YFzBFJJV14ITMdBesyQs',
     targetSheetName: '晚班班表',
     targetGid: 1144284018,
     sourceSheetName: '晚班班表'
