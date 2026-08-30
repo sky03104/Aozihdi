@@ -64,6 +64,14 @@ var NOTIFY_GAS_URL = "https://script.google.com/macros/s/AKfycbxEVBHseDpLWiWe4d8
 // ── 雙班別設定 ──
 // 2026-08-30：凹子底沙盒改用獨立試算表（複製自巨蛋正式站，保留表頭格式），
 // 避免這支沙盒部署的 Excel 上傳寫壞巨蛋正式線上班表。gid 沿用來源（整份試算表複製，內部 sheetId 不變）。
+// 2026-08-30：新增 Drive API 進階服務後，執行身分需要重新授權才會生效。
+// 在 Apps Script 編輯器頂端函式下拉選單選這支、按「▶ 執行」，跳出授權視窗後
+// 「進階」→「前往...(不安全)」→「允許」。授權完成後這支函式即可刪除。
+function 手動授權_請跑一次() {
+  var files = Drive.Files.list({ maxResults: 1 });
+  console.log('Drive API 授權成功，可以刪除這支函式了。');
+}
+
 var SHIFT_CONFIG = {
   night: {
     label: '晚班',
