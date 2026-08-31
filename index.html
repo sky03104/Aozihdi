@@ -1259,18 +1259,19 @@ function ok(obj) {
            （撞號會讓兩個人的班表互相蓋掉）。switchShift('all') 與開啟時的初始載入都走這裡，
            合併規則只有這一份。 */
         const 合併案場班表_ = (夜, 早) => {
+            // 2026-08-31：咖哩要求案場班表改成早班排前面、晚班排後面（原本是晚班先塞進陣列排前面）
             const ID_OFFSET = 10000;
             let nStaff = [], nSc = {};
-            if (夜 && Array.isArray(夜.staff) && 夜.staff.length) {
-                nStaff = [...夜.staff];
-                nSc = { ...(夜.sched || {}) };
-            }
             if (早 && Array.isArray(早.staff) && 早.staff.length) {
-                const mStaff = 早.staff.map(ms => ({ ...ms, id: ms.id + ID_OFFSET }));
-                const mScOff = {};
-                Object.entries(早.sched || {}).forEach(([id, v]) => { mScOff[+id + ID_OFFSET] = v; });
-                nStaff = [...nStaff, ...mStaff];
-                nSc = { ...nSc, ...mScOff };
+                nStaff = [...早.staff];
+                nSc = { ...(早.sched || {}) };
+            }
+            if (夜 && Array.isArray(夜.staff) && 夜.staff.length) {
+                const nightStaff = 夜.staff.map(ns => ({ ...ns, id: ns.id + ID_OFFSET }));
+                const nightScOff = {};
+                Object.entries(夜.sched || {}).forEach(([id, v]) => { nightScOff[+id + ID_OFFSET] = v; });
+                nStaff = [...nStaff, ...nightStaff];
+                nSc = { ...nSc, ...nightScOff };
             }
             return { staff: nStaff, sched: nSc };
         };
