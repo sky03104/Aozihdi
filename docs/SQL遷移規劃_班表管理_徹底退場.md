@@ -145,6 +145,22 @@ create table staff_emp_ids (
 - 多檔案 GAS 專案：改動任一檔案要提醒咖哩把所有互相依賴的檔案一起貼上重新部署
 - **這次額外的規則：任何 SQL/Script Properties 設定都只能指向 `tjrlpthprtrlmugrofpj`，
   絕不寫入或讀取 `narilpgjmjncladkquly`**
+- **⚠️ 新踩的大坑（2026-08-31）：改了工具的 .html 檔案，不代表主控台真的會載入它！**
+  `index.html`（凹子底沙盒的主控台）裡每個工具的網址都是寫死的常數／`externalUrl`，
+  Aozihdi 這個 repo 是直接從 tianying-security clone 過來的，所以絕大多數工具的網址
+  **原封不動指向 `sky03104.github.io/tianying-security/xxx.html`（巨蛋正式站）**，不是
+  `sky03104.github.io/Aozihdi/xxx.html`（凹子底沙盒自己）。這次 `tool_upload.html`／
+  `tool_guard_gen.html` 改了老半天一直「看起來沒生效」，除錯繞了一大圈（node --check
+  過、GitHub Actions 部署成功、view-source 確認原始碼是新的、無痕模式排除快取），最後
+  才發現主控台從頭到尾載入的是 tianying-security 版本，我這邊改的 Aozihdi 版本從未被
+  用到過。**之後只要改動任何一支工具（凹子底沙盒），一定要先去 `index.html` 搜尋該工具的
+  檔名，確認對應的常數／`externalUrl` 已經改成指向 `sky03104.github.io/Aozihdi/`，
+  否則改了等於白改。** 搜尋指令：`grep -n "tianying-security" index.html`，目前尚未搬遷、
+  仍正確指向巨蛋正式站的工具（之後要動哪個才需要照這個模式改）：`post.html`／
+  `tool_opening.html`／`tool_ai_chat.html`／`tool_logistics.html`／`tool_handover.html`／
+  `tool_signin.html`／`tool_car.html`／`tool_closing.html`／`tool_emergency.html`／
+  `tool_report.html`／`tool_work.html`（兩處，含 `aiwork`）／`tool_feedback.html`／
+  `tool_shift_adjust.html`／`tool_billing.html`／`tool_menstrual.html`／`tool_radio.html`。
 
 ## 進度追蹤
 
