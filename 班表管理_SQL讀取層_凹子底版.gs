@@ -155,6 +155,52 @@ function listScheduleMonths_SQL(e) {
 }
 
 // ============================
+// v2.17：案場班表（早+晚合併）——新增一次查完兩班的 action，取代前端原本
+// 分兩次呼叫 getSchedule（night/morning）再自己合併的做法，省一次網路來回。
+// 只查 Supabase，不做 Sheets 備援（備援交給前端：這支失敗就沿用舊的兩次
+// 呼叫路徑，兩條路並存方便實測比較，不是取代關係）。
+// ============================
+function getScheduleMerged_SQL(e) {
+  try {
+    var out = { night: null, morning: null };
+    ['night', 'morning'].forEach(function (shiftKey) {
+      var shiftTypeForDb = SHIFT_TYPE_MAP_[shiftKey];
+      var versions = supabaseRequest_('GET',
+        '/rest/v1/schedule_versions?shift_type=eq.' + shiftTypeForDb + '&status=eq.live');
+      if (versions && versions.length > 0) {
+        var v = versions[0];
+        var entries = 抓版本明細_(v.id);
+        out[shiftKey] = { ym: v.year_month.replace('-', '/'), rows: 重組Rows_(entries) };
+      }
+    });
+    if (!out.night && !out.morning) {
+      return respond({ success: false, error: 'Supabase 找不到早班或晚班的線上版本' });
+    }
+    return respond({ success: true, night: out.night, morning: out.morning });
+  } catch (err) {
+    return respond({ success: false, error: err.message });
+  }
+}
+
+var 班表合併快取秒數_ = 3600; // 跟單班快取一致，寫入時一併清除（見 清除班表快取_）
+
+function getScheduleMerged_含快取(e) {
+  var cache = CacheService.getScriptCache();
+  var key = 'schedule_merged';
+  var cached = cache.get(key);
+  if (cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+
+  var result = getScheduleMerged_SQL(e);
+  try {
+    var data = JSON.parse(result.getContent());
+    if (data.success) cache.put(key, result.getContent(), 班表合併快取秒數_);
+  } catch (err) {
+    console.error('寫入案場班表合併快取失敗：' + err.toString());
+  }
+  return result;
+}
+
+// ============================
 // v2.16：getSchedule 短時間快取（1小時）
 // ────────────────────────────
 // getSchedule 這支查詢範圍固定很小，Sheets本身就夠快，真正拖慢的是 Apps
@@ -172,7 +218,9 @@ function 班表快取Key_(shiftKey) {
 
 function 清除班表快取_(shiftKey) {
   try {
-    CacheService.getScriptCache().remove(班表快取Key_(shiftKey));
+    var cache = CacheService.getScriptCache();
+    cache.remove(班表快取Key_(shiftKey));
+    cache.remove('schedule_merged'); // 案場班表是早+晚合併，任一班改動都要一併失效
   } catch (err) {
     console.error('清除班表快取失敗（' + shiftKey + '）：' + err.toString());
   }
