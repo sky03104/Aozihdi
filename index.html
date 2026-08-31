@@ -157,7 +157,10 @@ const DEMO_USERS = [
 ];
 const DEMO_PENDING = [];
 // 請假申請／公告／交辦事項雲端服務（沒搬 SQL，繼續打 GAS）：寫入「天鷹保全APP」試算表（獨立GAS專案）
-const ACCOUNT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxEVBHseDpLWiWe4d8kLcCHbVFiKAK9wyoLwqNkt59PS4vPCY9QfG0_wiDJf2coO3zMcg/exec';
+// 2026-08-31：改指向凹子底沙盒版部署（原本寫死巨蛋正式站網址，同一種踩坑——雖然
+// getLeaveRequests 等函式明明就在 天鷹保全APP_後端_GAS_凹子底版.gs 裡，但這裡連的
+// 卻是另一個巨蛋正式站的部署網址，不是我們部署好的凹子底沙盒版）
+const ACCOUNT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyMYMi2cY02A8soyOai2ZVJ3H-5ObXXAwxQFoLkZEzg2dRJw5zBTTKDFYBG19kiFSm_/exec';
 /* ── 帳號密碼權限系統 SQL 試作（2026-08-29）──────────────────
    帳號／申請／設定／LINE 綁定改走 Supabase：前端直連 + Row Level
    Security 把關，登入交給 Supabase Auth（內建 bcrypt 密碼雜湊 + JWT
