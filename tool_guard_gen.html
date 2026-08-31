@@ -108,8 +108,7 @@ function backUrl(){ return 'index.html?empId=' + encodeURIComponent(EMP_ID); }
 // 部署後把 /exec 網址填在這裡（見 哨表產生_GAS_部署說明.md）
 const GUARD_GEN_GAS_URL = 'https://script.google.com/macros/s/AKfycbysR6FRDALHSAuE3u9-OWTwVoEzpzwOfD6tFIASzCKmQp40KUsDxoTCLy4fdacBtne-/exec'; // 2026-08-30：改指向凹子底沙盒版 哨表產生_GAS_凹子底版
 // 哨表上傳走「哨表上傳_GAS_v6_凹子底版.gs」，跟 tool_upload.html 用同一支沙盒部署
-// 2026-08-31：待咖哩部署後回填新網址（原本寫死巨蛋正式站網址）
-const GD_UPLOAD_GAS_URL = '';
+const GD_UPLOAD_GAS_URL = 'https://script.google.com/macros/s/AKfycbwmExSYozchARpwlcBfJ-trzY3VKP6UNkWQg1bnWeowz_V0z16R05DJqlc1bqqfVrW4/exec'; // 2026-08-31：凹子底沙盒版 哨表上傳_GAS_v6_凹子底版
 
 async function callGuardGas(action, data) {
   try {
