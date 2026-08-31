@@ -1166,13 +1166,13 @@ function ok(obj) {
            畫面會閃動、且持久化 effect 的寫入時機不可控。
            解析規則只有這一份，loadFromCloud 也走它，不會兩處各寫一套。
            回傳 { staff, sched, cnt }；讀不到／月份不符／離線一律回 null。 */
-        const 抓班表_ = async (shKey, baseStaff, baseSched) => {
+        /* 2026-08-31 抽出：把「已經拿到手的 getSchedule 回應」解析成 {staff,sched,cnt}，
+           不負責 fetch。抓班表_（單班查詢）跟 抓案場班表合併_（一次查兩班）共用同一套
+           解析規則，不要各寫一份。 */
+        const 解析班表回應_ = (shKey, d, baseStaff, baseSched) => {
             const bStaff = baseStaff || [];
             const bSched = baseSched || {};
-            if (!asUrl) return null;
             try {
-                const res = await fetch(asUrl + '?action=getSchedule&shift=' + shKey);
-                const d = await res.json();
                 if (!d.success || !Array.isArray(d.rows) || !d.rows.length) return null;
                 // 線上班表月份（Z1）需與當前月份相符才套用，避免換月初期載入舊月資料
                 const expectYm = `${Y}/${M < 10 ? '0' + M : M}`;
@@ -1217,7 +1217,34 @@ function ok(obj) {
                 finalStaff.forEach(s => { finalSc[s.id] = nSc[s.id]; });
                 return { staff: finalStaff, sched: finalSc, cnt: cnt };
             }
-            catch (e) { return null; /* 離線或讀取失敗 → 沿用本機快取 */ }
+            catch (e) { return null; /* 解析失敗 → 沿用本機快取 */ }
+        };
+        const 抓班表_ = async (shKey, baseStaff, baseSched) => {
+            if (!asUrl) return null;
+            try {
+                const res = await fetch(asUrl + '?action=getSchedule&shift=' + shKey);
+                const d = await res.json();
+                return 解析班表回應_(shKey, d, baseStaff, baseSched);
+            } catch (e) { return null; /* 離線或讀取失敗 → 沿用本機快取 */ }
+        };
+        /* 2026-08-31：案場班表一次查完（GAS action=getScheduleMerged，只讀
+           Supabase），取代原本分兩次呼叫 抓班表_('night')/抓班表_('morning')。
+           失敗（例如凹子底沙盒還沒部署這個 action、或 Supabase 兩班都沒有線上
+           版本）就回傳 null，呼叫端會自動退回原本分兩次查的路徑，不影響原有行為。
+           console.log 印查詢耗時，方便跟舊的兩次查詢比較實測差異。 */
+        const 抓案場班表合併_ = async () => {
+            if (!asUrl) return null;
+            try {
+                const t0 = performance.now();
+                const res = await fetch(asUrl + '?action=getScheduleMerged');
+                const d = await res.json();
+                const ms = Math.round(performance.now() - t0);
+                if (!d.success) { console.log('[案場班表] 合併查詢失敗（' + ms + 'ms）：' + (d.error || '未知原因')); return null; }
+                const 夜 = d.night ? 解析班表回應_('night', { success: true, ym: d.night.ym, rows: d.night.rows }, [], {}) : null;
+                const 早 = d.morning ? 解析班表回應_('morning', { success: true, ym: d.morning.ym, rows: d.morning.rows }, [], {}) : null;
+                console.log('[案場班表] 合併查詢耗時 ' + ms + 'ms（一次來回，取代原本兩次呼叫）');
+                return { 夜, 早 };
+            } catch (e) { console.log('[案場班表] 合併查詢例外：' + e.message); return null; }
         };
         /* 套用到畫面：抓班表_ 的結果直接進 state。回傳筆數（0＝沒套用，沿用本機快取）。 */
         const loadFromCloud = async (shiftArg, baseStaff, baseSched) => {
@@ -1298,7 +1325,10 @@ function ok(obj) {
         useEffect(() => {
             (async () => {
                 await loadStaffEmpIds_(); // 先載入工號對照表，抓班表_ 組staff時才查得到empId
-                const [夜, 早] = await Promise.all([抓班表_('night', [], {}), 抓班表_('morning', [], {})]);
+                const 合併結果 = await 抓案場班表合併_();
+                const [夜, 早] = 合併結果
+                    ? [合併結果.夜, 合併結果.早]
+                    : await Promise.all([抓班表_('night', [], {}), 抓班表_('morning', [], {})]);
                 const ym = `${Y}-${M}`;
                 try {
                     if (夜) localStorage.setItem(SHED_CACHE_KEYS.night, JSON.stringify({ ym: ym, staff: 夜.staff, sched: 夜.sched }));

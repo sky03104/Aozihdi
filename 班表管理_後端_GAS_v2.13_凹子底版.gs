@@ -160,6 +160,11 @@ function doGet(e) {
     // 跟讀哪個資料庫無關，加一層1小時短時間快取緩解（getScheduleData_含快取
     // 定義於 班表管理_SQL讀取層_凹子底版.gs）。
     return getScheduleData_含快取(e);
+  } else if (action === 'getScheduleMerged') {
+    // v2.17：案場班表（早+晚合併）一次查完，取代前端原本分兩次呼叫
+    // getSchedule 再自己合併的做法，省一次網路來回。只讀 Supabase，沒有
+    // Sheets 備援；前端呼叫失敗會自動退回原本的兩次呼叫路徑。
+    return getScheduleMerged_含快取(e);
   } else if (action === 'getScheduleByMonth') {
     return 讀取含備援_(e, getScheduleByMonth_SQL, getScheduleByMonth_, 'getScheduleByMonth');   // v2.13：指定月份（含歷史備份），請款工具用
   } else if (action === 'listScheduleMonths') {
