@@ -156,26 +156,50 @@ function listScheduleMonths_SQL(e) {
 
 // ============================
 // v2.17：案場班表（早+晚合併）——新增一次查完兩班的 action，取代前端原本
-// 分兩次呼叫 getSchedule（night/morning）再自己合併的做法，省一次網路來回。
+// 分兩次呼叫 getSchedule（night/morning）再自己合併的做法。
 // 只查 Supabase，不做 Sheets 備援（備援交給前端：這支失敗就沿用舊的兩次
 // 呼叫路徑，兩條路並存方便實測比較，不是取代關係）。
+//
+// v2.17.1 效能修正：第一版寫成「查完晚班兩段、再查早班兩段」共4次序列
+// Supabase 請求，實測 1815ms，比舊做法（瀏覽器 Promise.all 平行發兩個
+// GAS 請求，兩邊網路來回重疊）還慢——GAS 是單執行緒，函式內部依序呼叫
+// UrlFetchApp 完全無法平行，4次序列請求時間會疊加。改成用 PostgREST 的
+// in.() 篩選，版本查詢＋明細查詢各自合併成「一次查兩班」，Supabase 請求
+// 總數從4次降到2次，跟原本單班兩次呼叫的請求數一樣，但一次拿到兩班資料。
 // ============================
 function getScheduleMerged_SQL(e) {
   try {
-    var out = { night: null, morning: null };
-    ['night', 'morning'].forEach(function (shiftKey) {
-      var shiftTypeForDb = SHIFT_TYPE_MAP_[shiftKey];
-      var versions = supabaseRequest_('GET',
-        '/rest/v1/schedule_versions?shift_type=eq.' + shiftTypeForDb + '&status=eq.live');
-      if (versions && versions.length > 0) {
-        var v = versions[0];
-        var entries = 抓版本明細_(v.id);
-        out[shiftKey] = { ym: v.year_month.replace('-', '/'), rows: 重組Rows_(entries) };
-      }
-    });
-    if (!out.night && !out.morning) {
+    var nightType = SHIFT_TYPE_MAP_.night;
+    var morningType = SHIFT_TYPE_MAP_.morning;
+
+    // 第1次請求：早晚兩班的線上版本一次查
+    var versions = supabaseRequest_('GET',
+      '/rest/v1/schedule_versions?shift_type=in.(' + nightType + ',' + morningType + ')&status=eq.live');
+    var vByType = {};
+    (versions || []).forEach(function (v) { vByType[v.shift_type] = v; });
+
+    var nightV = vByType[nightType];
+    var morningV = vByType[morningType];
+    if (!nightV && !morningV) {
       return respond({ success: false, error: 'Supabase 找不到早班或晚班的線上版本' });
     }
+
+    // 第2次請求：兩個版本的明細一次查（version_id in.()），沒有的那班id列表就留空
+    var ids = [nightV, morningV].filter(Boolean).map(function (v) { return v.id; });
+    var allEntries = ids.length
+      ? supabaseRequest_('GET', '/rest/v1/schedule_entries?version_id=in.(' + ids.join(',') + ')&order=row_index.asc,day_of_month.asc')
+      : [];
+
+    var out = { night: null, morning: null };
+    if (nightV) {
+      var nightEntries = allEntries.filter(function (r) { return r.version_id === nightV.id; });
+      out.night = { ym: nightV.year_month.replace('-', '/'), rows: 重組Rows_(nightEntries) };
+    }
+    if (morningV) {
+      var morningEntries = allEntries.filter(function (r) { return r.version_id === morningV.id; });
+      out.morning = { ym: morningV.year_month.replace('-', '/'), rows: 重組Rows_(morningEntries) };
+    }
+
     return respond({ success: true, night: out.night, morning: out.morning });
   } catch (err) {
     return respond({ success: false, error: err.message });
