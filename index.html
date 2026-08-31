@@ -1003,7 +1003,7 @@ function ok(obj) {
         const [stMod, setStMod] = useState(null);
         const [stFrm, setStFrm] = useState({ name: "", role: "staff", shift: "晚班", empId: "" });
         const [cfm, setCfm] = useState(null);
-        const [asUrl, setAsUrl] = useState("https://script.google.com/macros/s/AKfycbzs56InZLeaHiRJhy1alNfQwDyH0mXEV9t_WJxzfjTjIhf68DHgMiWVQvVG6vKrRZ2x1w/exec");
+        const [asUrl, setAsUrl] = useState("https://script.google.com/macros/s/AKfycbyNY6_VfxQa7mqztDCfHTw46q0QIvmRYE4IQIpCSJttXBnOkdPCuJrTX2xSJomxcwRd/exec"); // 2026-08-31：改指向凹子底沙盒版 班表管理_後端_GAS_v2.13_凹子底版（原本寫死巨蛋正式站網址，同一種踩坑：這個網址是ScheduleApp元件自己獨立的useState預設值，跟tool_upload.html的SCH_WEBAPP_URL完全無關）
         const [syncS, setSyncS] = useState("idle");
         const [toast, setToast] = useState(null);
         const [drag, setDrag] = useState(false);
