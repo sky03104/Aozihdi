@@ -3234,6 +3234,7 @@ function App() {
     // ★ 用 getUserDB（含停用帳號）：getApprovedUsers 會把 inactive 濾掉，
     //   會導致手機端拿不到「已停用」狀態、停用的人照樣登入。
     useEffect(() => {
+        if (!currentUser) return; // 2026-08-31：改成登入完成後才查，避免匿名身分被RLS擋成0筆且不會重查
         (async () => {
             try {
                 const { data, error } = await sb.from('profiles').select('emp_id,display_name,role,dept,status,shift');
@@ -3260,7 +3261,7 @@ function App() {
             }
             catch (e) { /* 離線時略過，沿用本機快取 */ }
         })();
-    }, []);
+    }, [currentUser]);
     // 停用帳號即時登出：雲端同步回來發現「目前登入者」已被停用 → 強制登出並清除登入態
     useEffect(() => {
         if (!currentUser) return;
