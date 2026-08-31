@@ -107,8 +107,9 @@ function backUrl(){ return 'index.html?empId=' + encodeURIComponent(EMP_ID); }
 /* ══════════════════════ GAS 連線設定 ══════════════════════ */
 // 部署後把 /exec 網址填在這裡（見 哨表產生_GAS_部署說明.md）
 const GUARD_GEN_GAS_URL = 'https://script.google.com/macros/s/AKfycbysR6FRDALHSAuE3u9-OWTwVoEzpzwOfD6tFIASzCKmQp40KUsDxoTCLy4fdacBtne-/exec'; // 2026-08-30：改指向凹子底沙盒版 哨表產生_GAS_凹子底版
-// 哨表上傳走既有「哨表上傳_GAS_v6.gs」，沿用 tool_upload.html 已部署好的網址
-const GD_UPLOAD_GAS_URL = 'https://script.google.com/macros/s/AKfycbwl9hcbbuKBHWmleftzbbaiUihhsHVK4H0dKMd-LrCQwRE3aUPpIHlwWLcGZbhqugp_gg/exec';
+// 哨表上傳走「哨表上傳_GAS_v6_凹子底版.gs」，跟 tool_upload.html 用同一支沙盒部署
+// 2026-08-31：待咖哩部署後回填新網址（原本寫死巨蛋正式站網址）
+const GD_UPLOAD_GAS_URL = '';
 
 async function callGuardGas(action, data) {
   try {
@@ -955,6 +956,7 @@ function GenerateTab({ postConfig }) {
 
   async function handleUpload() {
     if (!result) return;
+    if (!GD_UPLOAD_GAS_URL) { showToast('尚未設定哨表上傳網址，請聯絡管理員部署 GAS', 'err'); return; }
     setUploading(true);
     const r = await fetch(GD_UPLOAD_GAS_URL, {
       method: 'POST',

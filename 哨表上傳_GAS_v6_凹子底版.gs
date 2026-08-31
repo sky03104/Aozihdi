@@ -1,10 +1,12 @@
 // ================================================================
-// 天鷹保全 哨表上傳工具 - Google Apps Script v6
-// 目標試算表 ID：1sIcdAhw0mz5iM3F5fulDNPOda2pv-t7xUhT6XXf9X7Q
+// 天鷹保全 哨表上傳工具 - Google Apps Script v6【凹子底沙盒版】
+// 目標試算表 ID：1Nnnsy41rsXFORNoh_MUPvob2gWUC5s0EeBCzy372Fbg（哨表_凹子底沙盒，
+// 複製自巨蛋正式站，避免這支沙盒部署寫壞巨蛋正式哨表試算表）
 // 部署：執行身分=我、存取=所有人（不需要 Drive API）
+// ⚠️ 這是凹子底沙盒獨立部署，絕不能覆蓋巨蛋正式站既有部署
 // ================================================================
 
-var GUARD_SS_ID = '1sIcdAhw0mz5iM3F5fulDNPOda2pv-t7xUhT6XXf9X7Q';
+var GUARD_SS_ID = '1Nnnsy41rsXFORNoh_MUPvob2gWUC5s0EeBCzy372Fbg';
 var HOLIDAY_API = 'https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/';
 var HISTORY_SHEET_NAME = '歷史哨表';
 // 早/晚班完整哨位表格只到 N 欄（第14欄）；P欄以後是使用者自己在來源
