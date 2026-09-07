@@ -42,7 +42,9 @@
 //     buildWeekScheduleFlex_ / buildMonthScheduleText_ / handleScheduleQuery_ 今日明日跨月判斷
 // ════════════════════════════════════════════════════════════
 
-var SHEET_ID = "1oZsn8WlJ_-qQ6k9tIzm6Ymp3Zp-IfBFCf80Ut7Zw_JU";
+// 2026-09-07：改指向凹子底沙盒版主試算表（複製自巨蛋正式站），避免這支沙盒
+// 部署寫壞巨蛋正式資料——之前漏改，導致凹子底新增的公告直接寫進巨蛋正式公告欄。
+var SHEET_ID = "1x3UQDTJWQ14vN1au7NQAEa_mTYV97elGPiO5R2z2GoQ";
 
 function ss_() {
   return SpreadsheetApp.openById(SHEET_ID);
@@ -54,25 +56,27 @@ function getDaysInMonth_(year, month) {
   return new Date(year, month, 0).getDate();
 }
 
+// 2026-09-07：改指向凹子底沙盒版早/晚班試算表（跟班表管理_後端_GAS_凹子底版共用同一份沙盒複本）
 var SCHEDULE_SHEETS_ = {
-  early: { id: "1l8SoOVDQ4nO6qBkXcNEaBzct6AN82-H_0njbKNQauUQ", sheetName: "早班班表", label: "早班" },
-  late:  { id: "1hIbgESfLitqC3W9DuSFGMWEuFZKJFKzK8srorQMuia8", sheetName: "晚班班表", label: "晚班" }
+  early: { id: "1SKEe-VoNBZnZj2wTI8BmKq5HMtKagV6GKdiTPZig3ks", sheetName: "早班班表", label: "早班" },
+  late:  { id: "133R-RCM1iO74Ty01osbW873YFzBFJJV14ITMdBesyQs", sheetName: "晚班班表", label: "晚班" }
 };
 
 // ── 公告欄同步用常數 ──
 var ANN_SHEET_NAME = "公告欄";
-var ANN_FOLDER_ID  = "1K_RRPUjcWrdNAS2ppcx6OFDtlkfSfAl3"; // 公告圖片存放的 Drive 資料夾
+var ANN_FOLDER_ID  = "1If2KQxqH-2ZYm_bENpgY64-7glDyEYMV"; // 2026-09-07：凹子底沙盒版公告圖片資料夾（原本共用巨蛋正式站資料夾）
 var ANN_MAX_IMAGES = 3;
 
 // ── 宣導事項同步用常數（獨立試算表，非公告欄）──
-// 試算表：宣導事項＆教育訓練 https://docs.google.com/spreadsheets/d/1AXhSEsR8ubdVdu8qgIJmQv7QnBJyYKBpkWQJQzoHD1I
-var DIRECTIVE_SHEET_ID   = "1AXhSEsR8ubdVdu8qgIJmQv7QnBJyYKBpkWQJQzoHD1I";
+// 2026-09-07：改指向凹子底沙盒版（複製自巨蛋正式站）
+var DIRECTIVE_SHEET_ID   = "1CD0DzmP1ragLdstZO1ZjU4GjNq3yel6Zk0R6TAmNMm4";
 var DIRECTIVE_SHEET_NAME = "宣導事項";
 var DIRECTIVE_MAX_IMAGES = 10;
 var DIRECTIVE_FOLDER_ID  = ANN_FOLDER_ID; // 宣導圖片沿用公告的 Drive 資料夾，如需分開存放可換成獨立資料夾 ID
 
 // ── 明日哨點推播用常數 ──
-var POST_SHEET_ID   = "1sIcdAhw0mz5iM3F5fulDNPOda2pv-t7xUhT6XXf9X7Q"; // 每日哨表試算表
+// 2026-09-07：改指向凹子底沙盒版哨表試算表（跟哨表上傳_GAS_v6_凹子底版共用同一份沙盒複本）
+var POST_SHEET_ID   = "1Nnnsy41rsXFORNoh_MUPvob2gWUC5s0EeBCzy372Fbg"; // 每日哨表試算表
 var POST_SHEET_NAME = "明日哨表";
 var POST_PAGE_URL   = "https://sky03104.github.io/tianying-security/post.html"; // 整張明日哨表瀏覽頁
 var POST_HISTORY_SHEET_NAME = "歷史哨表"; // 結構化哨表，用於補回視覺表解析不到的哨位
