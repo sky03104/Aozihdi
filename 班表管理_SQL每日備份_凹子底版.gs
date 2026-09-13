@@ -23,17 +23,43 @@ function 取得備份資料夾_() {
 }
 
 // ============================
+// 分頁抓取（Supabase 單次 GET 預設最多回 1000 筆）
+// ────────────────────────────────────────────────────────────
+// ⚠️ 不分頁抓的話備份會「悄悄」漏資料——回傳 200、程式不報錯，就是少了幾筆，
+//    平常完全看不出來，等哪天真的要拿備份還原才會發現。施工單那支就實測踩過
+//    （4302筆只抓到1000筆）。班表目前一個月頂多 30人×31天=930筆還在安全線內，
+//    但人數變多或一次備份多個版本就會超過，所以比照辦理先補上。
+//    用 limit+offset 一頁一頁抓，抓到「不滿一頁」為止就是抓完了。
+// ============================
+function supabase分頁抓全部_班表_(path) {
+  var all = [];
+  var pageSize = 1000;
+  var offset = 0;
+  while (true) {
+    var sep = path.indexOf('?') === -1 ? '?' : '&';
+    var page = supabaseRequest_('GET', path + sep + 'limit=' + pageSize + '&offset=' + offset);
+    if (!page || !page.length) break;
+    all = all.concat(page);
+    if (page.length < pageSize) break;
+    offset += pageSize;
+  }
+  return all;
+}
+
+// ============================
 // 主流程：把 Supabase 全部資料匯出成一個 JSON 檔存進 Drive
 // ============================
 function 每日備份Supabase到雲端硬碟() {
   try {
-    var versions = supabaseRequest_('GET', '/rest/v1/schedule_versions?select=*');
+    var versions = supabase分頁抓全部_班表_('/rest/v1/schedule_versions?select=*&order=id.asc');
     var payload = { 匯出時間: new Date().toISOString(), versions: [] };
+    var 明細總數 = 0;
 
     for (var i = 0; i < versions.length; i++) {
       var v = versions[i];
-      var entries = supabaseRequest_('GET',
+      var entries = supabase分頁抓全部_班表_(
         '/rest/v1/schedule_entries?version_id=eq.' + v.id + '&order=row_index.asc,day_of_month.asc');
+      明細總數 += entries.length;
       payload.versions.push({ version: v, entries: entries });
     }
 
@@ -47,7 +73,7 @@ function 每日備份Supabase到雲端硬碟() {
     folder.createFile(檔名, JSON.stringify(payload), MimeType.PLAIN_TEXT);
 
     清除過期備份_(folder);
-    console.log('每日備份完成：' + 檔名 + '，共 ' + versions.length + ' 個版本');
+    console.log('每日備份完成：' + 檔名 + '，共 ' + versions.length + ' 個版本、' + 明細總數 + ' 筆明細');
   } catch (err) {
     // 備份失敗不能是靜默的，一定要留紀錄，之後才查得到到底是哪天開始壞的
     console.error('每日備份Supabase失敗：' + err.toString());
